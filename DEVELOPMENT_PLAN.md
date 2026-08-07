@@ -1,0 +1,445 @@
+# DEVELOPMENT_PLAN.md
+
+# Visitor Management System — Development Plan
+
+## Development Philosophy
+
+The project is implemented incrementally.
+
+Each phase must be:
+
+1. implemented,
+2. reviewed,
+3. corrected if necessary,
+4. explicitly approved,
+
+before the next phase begins.
+
+Do not implement future phases proactively.
+
+The initial focus is UI so stakeholders can review the product early.
+
+The frontend built in these phases is production-oriented and will be retained.
+
+Mock data must be provided through replaceable service boundaries.
+
+---
+
+# Track A — UI / UX First
+
+## Phase 0 — Frontend Foundation
+
+Goal:
+
+Create the minimum foundation needed for production-oriented UI development.
+
+Required stack:
+
+- React
+- TypeScript
+- Vite
+- Tailwind CSS
+- shadcn/ui
+
+Add supporting dependencies only when needed by the current work.
+
+Includes:
+
+- Vite React TypeScript project if repository is empty,
+- Tailwind setup,
+- shadcn/ui setup,
+- routing foundation,
+- global design tokens/styles,
+- shared UI primitives,
+- feature/domain folder structure,
+- centralized domain types,
+- replaceable mock service layer,
+- lightweight development-only role/context simulation where needed.
+
+Does not include:
+
+- backend,
+- database,
+- real authentication,
+- Active Directory,
+- real email,
+- QR generation,
+- persistent storage.
+
+Acceptance:
+
+- application runs,
+- architecture is ready for modular UI work,
+- mock services are replaceable,
+- no future business modules are prematurely implemented.
+
+Phase 0 may be implemented as part of Phase 1 when starting from an empty repository.
+
+---
+
+## Phase 1 — Application Shell + Employee UI
+
+Goal:
+
+Produce the first stakeholder-demoable interface.
+
+Includes:
+
+- internal application shell,
+- compact collapsible sidebar,
+- compact top bar,
+- employee role navigation,
+- company/facility context placeholder,
+- Employee / My Visits dashboard,
+- Day / Week / Month visit timeline,
+- upcoming visits list,
+- visit status visuals,
+- New Visit UI,
+- Edit Visit UI,
+- Reschedule UI,
+- Cancel Visit UI,
+- mock state and mock service interactions.
+
+Timeline:
+
+- should be visit-specific and Gantt-like,
+- should initially be custom-built using React/CSS layout,
+- should not introduce a heavy Gantt dependency.
+
+Forms:
+
+- use React Hook Form + Zod when appropriate.
+
+Dates:
+
+- use date-fns.
+
+Important:
+
+- cancelled visits remain visible,
+- no backend,
+- no real email,
+- no real QR,
+- no real authentication.
+
+Acceptance:
+
+- employee can navigate the interface,
+- employee can create/edit/reschedule/cancel visits using mock state,
+- timeline displays visits clearly,
+- UI matches `UI_SPEC.md`,
+- build/typecheck/lint succeed where configured,
+- interface is ready for management review.
+
+Stop after Phase 1 and request review.
+
+---
+
+## Phase 2 — Security UI
+
+Includes:
+
+- Security dashboard,
+- Expected / Inside / Overdue / Completed tabs,
+- visitor/QR search UI,
+- unplanned visitor UI,
+- visitor right-side drawer,
+- editable permitted visitor fields,
+- visitor card selection,
+- mock Check In,
+- mock Check Out,
+- Card Returned / Not Returned flow,
+- overdue persistent alert simulation.
+
+Use TanStack Table if the visitor table requires sorting/filtering/column behavior that justifies it.
+
+No real persistence or QR scanning is required yet.
+
+Acceptance:
+
+- key security workflows can be demonstrated end-to-end using mock services.
+
+Stop and request review.
+
+---
+
+## Phase 3 — Visitor Pre-registration UI
+
+Includes:
+
+- public/mobile-first invitation page,
+- visit summary,
+- visitor information completion,
+- vehicle yes/no,
+- conditional plate field,
+- rules display,
+- explicit rule acceptance,
+- confirmation screen,
+- mock QR representation.
+
+No real email or backend token validation yet.
+
+Acceptance:
+
+- pre-registration flow is fully demonstrable on desktop and mobile.
+
+Stop and request review.
+
+---
+
+## Phase 4 — Goods Delivery UI
+
+Includes:
+
+- employee goods-delivery creation,
+- expected delivery list,
+- security delivery view,
+- Expected / Arrived / Completed status,
+- gate-only vs facility-entry indication,
+- mock arrival/departure operations.
+
+Acceptance:
+
+- after-hours delivery workflow is demonstrable.
+
+Stop and request review.
+
+---
+
+## Phase 5 — Manager and Reports UI
+
+Includes:
+
+- manager dashboard,
+- initial KPI cards,
+- report filter bar,
+- report table,
+- Excel/PDF buttons as UI actions,
+- multi-company/facility context using mock data,
+- at most a small number of useful charts.
+
+Recharts may be added only if actual stakeholder-reviewed charts are needed.
+
+Acceptance:
+
+- managers can navigate overview and reporting using mock data.
+
+Stop and request review.
+
+---
+
+## Phase 6 — Admin UI
+
+Includes:
+
+- Users
+- Companies
+- Facilities
+- Security Gates
+- Visit Types
+- Visitor Cards
+- Visitor Rule Versions
+- System Settings
+
+Settings include:
+
+- overdue tolerance,
+- overdue alert repeat interval.
+
+Acceptance:
+
+- all configuration modules use a consistent management pattern.
+
+Stop and request review.
+
+---
+
+## Phase 7 — UI Review and Freeze
+
+Goal:
+
+Review the entire frontend with stakeholders before backend implementation.
+
+Activities:
+
+- remove unnecessary screens,
+- adjust fields,
+- validate role workflows,
+- validate multi-company/facility navigation,
+- validate security speed/clarity,
+- validate mobile pre-registration,
+- normalize visual inconsistencies,
+- confirm responsive behavior,
+- confirm final screen inventory.
+
+Output:
+
+- approved frontend flows,
+- approved screen inventory,
+- approved field inventory,
+- approved interaction model.
+
+No production backend implementation begins until this phase is approved.
+
+---
+
+# Track B — Functional Implementation
+
+## Phase 8 — Backend Foundation + Authentication and Users
+
+Intended stack:
+
+- ASP.NET Core Web API
+- Microsoft SQL Server
+
+Includes:
+
+- backend solution foundation,
+- database foundation and migrations,
+- user persistence,
+- local authentication,
+- role enforcement,
+- Active Directory integration foundation,
+- user-to-company/department relationships.
+
+At this point TanStack Query may be introduced on the frontend if useful for real server-state management.
+
+---
+
+## Phase 9 — Organization Module
+
+Includes persistence and APIs for:
+
+- companies,
+- facilities,
+- security gates,
+- departments as required,
+- cross-company visit targeting,
+- facility permissions/context.
+
+---
+
+## Phase 10 — Visitor and Visit Backend
+
+Includes:
+
+- Visitor entity,
+- Visit entity,
+- visit statuses,
+- planned visit creation,
+- reschedule,
+- cancellation,
+- returning visitor lookup,
+- host relationship,
+- planned time validation,
+- no-show logic.
+
+---
+
+## Phase 11 — Security Check-in / Check-out and Card Backend
+
+Includes:
+
+- card inventory,
+- card state rules,
+- check-in,
+- check-out,
+- card return,
+- card not returned,
+- inside visitor queries,
+- security corrections.
+
+---
+
+## Phase 12 — Rules and Pre-registration Backend
+
+Includes:
+
+- invitation token,
+- visitor public form,
+- rule versions,
+- immutable acceptance records,
+- visitor information update,
+- visit lookup via token,
+- QR token generation/validation.
+
+---
+
+## Phase 13 — Email Notifications
+
+Includes:
+
+- invitation email,
+- visitor check-in email to host.
+
+Does not include host overdue email.
+
+---
+
+## Phase 14 — Overdue Monitoring
+
+Includes:
+
+- overdue calculation,
+- configurable tolerance,
+- configurable alert repeat interval,
+- security alert delivery logic,
+- no-show distinction.
+
+---
+
+## Phase 15 — Goods Delivery Backend
+
+Includes:
+
+- expected deliveries,
+- actual arrival,
+- actual departure,
+- delivery statuses,
+- gate-only/facility-entry handling,
+- optional visitor relationship when driver enters facility.
+
+---
+
+## Phase 16 — Reporting and Export
+
+Includes:
+
+- reporting queries,
+- filters,
+- Excel export,
+- PDF export,
+- multi-company/facility filtering.
+
+---
+
+## Phase 17 — Hardening and Validation
+
+Includes:
+
+- authorization review,
+- input validation,
+- security review,
+- error handling,
+- logging,
+- performance review,
+- accessibility review,
+- migration/seed strategy,
+- stakeholder acceptance testing.
+
+---
+
+# Phase Control Rule
+
+Codex must not start a future phase unless explicitly requested.
+
+When a phase is completed, Codex must stop and report:
+
+- what was implemented,
+- files changed,
+- key decisions,
+- known limitations,
+- items requiring review,
+- tests/checks performed.
+
+No "while I was here" implementation of future phases.
