@@ -1,4 +1,4 @@
-import { Building2, CalendarClock, Mail, MapPin, Pencil, UserRound } from "lucide-react"
+import { Building2, CalendarClock, Mail, MapPin, Pencil, UserRound, XCircle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -12,9 +12,10 @@ interface Props {
   onOpenChange(open: boolean): void
   onEdit(visit: Visit): void
   onReschedule(visit: Visit): void
+  onCancel(visit: Visit): void
 }
 
-export function VisitDetailsDialog({ visit, open, onOpenChange, onEdit, onReschedule }: Props) {
+export function VisitDetailsDialog({ visit, open, onOpenChange, onEdit, onReschedule, onCancel }: Props) {
   if (!visit) return null
 
   const openAction = (action: (visit: Visit) => void) => {
@@ -43,15 +44,13 @@ export function VisitDetailsDialog({ visit, open, onOpenChange, onEdit, onResche
           {visit.note && <Detail icon={Pencil} label="Not / Açıklama" value={visit.note} className="sm:col-span-2" />}
         </dl>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Kapat</Button>
-          {visit.status === "PLANNED" && (
-            <>
-              <Button variant="outline" onClick={() => openAction(onReschedule)}><CalendarClock />Ertele</Button>
-              <Button onClick={() => openAction(onEdit)}><Pencil />Düzenle</Button>
-            </>
-          )}
-        </DialogFooter>
+        {visit.status === "PLANNED" && (
+          <DialogFooter>
+            <Button variant="outline" className="border-red-200 text-destructive hover:bg-red-50 hover:text-destructive" onClick={() => openAction(onCancel)}><XCircle />İptal Et</Button>
+            <Button variant="outline" onClick={() => openAction(onReschedule)}><CalendarClock />Ertele</Button>
+            <Button onClick={() => openAction(onEdit)}><Pencil />Düzenle</Button>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   )

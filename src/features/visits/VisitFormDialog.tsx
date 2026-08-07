@@ -100,9 +100,7 @@ export function VisitFormDialog({ open, onOpenChange, visit, onSaved }: VisitFor
       <DialogContent className="max-w-2xl gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b px-5 py-4 pr-12">
           <DialogTitle>{visit ? "Ziyareti Düzenle" : "Yeni Ziyaret"}</DialogTitle>
-          <DialogDescription>
-            {visit ? "Davet ve planlama bilgilerini güncelleyin." : "Planlı bir ziyaret oluşturun ve ziyaretçi davetini hazırlayın."}
-          </DialogDescription>
+          {visit && <DialogDescription>Davet ve planlama bilgilerini güncelleyin.</DialogDescription>}
         </DialogHeader>
 
         <form onSubmit={onSubmit} className="flex min-h-0 flex-col" noValidate>
@@ -184,7 +182,6 @@ export function VisitFormDialog({ open, onOpenChange, visit, onSaved }: VisitFor
           </div>
 
           <DialogFooter className="border-t bg-card px-5 py-3">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Vazgeç</Button>
             <Button type="submit" disabled={form.formState.isSubmitting}>
               <Send />
               {form.formState.isSubmitting ? "Kaydediliyor…" : visit ? "Değişiklikleri Kaydet" : "Daveti Gönder"}

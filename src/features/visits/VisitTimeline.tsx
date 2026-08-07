@@ -140,7 +140,7 @@ function LaneTimeline({ visits, selectedDate, view, now, onVisitOpen }: { visits
     return (
       <div
         className="grid grid-cols-[52px_minmax(0,1fr)] border-b"
-        style={{ height: "clamp(450px, calc(100vh - 250px), 612px)" }}
+        style={{ height: "clamp(472px, calc(100vh - 228px), 632px)" }}
       >
         <div className="relative border-r bg-slate-50/70" aria-hidden="true">
           {hours.map((hour, index) => (
@@ -178,14 +178,14 @@ function LaneTimeline({ visits, selectedDate, view, now, onVisitOpen }: { visits
   })
 
   return (
-    <div className="w-full">
+    <div className="flex w-full flex-col" style={{ height: "clamp(472px, calc(100vh - 228px), 632px)" }}>
       <TimeHeader hours={hours} label="Gün" />
-      <div className="divide-y">
+      <div className="scrollbar-thin flex min-h-0 flex-1 flex-col divide-y overflow-y-auto">
         {days.map((day) => {
           const dayVisits = visits.filter((visit) => isSameDay(new Date(visit.plannedStart), day))
-          const height = Math.max(44, dayVisits.length * 33 + 8)
+          const height = Math.max(56, dayVisits.length * 33 + 8)
           return (
-            <div key={day.toISOString()} className="grid grid-cols-[112px_minmax(0,1fr)]">
+            <div key={day.toISOString()} className="grid grid-cols-[112px_minmax(0,1fr)]" style={{ minHeight: height }}>
               <div className={cn("border-r px-2.5 py-2.5", isSameDay(day, new Date()) && "bg-blue-50/60")}>
                 <p className="truncate text-[13px] font-semibold">{formatTr(day, "EEEE")}</p>
                 <p className="mt-0.5 truncate text-xs text-muted-foreground">{formatTr(day, "d MMMM")}</p>
@@ -441,23 +441,24 @@ function MonthTimeline({ visits, selectedDate, onVisitOpen }: { visits: Visit[];
     end: endOfWeek(endOfMonth(selectedDate), { weekStartsOn: 1 }),
   }
   const days = eachDayOfInterval(interval)
+  const weekCount = days.length / 7
 
   return (
-    <div className="overflow-x-auto scrollbar-thin">
-      <div className="min-w-[760px]">
+    <div className="overflow-x-auto scrollbar-thin" style={{ height: "clamp(472px, calc(100vh - 228px), 632px)" }}>
+      <div className="flex h-full min-w-[760px] flex-col">
         <div className="grid grid-cols-7 border-b bg-slate-50/80">
           {["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"].map((day) => (
             <div key={day} className="border-r px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground last:border-r-0">{day}</div>
           ))}
         </div>
-        <div className="grid grid-cols-7">
+        <div className="grid flex-1 grid-cols-7" style={{ gridTemplateRows: `repeat(${weekCount}, minmax(0, 1fr))` }}>
           {days.map((day) => {
             const dayVisits = visits.filter((visit) => isSameDay(new Date(visit.plannedStart), day))
             return (
               <div
                 key={day.toISOString()}
                 className={cn(
-                  "h-[100px] overflow-hidden border-b border-r p-1.5 last:border-r-0",
+                  "min-h-0 overflow-hidden border-b border-r p-1.5 last:border-r-0",
                   !isSameMonth(day, selectedDate) && "bg-slate-50/70 text-muted-foreground",
                 )}
               >

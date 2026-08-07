@@ -11,7 +11,7 @@ import { VisitTimeline, type TimelineView } from "@/features/visits/VisitTimelin
 import { useVisits } from "@/features/visits/visit-context"
 
 export function MyVisitsPage() {
-  const { visits, isLoading, error } = useVisits()
+  const { visits, referenceData, isLoading, error } = useVisits()
   const [view, setView] = useState<TimelineView>("week")
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [formOpen, setFormOpen] = useState(false)
@@ -40,7 +40,7 @@ export function MyVisitsPage() {
   if (isLoading) return <PageSkeleton />
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {error && (
         <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
           <Info className="size-4" />{error}
@@ -54,7 +54,7 @@ export function MyVisitsPage() {
         </div>
       )}
 
-      <div className="grid items-start gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="mt-2 grid items-start gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
         <VisitTimeline
           visits={visits}
           view={view}
@@ -64,7 +64,7 @@ export function MyVisitsPage() {
           onVisitOpen={setViewingVisit}
           onNewVisit={openNewVisit}
         />
-        <UpcomingVisits visits={visits} onView={setViewingVisit} onEdit={openEdit} onReschedule={setReschedulingVisit} onCancel={setCancellingVisit} />
+        <UpcomingVisits visits={visits} onView={setViewingVisit} currentFacilityId={referenceData?.currentEmployee.facilityId} />
       </div>
 
       <VisitDetailsDialog
@@ -73,6 +73,7 @@ export function MyVisitsPage() {
         onOpenChange={(open) => !open && setViewingVisit(null)}
         onEdit={openEdit}
         onReschedule={setReschedulingVisit}
+        onCancel={setCancellingVisit}
       />
       <VisitFormDialog open={formOpen} onOpenChange={setFormOpen} visit={editingVisit} onSaved={setNotice} />
       <RescheduleVisitDialog
