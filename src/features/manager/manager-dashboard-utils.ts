@@ -4,6 +4,8 @@ import type { ExpectedAfterHoursDelivery } from "@/domain/manager-dashboard"
 import type { Visit, VisitStatus } from "@/domain/visits"
 
 export type DashboardScope = { companyId: string; facilityId: string }
+export const dashboardVisitStatuses = ["PLANNED", "LATE", "CHECKED_IN", "OVERDUE", "CHECKED_OUT", "CANCELLED"] as const
+export type DashboardVisitStatus = (typeof dashboardVisitStatuses)[number]
 export type OtherVisitsTab = "planned" | "completed"
 export type TableStatusFilter = "ALL" | VisitStatus
 export type OtherVisitsFilters = { tab: OtherVisitsTab; search: string; status: TableStatusFilter; facilityId: string }
@@ -38,10 +40,24 @@ export function getOperationBins(visits: Visit[], deliveries: ExpectedAfterHours
   })
 }
 
-export function getStatusCounts(visits: Visit[]) {
-  const baseStatuses: VisitStatus[] = ["PLANNED", "CHECKED_IN", "CHECKED_OUT", "CANCELLED"]
-  const statuses = visits.some((visit) => visit.status === "NO_SHOW") ? [...baseStatuses, "NO_SHOW" as const] : baseStatuses
-  return statuses.map((status) => ({ status, value: visits.filter((visit) => visit.status === status).length }))
+export function getDashboardVisitStatus(visit: Visit, now: Date): DashboardVisitStatus | null {
+  if (visit.status === "PLANNED") {
+    return !visit.actualCheckIn && isBefore(new Date(visit.plannedStart), now) ? "LATE" : "PLANNED"
+  }
+
+  if (visit.status === "CHECKED_IN") {
+    return !visit.actualCheckOut && isBefore(new Date(visit.plannedEnd), now) ? "OVERDUE" : "CHECKED_IN"
+  }
+
+  if (visit.status === "CHECKED_OUT" || visit.status === "CANCELLED") return visit.status
+  return null
+}
+
+export function getStatusCounts(visits: Visit[], now: Date) {
+  return dashboardVisitStatuses.map((status) => ({
+    status,
+    value: visits.filter((visit) => getDashboardVisitStatus(visit, now) === status).length,
+  }))
 }
 
 export function getOverdueVisits(visits: Visit[], now: Date) {

@@ -49,4 +49,32 @@
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--border)) transparent;
   }
+
+  .distribution-card {
+    container-type: inline-size;
+    container-name: distribution;
+  }
+
+  .distribution-layout {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .distribution-donut {
+    width: 10.5rem;
+    height: 10.5rem;
+    aspect-ratio: 1 / 1;
+  }
+
+  .distribution-legend {
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.25rem 0.5rem;
+  }
+
+  .distribution-legend-item {
+    gap: 0.5rem;
+    padding: 0.25rem 0.375rem;
+    font-size: 0.875rem;
+  }
 }

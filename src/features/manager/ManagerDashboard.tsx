@@ -5,7 +5,7 @@ import { Link } from "react-router-dom"
 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import type { ExpectedAfterHoursDelivery } from "@/domain/manager-dashboard"
-import type { Visit, VisitStatus } from "@/domain/visits"
+import type { Visit } from "@/domain/visits"
 import { getOperationNowIndicator } from "@/features/manager/manager-clock"
 import { ManagerDashboardFilters } from "@/features/manager/ManagerDashboardFilters"
 import { useManagerRefresh } from "@/features/manager/manager-refresh-context"
@@ -16,18 +16,20 @@ import { formatTr } from "@/lib/date"
 import { cn } from "@/lib/utils"
 import { managerDashboardService } from "@/services"
 import {
+  getDashboardVisitStatus,
   getDelayMinutes,
   getNextPlannedVisits,
   getOperationBins,
   getScopedVisits,
   getStatusCounts,
   getTodayVisits,
+  type DashboardVisitStatus,
 } from "./manager-dashboard-utils"
 
 type SelectionDescriptor =
   | { anchorKey: string; key: string; kind: "hour"; hour: number }
   | { anchorKey: string; key: string; kind: "delivery"; hour: number }
-  | { anchorKey: string; key: string; kind: "status"; status: VisitStatus }
+  | { anchorKey: string; key: string; kind: "status"; status: DashboardVisitStatus }
 
 type SelectionData = {
   title: string
@@ -35,12 +37,13 @@ type SelectionData = {
   deliveries: ExpectedAfterHoursDelivery[]
 }
 
-const statusMeta: { status: VisitStatus; label: string; color: string }[] = [
+const statusMeta: { status: DashboardVisitStatus; label: string; color: string }[] = [
   { status: "PLANNED", label: "Beklenen", color: "#1463eb" },
+  { status: "LATE", label: "Gecikti", color: "#f59e0b" },
   { status: "CHECKED_IN", label: "İçeride", color: "#4caf62" },
+  { status: "OVERDUE", label: "Süre Aşımı", color: "#e11d48" },
   { status: "CHECKED_OUT", label: "Tamamlandı", color: "#8bb8ff" },
   { status: "CANCELLED", label: "İptal", color: "#aeb6c2" },
-  { status: "NO_SHOW", label: "Gelmedi", color: "#f59e0b" },
 ]
 
 export function ManagerDashboard() {
@@ -64,10 +67,10 @@ export function ManagerDashboard() {
     (companyId === "all" || delivery.companyId === companyId) &&
     (facilityId === "all" || delivery.facilityId === facilityId),
   )
-  const counts = getStatusCounts(todayVisits)
+  const counts = getStatusCounts(todayVisits, currentTime)
   const futureVisits = getNextPlannedVisits(todayVisits, now, todayVisits.length)
   const nextVisits = futureVisits.slice(0, 5)
-  const selectionData = selection ? resolveSelection(selection, todayVisits, scopedDeliveries) : null
+  const selectionData = selection ? resolveSelection(selection, todayVisits, scopedDeliveries, currentTime) : null
 
   useEffect(() => {
     if (!selection) return
@@ -119,9 +122,6 @@ export function ManagerDashboard() {
 }
 
 function InsideVisits({ visits, now }: { visits: Visit[]; now: Date }) {
-  const overdueCount = visits.filter((visit) => getDelayMinutes(visit, now) > 0).length
-  const summary = `${visits.length} kişi · ${overdueCount} süre aşımı`
-
   return (
     <section className="h-[340px] overflow-hidden rounded-lg border border-emerald-200 bg-card shadow-panel">
       <div className="flex min-h-12 items-center justify-between gap-3 border-l-[3px] border-emerald-500 bg-emerald-50/35 px-4 py-2.5">
@@ -129,7 +129,6 @@ function InsideVisits({ visits, now }: { visits: Visit[]; now: Date }) {
           <span className="size-3 shrink-0 rounded-full bg-emerald-500" />
           <h2 className="truncate text-lg font-semibold">Şu Anda İçeride</h2>
         </div>
-        <p className="ml-auto shrink-0 text-right text-[13px] font-medium text-slate-600" aria-live="polite">{summary}</p>
       </div>
       {visits.length === 0 ? (
         <p className="px-4 py-7 text-center text-sm text-slate-600">Seçili bağlamda içeride ziyaretçi bulunmuyor.</p>
@@ -285,17 +284,17 @@ function OperationHour({ bin, max, visits, ...interactiveProps }: { bin: ReturnT
   )
 }
 
-function Distribution({ counts, ...interactiveProps }: { counts: { status: VisitStatus; value: number }[] } & InteractiveChartProps) {
+function Distribution({ counts, ...interactiveProps }: { counts: { status: DashboardVisitStatus; value: number }[] } & InteractiveChartProps) {
   const segments = counts.map((count) => ({ ...statusMeta.find((item) => item.status === count.status)!, value: count.value }))
   const total = segments.reduce((sum, item) => sum + item.value, 0)
   const circumference = 2 * Math.PI * 42
   let offset = 0
 
   return (
-    <section className="flex min-h-[340px] flex-col overflow-hidden rounded-lg border bg-card p-4 shadow-panel xl:h-[340px]">
+    <section className="distribution-card flex min-h-[340px] flex-col overflow-hidden rounded-lg border bg-card p-4 shadow-panel xl:h-[340px]">
       <h2 className="text-lg font-semibold">Durum Dağılımı</h2>
-      <div className="mt-1 flex flex-1 flex-col items-center justify-center gap-3 sm:flex-row sm:gap-3 xl:gap-4">
-        <svg viewBox="0 0 100 100" className="size-44 shrink-0 xl:size-56" role="img" aria-label={`Toplam ${total} ziyaret durum dağılımı`}>
+      <div className="distribution-layout mt-1 flex flex-1 flex-row items-center justify-center gap-4">
+        <svg viewBox="0 0 100 100" className="distribution-donut size-52 shrink-0" role="img" aria-label={`Toplam ${total} ziyaret durum dağılımı`}>
           <circle cx="50" cy="50" r="42" fill="none" stroke="#e8edf5" strokeWidth="14" />
           {segments.map((segment) => {
             const length = total ? (segment.value / total) * circumference : 0
@@ -334,7 +333,7 @@ function Distribution({ counts, ...interactiveProps }: { counts: { status: Visit
           <text x="50" y="61" textAnchor="middle" className="pointer-events-none fill-slate-600 text-[8px]">Toplam</text>
         </svg>
 
-        <div className="grid gap-2">
+        <div className="distribution-legend grid gap-2">
           {segments.map((segment) => {
             const descriptor: SelectionDescriptor = {
               anchorKey: `status-legend-${segment.status}`,
@@ -349,7 +348,7 @@ function Distribution({ counts, ...interactiveProps }: { counts: { status: Visit
                   type="button"
                   aria-pressed={selected}
                   className={cn(
-                    "flex w-full items-center justify-between gap-4 rounded px-1.5 py-1.5 text-base text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600",
+                    "distribution-legend-item flex w-full items-center justify-between gap-4 rounded px-1.5 py-1.5 text-base text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600",
                     selected && "bg-blue-50 text-blue-900 ring-1 ring-blue-200",
                   )}
                 >
@@ -471,9 +470,9 @@ function NextVisits({ visits, total, now }: { visits: Visit[]; total: number; no
   )
 }
 
-function resolveSelection(selection: SelectionDescriptor, visits: Visit[], deliveries: ExpectedAfterHoursDelivery[]): SelectionData {
+function resolveSelection(selection: SelectionDescriptor, visits: Visit[], deliveries: ExpectedAfterHoursDelivery[], now: Date): SelectionData {
   if (selection.kind === "status") {
-    const selectedVisits = visits.filter((visit) => visit.status === selection.status)
+    const selectedVisits = visits.filter((visit) => getDashboardVisitStatus(visit, now) === selection.status)
     const label = statusMeta.find((item) => item.status === selection.status)?.label ?? selection.status
     return { title: `${label} · ${selectedVisits.length}`, visits: selectedVisits, deliveries: [] }
   }

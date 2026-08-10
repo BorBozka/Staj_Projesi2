@@ -31,7 +31,7 @@ function defaultsFor(visit?: Visit, referenceData?: VisitReferenceData | null): 
     visitorLastName: visit?.visitor.lastName ?? "",
     visitorEmail: visit?.visitor.email ?? "",
     visitTypeId: visit?.visitTypeId ?? "",
-    hostEmployeeId: visit?.hostEmployeeId ?? currentEmployee?.employeeId ?? "",
+    hostEmployeeName: visit?.hostEmployeeName ?? "",
     hostCompanyId: visit?.hostCompanyId ?? currentEmployee?.companyId ?? "",
     facilityId: visit?.facilityId ?? currentEmployee?.facilityId ?? "",
     visitDate: formatTr(visit ? new Date(visit.plannedStart) : roundedNow, "yyyy-MM-dd"),
@@ -53,7 +53,6 @@ export function VisitFormDialog({ open, onOpenChange, visit, onSaved }: VisitFor
   const [submitError, setSubmitError] = useState<string | null>(null)
   const form = useForm<VisitFormValues>({ resolver: zodResolver(visitFormSchema), defaultValues: defaultsFor(visit, referenceData) })
   const companyId = form.watch("hostCompanyId")
-  const facilityId = form.watch("facilityId")
 
   useEffect(() => {
     if (open) {
@@ -65,13 +64,6 @@ export function VisitFormDialog({ open, onOpenChange, visit, onSaved }: VisitFor
   const facilities = useMemo(
     () => referenceData?.facilities.filter((facility) => facility.companyId === companyId) ?? [],
     [companyId, referenceData],
-  )
-  const employees = useMemo(
-    () =>
-      referenceData?.employees.filter(
-        (employee) => employee.companyId === companyId && (!facilityId || employee.facilityIds.includes(facilityId)),
-      ) ?? [],
-    [companyId, facilityId, referenceData],
   )
 
   const onSubmit = form.handleSubmit(async (values) => {
@@ -134,7 +126,6 @@ export function VisitFormDialog({ open, onOpenChange, visit, onSaved }: VisitFor
                   {...form.register("hostCompanyId", {
                     onChange: () => {
                       form.setValue("facilityId", "")
-                      form.setValue("hostEmployeeId", "")
                     },
                   })}
                 >
@@ -144,18 +135,15 @@ export function VisitFormDialog({ open, onOpenChange, visit, onSaved }: VisitFor
               </FormField>
               <FormField label="Tesis" required error={fieldError("facilityId")}>
                 <Select
-                  {...form.register("facilityId", { onChange: () => form.setValue("hostEmployeeId", "") })}
+                  {...form.register("facilityId")}
                   disabled={!companyId}
                 >
                   <option value="">Tesis seçin</option>
                   {facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}
                 </Select>
               </FormField>
-              <FormField label="İlgili Personel" required error={fieldError("hostEmployeeId")}>
-                <Select {...form.register("hostEmployeeId")} disabled={!facilityId}>
-                  <option value="">İlgili personeli seçin</option>
-                  {employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.name} · {employee.department}</option>)}
-                </Select>
+              <FormField label="İlgili Personel" required error={fieldError("hostEmployeeName")}>
+                <Input placeholder="Ad Soyad" {...form.register("hostEmployeeName")} />
               </FormField>
               <FormField label="Tarih" required error={fieldError("visitDate")}>
                 <Input type="date" {...form.register("visitDate")} />

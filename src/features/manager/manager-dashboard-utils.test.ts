@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import type { ExpectedAfterHoursDelivery } from "@/domain/manager-dashboard"
 import type { Visit, VisitStatus } from "@/domain/visits"
-import { getDelayMinutes, getNextPlannedVisits, getOperationBins, getOtherVisits, getScopedVisits, getStatusCounts, getTodayVisits } from "./manager-dashboard-utils"
+import { getDashboardVisitStatus, getDelayMinutes, getNextPlannedVisits, getOperationBins, getOtherVisits, getScopedVisits, getStatusCounts, getTodayVisits } from "./manager-dashboard-utils"
 
 function makeVisit(id: string, status: VisitStatus, plannedStart: string, overrides: Partial<Visit> = {}): Visit {
   return {
@@ -51,9 +51,29 @@ describe("manager dashboard calculations", () => {
     expect(bins.find((bin) => bin.hour === 23)?.deliveries).toHaveLength(1)
   })
 
-  it("keeps NO_SHOW conditional in status totals and calculates delay with no tolerance", () => {
-    expect(getStatusCounts(visits).map((item) => item.status)).not.toContain("NO_SHOW")
-    expect(getStatusCounts([...visits, makeVisit("Gelmedi", "NO_SHOW", "2026-08-10T11:00:00+03:00")]).find((item) => item.status === "NO_SHOW")?.value).toBe(1)
+  it("derives exclusive live dashboard statuses without showing NO_SHOW", () => {
+    const dashboardVisits = [
+      makeVisit("Beklenen", "PLANNED", "2026-08-10T13:00:00+03:00"),
+      makeVisit("Gecikti", "PLANNED", "2026-08-10T10:00:00+03:00"),
+      makeVisit("İçeride", "CHECKED_IN", "2026-08-10T11:00:00+03:00", { actualCheckIn: "2026-08-10T11:05:00+03:00", plannedEnd: "2026-08-10T13:00:00+03:00" }),
+      makeVisit("Süre Aşımı", "CHECKED_IN", "2026-08-10T09:00:00+03:00", { actualCheckIn: "2026-08-10T09:05:00+03:00", plannedEnd: "2026-08-10T11:00:00+03:00" }),
+      makeVisit("Tamamlandı", "CHECKED_OUT", "2026-08-10T09:00:00+03:00"),
+      makeVisit("İptal", "CANCELLED", "2026-08-10T09:00:00+03:00"),
+      makeVisit("Gelmedi", "NO_SHOW", "2026-08-10T09:00:00+03:00"),
+    ]
+    const counts = getStatusCounts(dashboardVisits, now)
+
+    expect(getDashboardVisitStatus(dashboardVisits[3], now)).toBe("OVERDUE")
+    expect(getDashboardVisitStatus(dashboardVisits[6], now)).toBeNull()
+    expect(counts).toEqual([
+      { status: "PLANNED", value: 1 },
+      { status: "LATE", value: 1 },
+      { status: "CHECKED_IN", value: 1 },
+      { status: "OVERDUE", value: 1 },
+      { status: "CHECKED_OUT", value: 1 },
+      { status: "CANCELLED", value: 1 },
+    ])
+    expect(counts.reduce((sum, count) => sum + count.value, 0)).toBe(6)
     expect(getDelayMinutes(visits[1], now)).toBe(45)
   })
 

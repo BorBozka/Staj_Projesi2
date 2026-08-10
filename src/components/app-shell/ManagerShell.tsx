@@ -15,7 +15,7 @@ const personalNavigationItems = [{ label: "Ziyaretlerim", icon: CalendarDays, to
 const managementNavigationItems = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/manager/dashboard" },
   { label: "Tüm Ziyaretler", icon: CalendarDays, to: "/manager/all-visits" },
-  { label: "Mal Girişi / Teslimatlar", icon: PackageCheck },
+  { label: "Mal Girişi / Teslimat", icon: PackageCheck },
   { label: "Raporlar", icon: FileBarChart },
 ]
 
@@ -56,17 +56,17 @@ export function ManagerShell() {
 
   return (
     <ManagerRefreshProvider value={{ companyId, currentTime, facilityId, isRefreshing, lastUpdated, refreshVersion, refresh, selectCompany, selectFacility: setFacilityId }}>
-      <div className={cn("min-h-screen bg-slate-50", collapsed ? "md:pl-[60px]" : "md:pl-[188px]")} style={{ zoom: 0.9 }}>
+      <div className={cn("min-h-screen bg-slate-50 transition-[padding-left] duration-200", collapsed ? "md:pl-[60px]" : "md:pl-[188px]")} style={{ zoom: 0.9 }}>
         <aside
-          className={cn("fixed inset-y-0 left-0 z-40 hidden cursor-pointer border-r border-slate-800 bg-slate-950 text-slate-200 transition-[width] duration-200 md:flex md:flex-col", collapsed ? "w-[60px]" : "w-[188px]")}
+          className={cn("fixed inset-y-0 left-0 z-40 hidden cursor-pointer select-none overflow-x-hidden border-r border-slate-800 bg-slate-950 text-slate-200 transition-[width] duration-200 md:flex md:flex-col", collapsed ? "w-[60px]" : "w-[188px]")}
           onClick={(event) => {
             if (event.target instanceof Element && event.target.closest("a,button")) return
             setCollapsed((value) => !value)
           }}
         >
-          <div className={cn("flex h-[66px] items-center", collapsed ? "justify-center" : "px-4")}>
+          <div className={cn("flex h-[66px] items-center", collapsed ? "justify-center" : "pl-2.5 pr-4")}>
             <img src={bplasLogo} alt="BPLAS" className="size-10 rounded-lg object-cover shadow-sm" />
-            {!collapsed && <p className="ml-3 text-sm font-semibold text-white">Yönetim Sistemi</p>}
+            {!collapsed && <p className="ml-3 whitespace-nowrap text-sm font-semibold text-white">Yönetim Sistemi</p>}
           </div>
           <nav className="flex-1 px-2 py-1.5" aria-label="Yönetici menüsü">
             <NavigationGroup label="Yönetim" collapsed={collapsed} items={managementNavigationItems} />
@@ -76,7 +76,7 @@ export function ManagerShell() {
 
         <header className="sticky top-0 z-30 flex h-[66px] items-center justify-between gap-5 border-b bg-white/95 px-5 backdrop-blur md:px-6">
           <div className="flex min-w-0 items-center gap-5">
-            <h1 className="min-w-0 text-xl font-semibold tracking-tight text-slate-900">{pageTitle}</h1>
+            <h1 className="min-w-0 select-none text-xl font-semibold tracking-tight text-slate-900">{pageTitle}</h1>
             {isDashboard && <ManagerDashboardFilters placement="header" className="hidden xl:flex" />}
           </div>
           <div className="flex shrink-0 items-center gap-4">
@@ -95,5 +95,5 @@ export function ManagerShell() {
 }
 
 function NavigationGroup({ label, collapsed, items, className }: { label: string; collapsed: boolean; items: { label: string; icon: typeof CalendarDays; to?: string }[]; className?: string }) {
-  return <div className={className}>{!collapsed && <p className="px-2 pb-2 text-xs font-medium text-slate-400">{label}</p>}{items.map(({ label: itemLabel, icon: Icon, to }) => to ? <NavLink key={itemLabel} to={to} title={collapsed ? itemLabel : undefined} className={({ isActive }) => cn("mb-1 flex h-11 items-center rounded-md text-sm font-medium transition-colors", collapsed ? "justify-center" : "gap-3 px-3", isActive ? "bg-blue-600 text-white shadow-sm" : "text-slate-300 hover:bg-slate-800 hover:text-white")}><Icon className="size-5 shrink-0" />{!collapsed && itemLabel}</NavLink> : <div key={itemLabel} className={cn("mb-1 flex h-11 cursor-not-allowed items-center rounded-md text-sm text-slate-600", collapsed ? "justify-center" : "gap-3 px-3")} aria-disabled="true"><Icon className="size-5 shrink-0" />{!collapsed && itemLabel}</div>)}</div>
+  return <div className={className}><p className={cn("px-2 pb-2 text-xs font-medium text-slate-400", collapsed && "invisible")} aria-hidden={collapsed}>{label}</p>{items.map(({ label: itemLabel, icon: Icon, to }) => to ? <NavLink key={itemLabel} to={to} title={collapsed ? itemLabel : undefined} className={({ isActive }) => cn("mb-1 flex h-11 items-center whitespace-nowrap rounded-md text-sm font-medium transition-colors", collapsed ? "justify-center" : "gap-3 pl-5 pr-3", isActive ? "bg-blue-600 text-white shadow-sm" : "text-slate-300 hover:bg-slate-800 hover:text-white")}><Icon className="size-5 shrink-0" />{!collapsed && itemLabel}</NavLink> : <div key={itemLabel} className={cn("mb-1 flex h-11 cursor-not-allowed items-center whitespace-nowrap rounded-md text-sm text-slate-600", collapsed ? "justify-center" : "gap-3 pl-5 pr-3")} aria-disabled="true"><Icon className="size-5 shrink-0" />{!collapsed && itemLabel}</div>)}</div>
 }

@@ -8,7 +8,7 @@ const visitInput: VisitInput = {
   visitorLastName: "Ziyaretci",
   visitorEmail: "test@example.com",
   visitTypeId: "meeting",
-  hostEmployeeId: "maya-kara",
+  hostEmployeeName: "Maya Kara",
   hostCompanyId: "bplas",
   facilityId: "bplas-merkez",
   plannedStart: "2026-08-12T09:00:00.000Z",

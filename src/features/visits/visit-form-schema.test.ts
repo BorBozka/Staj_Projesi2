@@ -7,7 +7,7 @@ const validValues = {
   visitorLastName: "Aksoy",
   visitorEmail: "deniz.aksoy@example.com",
   visitTypeId: "meeting",
-  hostEmployeeId: "maya-kara",
+  hostEmployeeName: "Maya Kara",
   hostCompanyId: "bplas",
   facilityId: "bplas-merkez",
   visitDate: "2026-08-10",

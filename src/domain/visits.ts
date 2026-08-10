@@ -75,7 +75,7 @@ export interface VisitInput {
   visitorLastName: string
   visitorEmail: string
   visitTypeId: string
-  hostEmployeeId: string
+  hostEmployeeName: string
   hostCompanyId: string
   facilityId: string
   plannedStart: string

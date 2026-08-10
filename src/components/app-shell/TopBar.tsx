@@ -1,4 +1,4 @@
-import { Bell, Building2, ChevronDown, Menu } from "lucide-react"
+import { Bell, Building2, Menu } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 
@@ -22,17 +22,15 @@ export function TopBar({ onOpenNavigation, navigationOpen }: TopBarProps) {
         >
           <Menu />
         </Button>
-        <button
-          type="button"
-          className="flex h-7 items-center gap-1.5 rounded-md border bg-white px-2 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+        <div
+          className="flex h-7 items-center gap-1.5 rounded-md border bg-white px-2 text-xs font-medium text-slate-700 shadow-sm"
           aria-label={"Ge\u00e7erli \u015firket ve tesis"}
         >
           <Building2 className="size-3.5 text-slate-500" />
           <span className="hidden sm:inline">{"BPLAS A.\u015e."}</span>
           <span className="hidden text-slate-300 sm:inline">/</span>
           <span>Merkez Tesis</span>
-          <ChevronDown className="size-3.5 text-slate-400" />
-        </button>
+        </div>
       </div>
 
       <div className="flex items-center gap-1.5">

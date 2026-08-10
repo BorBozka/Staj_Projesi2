@@ -60,10 +60,9 @@ export class MockVisitService implements VisitService {
   private fromInput(id: string, input: VisitInput, existing?: Visit): Visit {
     const reference = mockVisitReferenceData
     const visitType = reference.visitTypes.find((item) => item.id === input.visitTypeId)
-    const employee = reference.employees.find((item) => item.id === input.hostEmployeeId)
     const company = reference.companies.find((item) => item.id === input.hostCompanyId)
     const facility = reference.facilities.find((item) => item.id === input.facilityId)
-    if (!visitType || !employee || !company || !facility) throw new Error("Geçersiz ziyaret referans bilgisi.")
+    if (!visitType || !company || !facility) throw new Error("Geçersiz ziyaret referans bilgisi.")
 
     const now = new Date().toISOString()
     return {
@@ -77,8 +76,8 @@ export class MockVisitService implements VisitService {
       },
       visitTypeId: visitType.id,
       visitTypeName: visitType.name,
-      hostEmployeeId: employee.id,
-      hostEmployeeName: employee.name,
+      hostEmployeeId: existing?.hostEmployeeId ?? `manual-host-${crypto.randomUUID()}`,
+      hostEmployeeName: input.hostEmployeeName.trim(),
       hostCompanyId: company.id,
       hostCompanyName: company.name,
       facilityId: facility.id,
