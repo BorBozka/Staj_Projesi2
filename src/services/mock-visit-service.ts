@@ -68,6 +68,7 @@ export class MockVisitService implements VisitService {
     const now = new Date().toISOString()
     return {
       id,
+      creatorEmployeeId: existing?.creatorEmployeeId ?? reference.currentEmployee.employeeId,
       visitor: {
         id: existing?.visitor.id ?? `visitor-${crypto.randomUUID()}`,
         firstName: input.visitorFirstName.trim(),
@@ -84,6 +85,9 @@ export class MockVisitService implements VisitService {
       facilityName: facility.name,
       plannedStart: input.plannedStart,
       plannedEnd: input.plannedEnd,
+      actualCheckIn: existing?.actualCheckIn,
+      actualCheckOut: existing?.actualCheckOut,
+      visitorCardReturned: existing?.visitorCardReturned,
       status: existing?.status ?? "PLANNED",
       note: input.note?.trim() || undefined,
       createdAt: existing?.createdAt ?? now,

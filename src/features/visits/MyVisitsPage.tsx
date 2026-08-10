@@ -1,5 +1,6 @@
 import { CheckCircle2, Info, X } from "lucide-react"
 import { useEffect, useState } from "react"
+import { useLocation } from "react-router-dom"
 
 import type { Visit } from "@/domain/visits"
 import { CancelVisitDialog } from "@/features/visits/CancelVisitDialog"
@@ -12,6 +13,7 @@ import { useVisits } from "@/features/visits/visit-context"
 
 export function MyVisitsPage() {
   const { visits, referenceData, isLoading, error } = useVisits()
+  const location = useLocation()
   const [view, setView] = useState<TimelineView>("week")
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [formOpen, setFormOpen] = useState(false)
@@ -39,6 +41,11 @@ export function MyVisitsPage() {
 
   if (isLoading) return <PageSkeleton />
 
+  const ownVisits = referenceData
+    ? visits.filter((visit) => visit.creatorEmployeeId === referenceData.currentEmployee.employeeId)
+    : visits
+  const isManagerView = location.pathname.startsWith("/manager/")
+
   return (
     <div className="space-y-2">
       {error && (
@@ -54,17 +61,18 @@ export function MyVisitsPage() {
         </div>
       )}
 
-      <div className="mt-2 grid gap-3 xl:h-[calc(100dvh-82px)] xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className={"mt-2 grid gap-3 xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_320px] " + (isManagerView ? "xl:h-[calc(100dvh-30px)]" : "xl:h-[calc(100dvh-82px)]")}>
         <VisitTimeline
-          visits={visits}
+          visits={ownVisits}
           view={view}
           selectedDate={selectedDate}
+          currentFacilityId={referenceData?.currentEmployee.facilityId}
           onViewChange={setView}
           onSelectedDateChange={setSelectedDate}
           onVisitOpen={setViewingVisit}
           onNewVisit={openNewVisit}
         />
-        <UpcomingVisits visits={visits} onView={setViewingVisit} currentFacilityId={referenceData?.currentEmployee.facilityId} />
+        <UpcomingVisits visits={ownVisits} onView={setViewingVisit} currentFacilityId={referenceData?.currentEmployee.facilityId} />
       </div>
 
       <VisitDetailsDialog

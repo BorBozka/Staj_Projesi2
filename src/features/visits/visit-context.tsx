@@ -8,6 +8,7 @@ interface VisitContextValue {
   referenceData: VisitReferenceData | null
   isLoading: boolean
   error: string | null
+  reload(): Promise<void>
   createVisit(input: VisitInput): Promise<Visit>
   updateVisit(id: string, input: VisitInput): Promise<Visit>
   rescheduleVisit(id: string, input: RescheduleVisitInput): Promise<Visit>
@@ -87,12 +88,13 @@ export function VisitProvider({ service, children }: { service: VisitService; ch
       referenceData,
       isLoading,
       error,
+      reload: load,
       createVisit,
       updateVisit,
       rescheduleVisit,
       cancelVisit,
     }),
-    [visits, referenceData, isLoading, error, createVisit, updateVisit, rescheduleVisit, cancelVisit],
+    [visits, referenceData, isLoading, error, load, createVisit, updateVisit, rescheduleVisit, cancelVisit],
   )
 
   return <VisitContext.Provider value={value}>{children}</VisitContext.Provider>

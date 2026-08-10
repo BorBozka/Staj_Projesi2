@@ -2,9 +2,16 @@ import { lazy, Suspense } from "react"
 import { Navigate, Route, Routes } from "react-router-dom"
 
 import { AppShell } from "@/components/app-shell/AppShell"
+import { ManagerShell } from "@/components/app-shell/ManagerShell"
 
 const MyVisitsPage = lazy(() =>
   import("@/features/visits/MyVisitsPage").then((module) => ({ default: module.MyVisitsPage })),
+)
+const ManagerDashboard = lazy(() =>
+  import("@/features/manager/ManagerDashboard").then((module) => ({ default: module.ManagerDashboard })),
+)
+const AllVisitsPage = lazy(() =>
+  import("@/features/manager/AllVisitsPage").then((module) => ({ default: module.AllVisitsPage })),
 )
 
 export function App() {
@@ -19,8 +26,21 @@ export function App() {
             </Suspense>
           }
         />
-        <Route path="*" element={<Navigate to="/my-visits" replace />} />
       </Route>
+      <Route path="/manager" element={<ManagerShell />}>
+        <Route path="my-visits" element={<Suspense fallback={<RouteSkeleton />}><MyVisitsPage /></Suspense>} />
+        <Route
+          path="dashboard"
+          element={
+            <Suspense fallback={<RouteSkeleton />}>
+              <ManagerDashboard />
+            </Suspense>
+          }
+        />
+        <Route path="all-visits" element={<Suspense fallback={<RouteSkeleton />}><AllVisitsPage /></Suspense>} />
+        <Route index element={<Navigate to="dashboard" replace />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/manager/dashboard" replace />} />
     </Routes>
   )
 }

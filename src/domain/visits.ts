@@ -11,6 +11,7 @@ export interface Visitor {
 
 export interface Visit {
   id: string
+  creatorEmployeeId?: string
   visitor: Visitor
   visitTypeId: string
   visitTypeName: string
@@ -22,6 +23,9 @@ export interface Visit {
   facilityName: string
   plannedStart: string
   plannedEnd: string
+  actualCheckIn?: string
+  actualCheckOut?: string
+  visitorCardReturned?: boolean
   status: VisitStatus
   note?: string
   createdAt: string
@@ -62,6 +66,7 @@ export interface VisitReferenceData {
     employeeId: string
     companyId: string
     facilityId: string
+    role: "EMPLOYEE" | "MANAGER"
   }
 }
 

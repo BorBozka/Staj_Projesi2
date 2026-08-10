@@ -13,9 +13,10 @@ interface Props {
   onEdit(visit: Visit): void
   onReschedule(visit: Visit): void
   onCancel(visit: Visit): void
+  readOnly?: boolean
 }
 
-export function VisitDetailsDialog({ visit, open, onOpenChange, onEdit, onReschedule, onCancel }: Props) {
+export function VisitDetailsDialog({ visit, open, onOpenChange, onEdit, onReschedule, onCancel, readOnly = false }: Props) {
   if (!visit) return null
 
   const openAction = (action: (visit: Visit) => void) => {
@@ -25,7 +26,7 @@ export function VisitDetailsDialog({ visit, open, onOpenChange, onEdit, onResche
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg" onOpenAutoFocus={(event) => event.preventDefault()}>
         <DialogHeader>
           <div className="flex items-center gap-2 pr-7">
             <DialogTitle>{visit.visitor.firstName} {visit.visitor.lastName}</DialogTitle>
@@ -44,7 +45,7 @@ export function VisitDetailsDialog({ visit, open, onOpenChange, onEdit, onResche
           {visit.note && <Detail icon={Pencil} label="Not / Açıklama" value={visit.note} className="sm:col-span-2" />}
         </dl>
 
-        {visit.status === "PLANNED" && (
+        {!readOnly && visit.status === "PLANNED" && (
           <DialogFooter className="[&>button]:h-8 sm:[&>button]:w-28">
             <Button variant="outline" className="border-red-200 text-destructive hover:border-red-300 hover:bg-red-100 hover:text-destructive hover:shadow-sm" onClick={() => openAction(onCancel)}><XCircle />İptal Et</Button>
             <Button variant="outline" className="hover:border-slate-300 hover:bg-slate-200 hover:text-slate-950 hover:shadow-sm" onClick={() => openAction(onReschedule)}><CalendarClock />Ertele</Button>

@@ -53,7 +53,7 @@ export function UpcomingVisits({ visits, onView, currentFacilityId }: Props) {
               <div className="mt-1.5 space-y-1 text-xs leading-[18px] text-slate-600">
                 <div className="flex items-start gap-1.5"><CalendarDays className="mt-0.5 size-3.5 shrink-0 text-slate-400" /><span>{formatTr(new Date(visit.plannedStart), "d MMMM EEEE · HH:mm")}–{formatTr(new Date(visit.plannedEnd), "HH:mm")}</span></div>
                 {currentFacilityId && visit.facilityId !== currentFacilityId && (
-                  <div className="flex min-w-0 items-start gap-1.5 text-muted-foreground"><MapPin className="mt-0.5 size-3.5 shrink-0 text-slate-400" /><span>{visit.facilityName}</span></div>
+                  <div className="flex min-w-0 items-start gap-1.5 text-slate-700"><MapPin className="mt-0.5 size-3.5 shrink-0 text-primary" /><span><span className="font-medium">Farklı tesis:</span> {visit.facilityName}</span></div>
                 )}
               </div>
             </button>

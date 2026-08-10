@@ -29,6 +29,7 @@ interface Props {
   visits: Visit[]
   view: TimelineView
   selectedDate: Date
+  currentFacilityId?: string
   onViewChange(view: TimelineView): void
   onSelectedDateChange(date: Date): void
   onVisitOpen(visit: Visit): void
@@ -41,7 +42,7 @@ const viewLabels: Record<TimelineView, string> = {
   month: "Ay",
 }
 
-export function VisitTimeline({ visits, view, selectedDate, onViewChange, onSelectedDateChange, onVisitOpen, onNewVisit }: Props) {
+export function VisitTimeline({ visits, view, selectedDate, currentFacilityId, onViewChange, onSelectedDateChange, onVisitOpen, onNewVisit }: Props) {
   const [now, setNow] = useState(() => new Date())
 
   useEffect(() => {
@@ -123,6 +124,7 @@ export function VisitTimeline({ visits, view, selectedDate, onViewChange, onSele
           view={view}
           now={now}
           timeRange={getTimelineRange(visibleVisits)}
+          currentFacilityId={currentFacilityId}
           onVisitOpen={onVisitOpen}
         />
       )}
@@ -136,7 +138,7 @@ export function VisitTimeline({ visits, view, selectedDate, onViewChange, onSele
   )
 }
 
-function LaneTimeline({ visits, selectedDate, view, now, timeRange, onVisitOpen }: { visits: Visit[]; selectedDate: Date; view: "day" | "week"; now: Date; timeRange: TimelineRange; onVisitOpen(visit: Visit): void }) {
+function LaneTimeline({ visits, selectedDate, view, now, timeRange, currentFacilityId, onVisitOpen }: { visits: Visit[]; selectedDate: Date; view: "day" | "week"; now: Date; timeRange: TimelineRange; currentFacilityId?: string; onVisitOpen(visit: Visit): void }) {
   const hours = Array.from({ length: (timeRange.endMinutes - timeRange.startMinutes) / 60 + 1 }, (_, index) => timeRange.startMinutes / 60 + index)
 
   if (view === "day") {
@@ -201,7 +203,7 @@ function LaneTimeline({ visits, selectedDate, view, now, timeRange, onVisitOpen 
                 style={{ minHeight }}
               >
                 {isSameDay(day, now) && <WeekCurrentTimeIndicator now={now} timeRange={timeRange} />}
-                {dayVisits.map((visit, index) => <VisitBlock key={visit.id} visit={visit} timeRange={timeRange} top={2 + index * 27} onOpen={onVisitOpen} />)}
+                {dayVisits.map((visit, index) => <VisitBlock key={visit.id} visit={visit} timeRange={timeRange} top={2 + index * 27} currentFacilityId={currentFacilityId} onOpen={onVisitOpen} />)}
               </div>
             </div>
           ))}
@@ -355,7 +357,7 @@ function DayVisitCard({ visit, column, columnCount, timeRange, onOpen }: { visit
   )
 }
 
-function VisitBlock({ visit, timeRange, top = 10, onOpen }: { visit: Visit; timeRange: TimelineRange; top?: number; onOpen(visit: Visit): void }) {
+function VisitBlock({ visit, timeRange, top = 10, currentFacilityId, onOpen }: { visit: Visit; timeRange: TimelineRange; top?: number; currentFacilityId?: string; onOpen(visit: Visit): void }) {
   const start = new Date(visit.plannedStart)
   const end = new Date(visit.plannedEnd)
   const startMinutes = start.getHours() * 60 + start.getMinutes()
@@ -381,6 +383,7 @@ function VisitBlock({ visit, timeRange, top = 10, onOpen }: { visit: Visit; time
       <span className="block overflow-hidden">
         <span className={cn("block truncate text-[10px] font-semibold leading-[11px]", visit.status === "CANCELLED" && "line-through")}>
           {visit.visitor.firstName} {visit.visitor.lastName}
+          {currentFacilityId && visit.facilityId !== currentFacilityId && <span className="text-primary"> · {visit.facilityName}</span>}
         </span>
         <span className="block truncate text-[10px] leading-[11px] opacity-80">{formatTr(start, "HH:mm")}–{formatTr(end, "HH:mm")}</span>
       </span>

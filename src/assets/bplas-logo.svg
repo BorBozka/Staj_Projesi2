@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 220" role="img" aria-labelledby="title">
+  <title id="title">BPLAS</title>
+  <rect width="200" height="220" fill="#273d7b"/>
+  <path d="M15 68h170L100 214z" fill="#00a99d"/>
+  <text x="100" y="111" text-anchor="middle" font-family="Georgia, serif" font-size="102" font-weight="700" fill="#fff">B</text>
+  <text x="100" y="172" text-anchor="middle" font-family="Georgia, serif" font-size="43" letter-spacing="8" fill="#fff">PLAS</text>
+  <path d="M38 180h124" stroke="#ef3340" stroke-width="4"/>
+</svg>
