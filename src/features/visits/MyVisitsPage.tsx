@@ -54,7 +54,7 @@ export function MyVisitsPage() {
         </div>
       )}
 
-      <div className="mt-2 grid items-start gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="mt-2 grid gap-3 xl:h-[calc(100dvh-82px)] xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_320px]">
         <VisitTimeline
           visits={visits}
           view={view}

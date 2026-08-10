@@ -6,18 +6,18 @@
 
 Before making changes, read:
 
-1. `docs/PRODUCT_SPEC.md`
-2. `docs/UI_SPEC.md`
-3. `docs/TECH_STACK.md`
-4. `docs/DEVELOPMENT_PLAN.md`
+1. `PRODUCT_SPEC.md`
+2. `UI_SPEC.md`
+3. `TECH_STACK.md`
+4. `DEVELOPMENT_PLAN.md`
 
 These files define the project.
 
-`docs/PRODUCT_SPEC.md` is authoritative for business behavior.
+`PRODUCT_SPEC.md` is authoritative for business behavior.
 
-`docs/UI_SPEC.md` is authoritative for interface direction.
+`UI_SPEC.md` is authoritative for interface direction.
 
-`docs/TECH_STACK.md` is authoritative for technology choices.
+`TECH_STACK.md` is authoritative for technology choices.
 
 If older chat/discovery material conflicts with repository documentation, follow the repository documentation.
 

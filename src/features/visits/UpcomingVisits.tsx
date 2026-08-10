@@ -1,8 +1,9 @@
-import { isAfter, startOfDay } from "date-fns"
 import { CalendarDays, MapPin } from "lucide-react"
+import { useEffect, useState } from "react"
 
 import type { Visit } from "@/domain/visits"
 import { VisitStatusBadge } from "@/features/visits/VisitStatusBadge"
+import { getUpcomingVisits } from "@/features/visits/upcoming-visits"
 import { formatTr } from "@/lib/date"
 
 interface Props {
@@ -12,13 +13,18 @@ interface Props {
 }
 
 export function UpcomingVisits({ visits, onView, currentFacilityId }: Props) {
-  const upcoming = visits
-    .filter((visit) => visit.status === "PLANNED" && isAfter(new Date(visit.plannedEnd), startOfDay(new Date())))
-    .sort((a, b) => a.plannedStart.localeCompare(b.plannedStart))
+  const [now, setNow] = useState(() => new Date())
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 60_000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  const upcoming = getUpcomingVisits(visits, now)
 
   return (
-    <section className="overflow-hidden rounded-lg border bg-card shadow-panel" aria-labelledby="upcoming-title">
-      <div className="flex items-center justify-between border-b px-3 py-2.5">
+    <section className="flex h-full flex-col overflow-hidden rounded-lg border bg-card shadow-panel xl:min-h-0" aria-labelledby="upcoming-title">
+      <div className="shrink-0 flex items-center justify-between border-b px-3 py-2.5">
         <h2 id="upcoming-title" className="text-sm font-semibold">Yaklaşan Ziyaretler</h2>
         <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{upcoming.length}</span>
       </div>
@@ -26,7 +32,7 @@ export function UpcomingVisits({ visits, onView, currentFacilityId }: Props) {
       {upcoming.length === 0 ? (
         <p className="px-4 py-8 text-center text-[13px] text-muted-foreground">Yaklaşan ziyaret bulunmuyor.</p>
       ) : (
-        <div className="max-h-[min(520px,calc(100vh-128px))] divide-y overflow-y-auto scrollbar-thin">
+        <div className="min-h-0 flex-1 divide-y overflow-y-auto scrollbar-thin">
           {upcoming.map((visit) => (
             <button
               key={visit.id}

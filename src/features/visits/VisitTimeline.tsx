@@ -18,14 +18,12 @@ import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import type { Visit } from "@/domain/visits"
 import { VisitStatusBadge } from "@/features/visits/VisitStatusBadge"
+import { getTimelineRange, type TimelineRange } from "@/features/visits/timeline-range"
 import { visitStatusAccents, visitStatusSurfaces } from "@/features/visits/visit-status-styles"
 import { formatTr } from "@/lib/date"
 import { cn } from "@/lib/utils"
 
 export type TimelineView = "day" | "week" | "month"
-
-const timelineStartHour = 8
-const timelineEndHour = 18
 
 interface Props {
   visits: Visit[]
@@ -78,8 +76,8 @@ export function VisitTimeline({ visits, view, selectedDate, onViewChange, onSele
         : formatTr(selectedDate, "MMMM yyyy")
 
   return (
-    <section className="overflow-hidden rounded-lg border bg-card shadow-panel" aria-label="Ziyaret Takvimi">
-      <div className="flex flex-col gap-1.5 border-b px-3 py-2 lg:flex-row lg:items-center lg:justify-between">
+    <section className="flex h-full flex-col overflow-hidden rounded-lg border bg-card shadow-panel xl:min-h-0" aria-label="Ziyaret Takvimi">
+      <div className="shrink-0 flex flex-col gap-1.5 border-b px-3 py-2 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-semibold">Ziyaret Takvimi</h2>
@@ -119,10 +117,17 @@ export function VisitTimeline({ visits, view, selectedDate, onViewChange, onSele
       {view === "month" ? (
         <MonthTimeline visits={visits} selectedDate={selectedDate} onVisitOpen={onVisitOpen} />
       ) : (
-        <LaneTimeline visits={visibleVisits} selectedDate={selectedDate} view={view} now={now} onVisitOpen={onVisitOpen} />
+        <LaneTimeline
+          visits={visibleVisits}
+          selectedDate={selectedDate}
+          view={view}
+          now={now}
+          timeRange={getTimelineRange(visibleVisits)}
+          onVisitOpen={onVisitOpen}
+        />
       )}
 
-      <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 border-t bg-slate-50/70 px-3 py-1.5">
+      <div className="shrink-0 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 border-t bg-slate-50/70 px-3 py-1.5">
         {(["PLANNED", "CHECKED_IN", "CHECKED_OUT", "CANCELLED", "NO_SHOW"] as const).map((status) => (
           <VisitStatusBadge key={status} status={status} compact />
         ))}
@@ -131,16 +136,15 @@ export function VisitTimeline({ visits, view, selectedDate, onViewChange, onSele
   )
 }
 
-function LaneTimeline({ visits, selectedDate, view, now, onVisitOpen }: { visits: Visit[]; selectedDate: Date; view: "day" | "week"; now: Date; onVisitOpen(visit: Visit): void }) {
-  const hours = Array.from({ length: timelineEndHour - timelineStartHour + 1 }, (_, index) => timelineStartHour + index)
+function LaneTimeline({ visits, selectedDate, view, now, timeRange, onVisitOpen }: { visits: Visit[]; selectedDate: Date; view: "day" | "week"; now: Date; timeRange: TimelineRange; onVisitOpen(visit: Visit): void }) {
+  const hours = Array.from({ length: (timeRange.endMinutes - timeRange.startMinutes) / 60 + 1 }, (_, index) => timeRange.startMinutes / 60 + index)
 
   if (view === "day") {
     const agendaVisits = layoutDayVisits(visits)
 
     return (
       <div
-        className="grid grid-cols-[52px_minmax(0,1fr)] border-b"
-        style={{ height: "clamp(472px, calc(100vh - 228px), 632px)" }}
+        className="grid min-h-[472px] min-w-0 flex-1 grid-cols-[52px_minmax(0,1fr)] border-b xl:min-h-0"
       >
         <div className="relative border-r bg-slate-50/70" aria-hidden="true">
           {hours.map((hour, index) => (
@@ -162,9 +166,9 @@ function LaneTimeline({ visits, selectedDate, view, now, onVisitOpen }: { visits
               aria-hidden="true"
             />
           ))}
-          {isSameDay(selectedDate, now) && <DayCurrentTimeIndicator now={now} />}
+          {isSameDay(selectedDate, now) && <DayCurrentTimeIndicator now={now} timeRange={timeRange} />}
           {agendaVisits.map(({ visit, column, columnCount }) => (
-            <DayVisitCard key={visit.id} visit={visit} column={column} columnCount={columnCount} onOpen={onVisitOpen} />
+            <DayVisitCard key={visit.id} visit={visit} column={column} columnCount={columnCount} timeRange={timeRange} onOpen={onVisitOpen} />
           ))}
           {agendaVisits.length === 0 && <EmptyTimelineOverlay />}
         </div>
@@ -176,30 +180,32 @@ function LaneTimeline({ visits, selectedDate, view, now, onVisitOpen }: { visits
     start: startOfWeek(selectedDate, { weekStartsOn: 1 }),
     end: endOfWeek(selectedDate, { weekStartsOn: 1 }),
   })
+  const weekDays = days.map((day) => {
+    const dayVisits = visits.filter((visit) => isSameDay(new Date(visit.plannedStart), day))
+    return { day, dayVisits, minHeight: Math.max(56, dayVisits.length * 27 + 4) }
+  })
 
   return (
-    <div className="flex w-full flex-col" style={{ height: "clamp(472px, calc(100vh - 228px), 632px)" }}>
+    <div className="flex min-h-[472px] min-w-0 flex-1 flex-col xl:min-h-0">
       <TimeHeader hours={hours} label="Gün" />
-      <div className="scrollbar-thin flex min-h-0 flex-1 flex-col divide-y overflow-y-auto">
-        {days.map((day) => {
-          const dayVisits = visits.filter((visit) => isSameDay(new Date(visit.plannedStart), day))
-          const height = Math.max(56, dayVisits.length * 33 + 8)
-          return (
-            <div key={day.toISOString()} className="grid grid-cols-[112px_minmax(0,1fr)]" style={{ minHeight: height }}>
-              <div className={cn("border-r px-2.5 py-2.5", isSameDay(day, new Date()) && "bg-blue-50/60")}>
+      <div className="scrollbar-thin flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <div className="flex min-h-full flex-1 flex-col divide-y">
+          {weekDays.map(({ day, dayVisits, minHeight }) => (
+            <div key={day.toISOString()} className="grid flex-1 grid-cols-[112px_minmax(0,1fr)]" style={{ minHeight }}>
+              <div className={cn("flex flex-col justify-center border-r px-2.5 py-2.5", isSameDay(day, new Date()) && "bg-blue-50/60")}>
                 <p className="truncate text-[13px] font-semibold">{formatTr(day, "EEEE")}</p>
                 <p className="mt-0.5 truncate text-xs text-muted-foreground">{formatTr(day, "d MMMM")}</p>
               </div>
               <div
-                className="relative bg-[linear-gradient(to_right,hsl(var(--border))_1px,transparent_1px)] bg-[length:10%_100%]"
-                style={{ minHeight: height }}
+                className="relative h-full bg-[linear-gradient(to_right,hsl(var(--border))_1px,transparent_1px)] bg-[length:10%_100%]"
+                style={{ minHeight }}
               >
-                {isSameDay(day, now) && <WeekCurrentTimeIndicator now={now} />}
-                {dayVisits.map((visit, index) => <VisitBlock key={visit.id} visit={visit} top={5 + index * 33} onOpen={onVisitOpen} />)}
+                {isSameDay(day, now) && <WeekCurrentTimeIndicator now={now} timeRange={timeRange} />}
+                {dayVisits.map((visit, index) => <VisitBlock key={visit.id} visit={visit} timeRange={timeRange} top={2 + index * 27} onOpen={onVisitOpen} />)}
               </div>
             </div>
-          )
-        })}
+          ))}
+        </div>
       </div>
     </div>
   )
@@ -240,10 +246,7 @@ interface DayVisitLayout {
 }
 
 function layoutDayVisits(visits: Visit[]): DayVisitLayout[] {
-  const windowStart = timelineStartHour * 60
-  const windowEnd = timelineEndHour * 60
   const visible = [...visits]
-    .filter((visit) => visitEndMinutes(visit) > windowStart && visitStartMinutes(visit) < windowEnd)
     .sort((a, b) => a.plannedStart.localeCompare(b.plannedStart))
   const result: DayVisitLayout[] = []
   let group: Visit[] = []
@@ -297,14 +300,13 @@ function dayHourLabelPosition(index: number, hourCount: number) {
   return { top: `${(index / (hourCount - 1)) * 100}%`, transform: "translateY(-50%)" }
 }
 
-function DayVisitCard({ visit, column, columnCount, onOpen }: { visit: Visit; column: number; columnCount: number; onOpen(visit: Visit): void }) {
+function DayVisitCard({ visit, column, columnCount, timeRange, onOpen }: { visit: Visit; column: number; columnCount: number; timeRange: TimelineRange; onOpen(visit: Visit): void }) {
   const start = new Date(visit.plannedStart)
   const end = new Date(visit.plannedEnd)
-  const windowStart = timelineStartHour * 60
-  const windowMinutes = (timelineEndHour - timelineStartHour) * 60
-  const startMinutes = Math.max(windowStart, visitStartMinutes(visit))
-  const endMinutes = Math.min(timelineEndHour * 60, visitEndMinutes(visit))
-  const top = ((startMinutes - windowStart) / windowMinutes) * 100
+  const windowMinutes = timeRange.endMinutes - timeRange.startMinutes
+  const startMinutes = Math.max(timeRange.startMinutes, visitStartMinutes(visit))
+  const endMinutes = Math.min(timeRange.endMinutes, visitEndMinutes(visit))
+  const top = ((startMinutes - timeRange.startMinutes) / windowMinutes) * 100
   const height = ((endMinutes - startMinutes) / windowMinutes) * 100
   const width = 100 / columnCount
   const left = column * width
@@ -353,14 +355,13 @@ function DayVisitCard({ visit, column, columnCount, onOpen }: { visit: Visit; co
   )
 }
 
-function VisitBlock({ visit, top = 10, onOpen }: { visit: Visit; top?: number; onOpen(visit: Visit): void }) {
+function VisitBlock({ visit, timeRange, top = 10, onOpen }: { visit: Visit; timeRange: TimelineRange; top?: number; onOpen(visit: Visit): void }) {
   const start = new Date(visit.plannedStart)
   const end = new Date(visit.plannedEnd)
   const startMinutes = start.getHours() * 60 + start.getMinutes()
   const endMinutes = end.getHours() * 60 + end.getMinutes()
-  const windowStart = timelineStartHour * 60
-  const windowMinutes = (timelineEndHour - timelineStartHour) * 60
-  const left = Math.max(0, ((startMinutes - windowStart) / windowMinutes) * 100)
+  const windowMinutes = timeRange.endMinutes - timeRange.startMinutes
+  const left = Math.max(0, ((startMinutes - timeRange.startMinutes) / windowMinutes) * 100)
   const unclampedWidth = ((endMinutes - startMinutes) / windowMinutes) * 100
   const width = Math.min(100 - left, Math.max(6, unclampedWidth))
 
@@ -369,7 +370,7 @@ function VisitBlock({ visit, top = 10, onOpen }: { visit: Visit; top?: number; o
       type="button"
       onClick={() => onOpen(visit)}
       className={cn(
-        "group absolute h-7 rounded border border-l-[3px] px-1.5 py-[3px] text-left shadow-sm transition-shadow hover:z-20 hover:shadow-md focus-visible:z-20",
+        "group absolute h-6 rounded border border-l-[3px] px-1.5 py-px text-left shadow-sm transition-shadow hover:z-20 hover:shadow-md focus-visible:z-20",
         visitStatusSurfaces[visit.status],
         visitStatusAccents[visit.status],
         visit.status === "CANCELLED" && "border-dashed",
@@ -383,18 +384,16 @@ function VisitBlock({ visit, top = 10, onOpen }: { visit: Visit; top?: number; o
         </span>
         <span className="block truncate text-[10px] leading-[11px] opacity-80">{formatTr(start, "HH:mm")}–{formatTr(end, "HH:mm")}</span>
       </span>
-      <VisitHoverTooltip visit={visit} />
     </button>
   )
 }
 
-function WeekCurrentTimeIndicator({ now }: { now: Date }) {
+function WeekCurrentTimeIndicator({ now, timeRange }: { now: Date; timeRange: TimelineRange }) {
   const currentMinutes = now.getHours() * 60 + now.getMinutes()
-  const windowStart = timelineStartHour * 60
-  const windowMinutes = (timelineEndHour - timelineStartHour) * 60
-  if (currentMinutes < windowStart || currentMinutes > timelineEndHour * 60) return null
+  const windowMinutes = timeRange.endMinutes - timeRange.startMinutes
+  if (currentMinutes < timeRange.startMinutes || currentMinutes > timeRange.endMinutes) return null
 
-  const left = ((currentMinutes - windowStart) / windowMinutes) * 100
+  const left = ((currentMinutes - timeRange.startMinutes) / windowMinutes) * 100
   return (
     <div className="pointer-events-none absolute inset-y-0 z-10 w-px bg-rose-500/80" style={{ left: `${left}%` }} aria-hidden="true">
       <span className="absolute left-1/2 top-1 -translate-x-1/2 rounded bg-rose-600 px-1 py-0.5 text-[9px] font-semibold leading-none text-white shadow-sm">
@@ -404,13 +403,12 @@ function WeekCurrentTimeIndicator({ now }: { now: Date }) {
   )
 }
 
-function DayCurrentTimeIndicator({ now }: { now: Date }) {
+function DayCurrentTimeIndicator({ now, timeRange }: { now: Date; timeRange: TimelineRange }) {
   const currentMinutes = now.getHours() * 60 + now.getMinutes()
-  const windowStart = timelineStartHour * 60
-  const windowMinutes = (timelineEndHour - timelineStartHour) * 60
-  if (currentMinutes < windowStart || currentMinutes > timelineEndHour * 60) return null
+  const windowMinutes = timeRange.endMinutes - timeRange.startMinutes
+  if (currentMinutes < timeRange.startMinutes || currentMinutes > timeRange.endMinutes) return null
 
-  const top = ((currentMinutes - windowStart) / windowMinutes) * 100
+  const top = ((currentMinutes - timeRange.startMinutes) / windowMinutes) * 100
   return (
     <div className="pointer-events-none absolute inset-x-0 z-10 h-px bg-rose-500/90" style={{ top: `${top}%` }} aria-hidden="true">
       <span className="absolute left-1 top-0 -translate-y-1/2 rounded bg-rose-600 px-1 py-0.5 text-[9px] font-semibold leading-none text-white shadow-sm">
@@ -444,7 +442,7 @@ function MonthTimeline({ visits, selectedDate, onVisitOpen }: { visits: Visit[];
   const weekCount = days.length / 7
 
   return (
-    <div className="overflow-x-auto scrollbar-thin" style={{ height: "clamp(472px, calc(100vh - 228px), 632px)" }}>
+    <div className="min-h-[472px] min-w-0 flex-1 overflow-x-auto scrollbar-thin xl:min-h-0">
       <div className="flex h-full min-w-[760px] flex-col">
         <div className="grid grid-cols-7 border-b bg-slate-50/80">
           {["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"].map((day) => (

@@ -45,10 +45,10 @@ export function VisitDetailsDialog({ visit, open, onOpenChange, onEdit, onResche
         </dl>
 
         {visit.status === "PLANNED" && (
-          <DialogFooter>
-            <Button variant="outline" className="border-red-200 text-destructive hover:bg-red-50 hover:text-destructive" onClick={() => openAction(onCancel)}><XCircle />İptal Et</Button>
-            <Button variant="outline" onClick={() => openAction(onReschedule)}><CalendarClock />Ertele</Button>
-            <Button onClick={() => openAction(onEdit)}><Pencil />Düzenle</Button>
+          <DialogFooter className="[&>button]:h-8 sm:[&>button]:w-28">
+            <Button variant="outline" className="border-red-200 text-destructive hover:border-red-300 hover:bg-red-100 hover:text-destructive hover:shadow-sm" onClick={() => openAction(onCancel)}><XCircle />İptal Et</Button>
+            <Button variant="outline" className="hover:border-slate-300 hover:bg-slate-200 hover:text-slate-950 hover:shadow-sm" onClick={() => openAction(onReschedule)}><CalendarClock />Ertele</Button>
+            <Button className="hover:bg-primary/80 hover:shadow-md" onClick={() => openAction(onEdit)}><Pencil />Düzenle</Button>
           </DialogFooter>
         )}
       </DialogContent>
