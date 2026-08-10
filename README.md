@@ -1,6 +1,6 @@
 # Ziyaretçi Yönetim Sistemi
 
-Çok şirketli ve çok tesisli yapılar için geliştirilen, rol odaklı ziyaret planlama ve operasyon arayüzü. Bu depo şu anda React tabanlı, gerçek API'lerle değiştirilebilecek mock servis katmanına sahip bir frontend uygulamasını içerir.
+Çok şirketli ve çok tesisli yapılar için geliştirilen, rol odaklı ziyaret planlama ve operasyon arayüzü. Bu repo şu anda React tabanlı, gerçek API'lerle değiştirilebilecek mock servis katmanına sahip bir frontend uygulamasını içerir.
 
 ## Öne Çıkanlar
 
@@ -11,7 +11,7 @@
 - Şirket ve tesis bağlamına göre filtreleme
 - Mock veri/servis sınırı sayesinde sonraki API entegrasyonuna hazır mimari
 
-> Uygulama yalnızca frontend aşamasındadır. Gerçek kimlik doğrulama, backend, e-posta, QR ve fiziksel erişim-kontrol entegrasyonları henüz bulunmaz.
+> Uygulama yalnızca frontend aşamasındadır. Gerçek kimlik doğrulama, backend, e-posta, QR ve fiziksel erişim-kontrol entegrasyonları henüz bulunmamaktadır.
 
 ## Teknolojiler
 
