@@ -18,6 +18,7 @@ function visitWithStatus(id: string, plannedStart: string, status: VisitStatus):
     plannedStart,
     plannedEnd: plannedStart,
     status,
+    invitationStatus: "SENT",
     createdAt: plannedStart,
     updatedAt: plannedStart,
   }

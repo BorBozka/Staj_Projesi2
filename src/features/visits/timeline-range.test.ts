@@ -20,6 +20,7 @@ function visitAt(hour: number, minute: number, endHour: number, endMinute: numbe
     plannedStart: start.toISOString(),
     plannedEnd: end.toISOString(),
     status: "PLANNED",
+    invitationStatus: "SENT",
     createdAt: start.toISOString(),
     updatedAt: start.toISOString(),
   }

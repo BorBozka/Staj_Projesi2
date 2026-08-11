@@ -135,6 +135,7 @@ export function ManagerDashboard() {
         onReschedule={noopVisitAction}
         onCancel={noopVisitAction}
         readOnly
+        viewerRole="MANAGER"
       />
     </div>
   )

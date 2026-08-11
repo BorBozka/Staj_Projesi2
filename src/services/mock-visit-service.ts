@@ -1,12 +1,13 @@
 import type { RescheduleVisitInput, Visit, VisitInput, VisitReferenceData } from "@/domain/visits"
 import { initialMockVisits, mockVisitReferenceData } from "@/services/mock-visit-data"
-import { managerNotificationService } from "@/services/manager-notification-service"
 import type { VisitService } from "@/services/visit-service"
 
 const clone = <T,>(value: T): T => structuredClone(value)
 
 export class MockVisitService implements VisitService {
   private visits = clone(initialMockVisits)
+
+  constructor(private readonly shouldFailInvitation: (visit: Visit) => boolean = () => false) {}
 
   async listVisits(): Promise<Visit[]> {
     return clone(this.visits).sort((a, b) => a.plannedStart.localeCompare(b.plannedStart))
@@ -19,7 +20,6 @@ export class MockVisitService implements VisitService {
   async createVisit(input: VisitInput): Promise<Visit> {
     const visit = this.fromInput(`v-${crypto.randomUUID()}`, input)
     this.visits = [...this.visits, visit]
-    if (visit.hasAdditionalRequirements) managerNotificationService.createAdditionalRequirementNotification(visit)
     return clone(visit)
   }
 
@@ -30,12 +30,38 @@ export class MockVisitService implements VisitService {
     return clone(updated)
   }
 
+  async sendVisitInvitation(id: string): Promise<Visit> {
+    const current = this.findVisit(id)
+    if (current.status !== "PLANNED") throw new Error("Yalnızca planlanmış ziyaretler için davet gönderilebilir.")
+    if (current.invitationStatus === "SENT") return clone(current)
+
+    const sending: Visit = {
+      ...current,
+      invitationStatus: "SENDING",
+      invitationError: undefined,
+      updatedAt: new Date().toISOString(),
+    }
+    this.visits = this.visits.map((visit) => visit.id === id ? sending : visit)
+    await Promise.resolve()
+
+    const failed = this.shouldFailInvitation(sending)
+    const completedAt = new Date().toISOString()
+    const completed: Visit = failed
+      ? { ...sending, invitationStatus: "FAILED", invitationError: "Davet teknik bir hata nedeniyle gönderilemedi.", updatedAt: completedAt }
+      : { ...sending, invitationStatus: "SENT", invitationSentAt: completedAt, invitationError: undefined, updatedAt: completedAt }
+    this.visits = this.visits.map((visit) => visit.id === id ? completed : visit)
+    return clone(completed)
+  }
+
   async rescheduleVisit(id: string, input: RescheduleVisitInput): Promise<Visit> {
     const current = this.findVisit(id)
     const updated: Visit = {
       ...current,
       plannedStart: input.plannedStart,
       plannedEnd: input.plannedEnd,
+      invitationStatus: "NOT_SENT",
+      invitationSentAt: undefined,
+      invitationError: undefined,
       updatedAt: new Date().toISOString(),
     }
     this.visits = this.visits.map((visit) => (visit.id === id ? updated : visit))
@@ -91,8 +117,12 @@ export class MockVisitService implements VisitService {
       actualCheckOut: existing?.actualCheckOut,
       visitorCardReturned: existing?.visitorCardReturned,
       status: existing?.status ?? "PLANNED",
+      invitationStatus: "NOT_SENT",
+      invitationSentAt: undefined,
+      invitationError: undefined,
       note: input.note?.trim() || undefined,
       hasAdditionalRequirements: input.hasAdditionalRequirements ?? false,
+      additionalRequirementNote: input.hasAdditionalRequirements ? input.additionalRequirementNote?.trim() || undefined : undefined,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
       cancelledAt: existing?.cancelledAt,

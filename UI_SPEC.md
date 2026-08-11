@@ -454,6 +454,15 @@ The table is primary.
 
 Limit charts to useful summaries.
 
+### Manager All Visits
+
+- Remains a read-only operational list.
+- Uses compact date-range, company, facility, status, visit-type, host, invitation, and additional-requirement filters.
+- Persists filters in the URL and paginates the filtered result.
+- Opens visit details in a right-side drawer without leaving the page.
+- Shows invitation delivery and additional-requirement indicators separately from the operational visit status.
+- Does not expose meeting grouping or resource-assignment actions in this phase.
+
 ---
 
 ## 21. Admin

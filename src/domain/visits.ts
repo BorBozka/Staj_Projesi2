@@ -2,6 +2,10 @@ export const visitStatuses = ["PLANNED", "CHECKED_IN", "CHECKED_OUT", "CANCELLED
 
 export type VisitStatus = (typeof visitStatuses)[number]
 
+export const invitationStatuses = ["NOT_SENT", "SENDING", "SENT", "FAILED"] as const
+
+export type InvitationStatus = (typeof invitationStatuses)[number]
+
 export interface Visitor {
   id: string
   firstName: string
@@ -28,8 +32,12 @@ export interface Visit {
   actualCheckOut?: string
   visitorCardReturned?: boolean
   status: VisitStatus
+  invitationStatus: InvitationStatus
+  invitationSentAt?: string
+  invitationError?: string
   note?: string
   hasAdditionalRequirements?: boolean
+  additionalRequirementNote?: string
   createdAt: string
   updatedAt: string
   cancelledAt?: string
@@ -85,6 +93,7 @@ export interface VisitInput {
   plannedEnd: string
   note?: string
   hasAdditionalRequirements?: boolean
+  additionalRequirementNote?: string
 }
 
 export interface RescheduleVisitInput {

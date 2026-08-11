@@ -82,6 +82,7 @@ export function MyVisitsPage() {
         onEdit={openEdit}
         onReschedule={setReschedulingVisit}
         onCancel={setCancellingVisit}
+        viewerRole={referenceData?.currentEmployee.role ?? "EMPLOYEE"}
       />
       <VisitFormDialog open={formOpen} onOpenChange={setFormOpen} visit={editingVisit} onSaved={setNotice} />
       <RescheduleVisitDialog

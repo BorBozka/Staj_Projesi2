@@ -217,6 +217,9 @@ Includes:
 - Excel/PDF buttons as UI actions,
 - multi-company/facility context using mock data,
 - at most a small number of useful charts.
+- read-only `All Visits` operations list with URL-persisted date-range and manager filters,
+- compact pagination and a right-side visit detail drawer,
+- invitation and additional-requirement visibility without meeting or resource-assignment actions.
 
 Recharts may be added only if actual stakeholder-reviewed charts are needed.
 

@@ -5,8 +5,9 @@ import {
   LayoutDashboard,
   Menu,
   PackageCheck,
+  Send,
 } from "lucide-react"
-import { useCallback, useEffect, useState } from "react"
+import { lazy, Suspense, useCallback, useEffect, useState } from "react"
 import { NavLink, Outlet } from "react-router-dom"
 
 import bplasLogo from "@/assets/bplas-logo.svg"
@@ -19,15 +20,17 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import type { ManagerNotification } from "@/domain/manager-notifications"
 import { startMinuteClock } from "@/features/manager/manager-clock"
 import { ManagerRefreshProvider } from "@/features/manager/manager-refresh-context"
+import { getInvitationActionLabel, getPendingInvitationVisits } from "@/features/visits/invitation-status"
 import { useVisits } from "@/features/visits/visit-context"
 import { formatTr } from "@/lib/date"
 import { cn } from "@/lib/utils"
-import { managerNotificationService } from "@/services/manager-notification-service"
 
 const personalNavigationItems = [{ label: "Ziyaretlerim", icon: CalendarDays, to: "/manager/my-visits" }]
+const VisitFormDialog = lazy(() =>
+  import("@/features/visits/VisitFormDialog").then((module) => ({ default: module.VisitFormDialog })),
+)
 const managementNavigationItems = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/manager/dashboard" },
   { label: "Tüm Ziyaretler", icon: CalendarDays, to: "/manager/all-visits" },
@@ -121,11 +124,10 @@ function ManagerSidebar({ collapsed, onCollapsedChange }: { collapsed: boolean; 
 }
 
 function ManagerNotifications({ collapsed }: { collapsed: boolean }) {
-  const [notifications, setNotifications] = useState(() => managerNotificationService.list())
-  const [selectedNotification, setSelectedNotification] = useState<ManagerNotification | null>(null)
-  const unreadCount = notifications.filter((notification) => !notification.isRead).length
-
-  useEffect(() => managerNotificationService.subscribe(() => setNotifications(managerNotificationService.list())), [])
+  const { visits } = useVisits()
+  const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null)
+  const pendingInvitations = getPendingInvitationVisits(visits)
+  const selectedVisit = visits.find((visit) => visit.id === selectedVisitId)
 
   return (
     <>
@@ -135,55 +137,52 @@ function ManagerNotifications({ collapsed }: { collapsed: boolean }) {
             variant="ghost"
             size={collapsed ? "icon-sm" : "sm"}
             className={cn("relative mb-1.5 text-slate-400 hover:bg-slate-800 hover:text-white", collapsed ? "w-full" : "w-full justify-start")}
-            aria-label={`Bildirimler${unreadCount ? `, ${unreadCount} okunmamış` : ""}`}
+            aria-label={`Bildirimler${pendingInvitations.length ? `, ${pendingInvitations.length} eylem bekleyen davet` : ""}`}
             title={collapsed ? "Bildirimler" : undefined}
           >
             <Bell />
             {!collapsed && <span>Bildirimler</span>}
-            {unreadCount > 0 && <span className="absolute right-1 top-0.5 flex size-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white">{unreadCount}</span>}
+            {pendingInvitations.length > 0 && <span className="absolute right-1 top-0.5 flex min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white">{pendingInvitations.length}</span>}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent side="right" align="end" className="w-80 p-1.5" aria-label="Yönetici bildirimleri">
           <DropdownMenuLabel className="text-sm text-slate-900">Bildirimler</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          {notifications.length === 0 ? (
-            <p className="px-2 py-5 text-center text-xs text-slate-500">Yeni bildirim yok.</p>
-          ) : notifications.map((notification) => (
+          <p className="px-2 pb-1 pt-1.5 text-xs font-semibold text-slate-600">Eylem bekleyenler</p>
+          {pendingInvitations.length === 0 ? (
+            <p className="px-2 py-5 text-center text-xs text-slate-500">Eylem bekleyen davet yok.</p>
+          ) : pendingInvitations.map((visit) => (
             <DropdownMenuItem
-              key={notification.id}
-              className={cn("block cursor-pointer whitespace-normal px-2 py-2.5", !notification.isRead && "bg-blue-50/70")}
-              onSelect={(event) => {
-                event.preventDefault()
-                managerNotificationService.markRead(notification.id)
-                setSelectedNotification(notification)
-              }}
+              key={visit.id}
+              className="block cursor-pointer whitespace-normal px-2 py-2.5 focus:bg-blue-50"
+              aria-label={`${visit.visitor.firstName} ${visit.visitor.lastName} için ${getInvitationActionLabel(visit)} aksiyonunu aç`}
+              onSelect={() => setSelectedVisitId(visit.id)}
             >
-              <p className="text-xs font-semibold text-slate-900">{notification.title}</p>
-              <p className="mt-1 text-xs leading-5 text-slate-600">{notification.detail}</p>
-              <p className="mt-1 text-[11px] text-blue-700">Detayları görüntüle</p>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-semibold text-slate-900">{visit.visitor.firstName} {visit.visitor.lastName}</p>
+                  <p className="mt-1 text-xs text-slate-600">{formatTr(new Date(visit.plannedStart), "d MMM yyyy · HH:mm")}</p>
+                  <p className={cn("mt-1 text-[11px] font-medium", visit.invitationStatus === "FAILED" ? "text-red-700" : "text-amber-700")}>
+                    {visit.invitationStatus === "FAILED" ? "Gönderim hatası" : "Davet gönderilmedi"}
+                  </p>
+                </div>
+                <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-blue-700"><Send className="size-3.5" />{getInvitationActionLabel(visit)}</span>
+              </div>
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Dialog open={Boolean(selectedNotification)} onOpenChange={(open) => !open && setSelectedNotification(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>{selectedNotification?.title}</DialogTitle>
-            <DialogDescription>{selectedNotification?.detail}</DialogDescription>
-          </DialogHeader>
-          {selectedNotification && (
-            <dl className="grid gap-x-4 gap-y-3 text-sm sm:grid-cols-[120px_minmax(0,1fr)]">
-              <dt className="text-slate-500">Ziyaretçi</dt><dd className="font-medium text-slate-900">{selectedNotification.visit.visitorName}</dd>
-              <dt className="text-slate-500">İletişim</dt><dd className="break-words text-slate-900">{selectedNotification.visit.visitorEmail}{selectedNotification.visit.visitorPhone && <><br />{selectedNotification.visit.visitorPhone}</>}</dd>
-              <dt className="text-slate-500">Ziyaret türü</dt><dd className="text-slate-900">{selectedNotification.visit.visitTypeName}</dd>
-              <dt className="text-slate-500">Konum</dt><dd className="text-slate-900">{selectedNotification.visit.companyName} · {selectedNotification.visit.facilityName}</dd>
-              <dt className="text-slate-500">Planlanan</dt><dd className="text-slate-900">{formatTr(new Date(selectedNotification.visit.plannedStart), "d MMMM yyyy · HH:mm")}–{formatTr(new Date(selectedNotification.visit.plannedEnd), "HH:mm")}</dd>
-              {selectedNotification.visit.note && <><dt className="text-slate-500">Not</dt><dd className="whitespace-pre-wrap text-slate-900">{selectedNotification.visit.note}</dd></>}
-            </dl>
-          )}
-        </DialogContent>
-      </Dialog>
+      {selectedVisit && (
+        <Suspense fallback={null}>
+          <VisitFormDialog
+            open
+            onOpenChange={(open) => !open && setSelectedVisitId(null)}
+            visit={selectedVisit}
+            onSaved={() => undefined}
+          />
+        </Suspense>
+      )}
     </>
   )
 }
@@ -229,6 +228,7 @@ function ManagerMobileNavigation({ open, onOpenChange }: { open: boolean; onOpen
         </nav>
 
         <div className="border-t border-slate-800 p-2">
+          <ManagerNotifications collapsed={false} />
           <ManagerProfile />
         </div>
       </DialogContent>

@@ -19,6 +19,7 @@ function makeVisit(id: string, status: VisitStatus, plannedStart: string, overri
     plannedStart,
     plannedEnd: "2026-08-10T12:00:00+03:00",
     status,
+    invitationStatus: "SENT",
     createdAt: plannedStart,
     updatedAt: plannedStart,
     ...overrides,

@@ -555,6 +555,15 @@ Exports:
 
 Use limited charts; filtered table is primary.
 
+The manager `All Visits` view is read-only and provides:
+
+- URL-persisted date-range and operational filters,
+- compact paginated visit records,
+- invitation and additional-requirement visibility,
+- a right-side read-only visit detail panel.
+
+Meeting grouping and resource assignment are not part of this view in the current phase.
+
 ---
 
 ## 23. After-Hours Goods Delivery

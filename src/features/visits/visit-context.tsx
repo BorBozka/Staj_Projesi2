@@ -11,6 +11,7 @@ interface VisitContextValue {
   reload(): Promise<void>
   createVisit(input: VisitInput): Promise<Visit>
   updateVisit(id: string, input: VisitInput): Promise<Visit>
+  sendVisitInvitation(id: string): Promise<Visit>
   rescheduleVisit(id: string, input: RescheduleVisitInput): Promise<Visit>
   cancelVisit(id: string): Promise<Visit>
 }
@@ -64,6 +65,15 @@ export function VisitProvider({ service, children }: { service: VisitService; ch
     [refreshVisits, service],
   )
 
+  const sendVisitInvitation = useCallback(
+    async (id: string) => {
+      const updated = await service.sendVisitInvitation(id)
+      await refreshVisits()
+      return updated
+    },
+    [refreshVisits, service],
+  )
+
   const rescheduleVisit = useCallback(
     async (id: string, input: RescheduleVisitInput) => {
       const updated = await service.rescheduleVisit(id, input)
@@ -91,10 +101,11 @@ export function VisitProvider({ service, children }: { service: VisitService; ch
       reload: load,
       createVisit,
       updateVisit,
+      sendVisitInvitation,
       rescheduleVisit,
       cancelVisit,
     }),
-    [visits, referenceData, isLoading, error, load, createVisit, updateVisit, rescheduleVisit, cancelVisit],
+    [visits, referenceData, isLoading, error, load, createVisit, updateVisit, sendVisitInvitation, rescheduleVisit, cancelVisit],
   )
 
   return <VisitContext.Provider value={value}>{children}</VisitContext.Provider>

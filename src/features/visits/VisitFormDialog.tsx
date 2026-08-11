@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { addHours, setMinutes } from "date-fns"
-import { BellRing, Send } from "lucide-react"
+import { Send } from "lucide-react"
 import { cloneElement, isValidElement, useEffect, useId, useMemo, useRef, useState } from "react"
 import { type FieldErrors, useForm } from "react-hook-form"
 
@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label"
 import { Select } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import type { Visit } from "@/domain/visits"
+import { getInvitationActionLabel } from "@/features/visits/invitation-status"
 import { useVisits } from "@/features/visits/visit-context"
 import { toVisitInput, visitFormSchema, type VisitFormValues } from "@/features/visits/visit-form-schema"
 import { formatTr } from "@/lib/date"
@@ -63,6 +64,7 @@ function defaultsFor(visit?: Visit): VisitFormValues {
     endTime: formatTr(visit ? new Date(visit.plannedEnd) : end, "HH:mm"),
     note: visit?.note ?? "",
     hasAdditionalRequirements: visit?.hasAdditionalRequirements ?? false,
+    additionalRequirementNote: visit?.additionalRequirementNote ?? "",
   }
 }
 
@@ -79,15 +81,18 @@ interface VisitFormDialogProps {
 }
 
 export function VisitFormDialog({ open, onOpenChange, visit, onSaved }: VisitFormDialogProps) {
-  const { referenceData, createVisit, updateVisit } = useVisits()
+  const { referenceData, createVisit, updateVisit, sendVisitInvitation } = useVisits()
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [saveNotice, setSaveNotice] = useState<string | null>(null)
   const [savedVisit, setSavedVisit] = useState<Visit | null>(null)
+  const [isSendingInvitation, setIsSendingInvitation] = useState(false)
   const [showValidationErrors, setShowValidationErrors] = useState(false)
   const form = useForm<VisitFormValues>({ resolver: zodResolver(visitFormSchema), defaultValues: defaultsFor(visit), mode: "onChange" })
   const companyId = form.watch("hostCompanyId")
   const phoneCountryCode = form.watch("phoneCountryCode")
+  const hasAdditionalRequirements = form.watch("hasAdditionalRequirements")
   const note = form.watch("note")
+  const invitationHelpId = useId()
   const noteTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const formContentRef = useRef<HTMLDivElement | null>(null)
   const { ref: noteFieldRef, ...noteField } = form.register("note")
@@ -99,6 +104,7 @@ export function VisitFormDialog({ open, onOpenChange, visit, onSaved }: VisitFor
       setSubmitError(null)
       setSaveNotice(null)
       setSavedVisit(visit ?? null)
+      setIsSendingInvitation(false)
       setShowValidationErrors(false)
     }
   }, [form, open, referenceData, visit])
@@ -109,6 +115,12 @@ export function VisitFormDialog({ open, onOpenChange, visit, onSaved }: VisitFor
     textarea.style.height = "auto"
     textarea.style.height = `${textarea.scrollHeight}px`
   }, [note])
+
+  useEffect(() => {
+    if (!form.formState.isDirty) return
+    setSaveNotice(null)
+    setSubmitError(null)
+  }, [form.formState.isDirty])
 
   const facilities = useMemo(
     () => referenceData?.facilities.filter((facility) => facility.companyId === companyId) ?? [],
@@ -129,7 +141,9 @@ export function VisitFormDialog({ open, onOpenChange, visit, onSaved }: VisitFor
       setSavedVisit(saved)
       form.reset(defaultsFor(saved))
       await form.trigger()
-      setSaveNotice("Ziyaret kaydedildi. Daveti gönderebilirsiniz.")
+      const message = "Ziyaret kaydedildi ve güvenliğe iletildi. Davet henüz gönderilmedi."
+      setSaveNotice(message)
+      onSaved(message)
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : "Ziyaret kaydedilemedi.")
     }
@@ -143,13 +157,40 @@ export function VisitFormDialog({ open, onOpenChange, visit, onSaved }: VisitFor
 
   const onSave = form.handleSubmit(saveVisit, onInvalidSave)
 
-  const sendInvitation = () => {
-    if (!(savedVisit ?? visit) || form.formState.isDirty) return
-    onSaved("Davet gönderim için sıraya alındı.")
-    onOpenChange(false)
+  const sendInvitation = async () => {
+    const currentVisit = savedVisit ?? visit
+    if (!currentVisit || form.formState.isDirty || currentVisit.invitationStatus === "SENT" || isSendingInvitation) return
+
+    setIsSendingInvitation(true)
+    setSubmitError(null)
+    try {
+      const sentVisit = await sendVisitInvitation(currentVisit.id)
+      setSavedVisit(sentVisit)
+      if (sentVisit.invitationStatus === "FAILED") {
+        setSaveNotice(null)
+        setSubmitError(sentVisit.invitationError ?? "Davet gönderilemedi.")
+        return
+      }
+      setSaveNotice("Davet başarıyla gönderildi.")
+      onSaved("Davet başarıyla gönderildi.")
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Davet gönderilemedi.")
+    } finally {
+      setIsSendingInvitation(false)
+    }
   }
 
-  const isSaved = Boolean(savedVisit ?? visit) && !form.formState.isDirty
+  const currentVisit = savedVisit ?? visit
+  const canSendInvitation = Boolean(currentVisit) && !form.formState.isDirty && currentVisit?.invitationStatus !== "SENT" && currentVisit?.invitationStatus !== "SENDING" && !isSendingInvitation
+  const invitationDisabledReason = !currentVisit
+    ? "Davet göndermek için önce ziyareti kaydedin."
+    : form.formState.isDirty
+      ? "Davet göndermek için değişiklikleri kaydedin."
+      : currentVisit.invitationStatus === "SENT"
+        ? "Davet daha önce başarıyla gönderildi."
+        : isSendingInvitation || currentVisit.invitationStatus === "SENDING"
+          ? "Davet gönderiliyor."
+          : "Kayıt hazır; daveti gönderebilirsiniz."
 
   const fieldError = (name: keyof VisitFormValues) => {
     const message = form.formState.errors[name]?.message
@@ -178,7 +219,7 @@ export function VisitFormDialog({ open, onOpenChange, visit, onSaved }: VisitFor
               <FormField label="E-posta" required error={fieldError("visitorEmail")} className="sm:col-span-2">
                 <Input type="email" placeholder="ziyaretci@firma.com" {...form.register("visitorEmail")} />
               </FormField>
-              <FormField label="Telefon" error={fieldError("visitorPhone")} className="sm:col-span-2">
+              <FormField label="Telefon (opsiyonel)" error={fieldError("visitorPhone")} className="sm:col-span-2">
                 <div className={phoneCountryCode === "other" ? "grid gap-2 sm:grid-cols-[150px_96px_minmax(0,1fr)]" : "grid gap-2 sm:grid-cols-[150px_minmax(0,1fr)]"}>
                   <Select {...form.register("phoneCountryCode")} aria-label="Telefon ülke kodu">
                     {phoneCountryCodes.map((country) => <option key={country.value} value={country.value}>{country.label}</option>)}
@@ -265,18 +306,24 @@ export function VisitFormDialog({ open, onOpenChange, visit, onSaved }: VisitFor
 
           <fieldset className="space-y-2 rounded-md border bg-slate-50/60 p-2.5">
             <legend className="px-1 text-xs font-semibold text-slate-700">Ek Bilgi</legend>
-            <Button
-              type="button"
-              variant={form.watch("hasAdditionalRequirements") ? "secondary" : "outline"}
-              size="sm"
-              className={form.watch("hasAdditionalRequirements") ? "border border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100" : "bg-white text-slate-700"}
-              aria-pressed={form.watch("hasAdditionalRequirements")}
-              onClick={() => form.setValue("hasAdditionalRequirements", !form.getValues("hasAdditionalRequirements"), { shouldDirty: true })}
-            >
-              <BellRing className="size-3.5" />
-              İlave gereksinim
-            </Button>
-            {form.watch("hasAdditionalRequirements") && <p className="-mt-1 text-xs text-amber-800">Kayıt oluşturulduğunda yönetici yetkililerine uygulama içi bildirim gönderilir.</p>}
+            <label className="flex min-h-9 cursor-pointer items-center gap-2 rounded-md border bg-white px-3 text-sm font-medium text-slate-700">
+              <input
+                type="checkbox"
+                className="size-4 rounded border-slate-300 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                {...form.register("hasAdditionalRequirements")}
+              />
+              <span>İlave gereksinim var</span>
+            </label>
+            {hasAdditionalRequirements && (
+              <FormField label="İlave gereksinim notu" error={fieldError("additionalRequirementNote")}>
+                <Textarea
+                  rows={2}
+                  className="min-h-16 resize-y"
+                  placeholder="8 kişilik toplantı odası ve projeksiyon gerekiyor."
+                  {...form.register("additionalRequirementNote")}
+                />
+              </FormField>
+            )}
             <FormField label="Not / Açıklama" error={fieldError("note")}>
               <Textarea
                 {...noteField}
@@ -295,13 +342,25 @@ export function VisitFormDialog({ open, onOpenChange, visit, onSaved }: VisitFor
           {saveNotice && <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800" role="status">{saveNotice}</p>}
           </div>
 
-          <DialogFooter className="flex-row items-center justify-end border-t bg-card px-5 py-3 sm:justify-end [&>p]:hidden">
-            <p className="text-xs text-slate-500">{isSaved ? "Ziyaret kaydedildi." : "Davet göndermek için önce ziyareti kaydedin."}</p>
-            <div className="flex items-center gap-2">
-            <Button type="submit" variant="outline" disabled={form.formState.isSubmitting}>Ziyareti Kaydet</Button>
-            <Button type="button" onClick={sendInvitation} disabled={!isSaved || form.formState.isSubmitting}>
+          <DialogFooter className="items-stretch border-t bg-card px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p id={invitationHelpId} className="text-xs text-slate-500" aria-live="polite">{invitationDisabledReason}</p>
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+            <Button
+              type="submit"
+              variant="outline"
+              disabled={form.formState.isSubmitting || isSendingInvitation || (Boolean(currentVisit) && !form.formState.isDirty)}
+            >
+              {form.formState.isSubmitting ? "Kaydediliyor…" : currentVisit && form.formState.isDirty ? "Değişiklikleri Kaydet" : currentVisit ? "Kaydedildi" : "Ziyareti Kaydet"}
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void sendInvitation()}
+              disabled={!canSendInvitation || form.formState.isSubmitting}
+              aria-describedby={invitationHelpId}
+              aria-label={`${currentVisit ? getInvitationActionLabel(currentVisit, isSendingInvitation) : "Daveti Gönder"}. ${invitationDisabledReason}`}
+            >
               <Send />
-              {form.formState.isSubmitting ? "Kaydediliyor…" : visit ? "Değişiklikleri Kaydet" : "Daveti Gönder"}
+              {currentVisit ? getInvitationActionLabel(currentVisit, isSendingInvitation) : "Daveti Gönder"}
             </Button>
             </div>
           </DialogFooter>

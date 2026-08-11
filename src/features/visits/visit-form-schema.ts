@@ -17,6 +17,7 @@ export const visitFormSchema = z
     endTime: z.string().min(1, "Bitiş saati zorunludur."),
     note: z.string().max(500, "Açıklama en fazla 500 karakter olabilir.").optional(),
     hasAdditionalRequirements: z.boolean().default(false),
+    additionalRequirementNote: z.string().max(500, "İlave gereksinim notu en fazla 500 karakter olabilir.").optional(),
   })
   .superRefine((value, context) => {
     if (!value.visitDate || !value.startTime || !value.endTime) return
@@ -55,5 +56,6 @@ export function toVisitInput(values: VisitFormValues) {
     plannedEnd: new Date(`${values.visitDate}T${values.endTime}:00`).toISOString(),
     note: values.note,
     hasAdditionalRequirements: values.hasAdditionalRequirements,
+    additionalRequirementNote: values.hasAdditionalRequirements ? values.additionalRequirementNote?.trim() || undefined : undefined,
   }
 }

@@ -1,6 +1,6 @@
 import { addDays, addHours, setHours, setMinutes, startOfDay, subDays } from "date-fns"
 
-import type { Visit, VisitReferenceData, VisitStatus } from "@/domain/visits"
+import type { InvitationStatus, Visit, VisitReferenceData, VisitStatus } from "@/domain/visits"
 
 export const mockVisitReferenceData: VisitReferenceData = {
   companies: [
@@ -60,7 +60,11 @@ interface SeedVisit {
   companyId: string
   facilityId: string
   status: VisitStatus
+  invitationStatus?: InvitationStatus
+  phone?: string
   note?: string
+  hasAdditionalRequirements?: boolean
+  additionalRequirementNote?: string
 }
 
 function toVisit(seed: SeedVisit): Visit {
@@ -80,6 +84,7 @@ function toVisit(seed: SeedVisit): Visit {
       firstName: seed.firstName,
       lastName: seed.lastName,
       email: seed.email,
+      phone: seed.phone,
     },
     visitTypeId: type.id,
     visitTypeName: type.name,
@@ -95,7 +100,12 @@ function toVisit(seed: SeedVisit): Visit {
     actualCheckOut: seed.actualCheckOut,
     visitorCardReturned: seed.visitorCardReturned,
     status: seed.status,
+    invitationStatus: seed.invitationStatus ?? "SENT",
+    invitationSentAt: (seed.invitationStatus ?? "SENT") === "SENT" ? timestamp : undefined,
+    invitationError: seed.invitationStatus === "FAILED" ? "Davet teknik bir hata nedeniyle gönderilemedi." : undefined,
     note: seed.note,
+    hasAdditionalRequirements: seed.hasAdditionalRequirements,
+    additionalRequirementNote: seed.hasAdditionalRequirements ? seed.additionalRequirementNote : undefined,
     createdAt: timestamp,
     updatedAt: timestamp,
     cancelledAt: seed.status === "CANCELLED" ? subDays(new Date(), 1).toISOString() : undefined,
@@ -108,9 +118,9 @@ const densityTestDay = addDays(today, 8)
 export const initialMockVisits: Visit[] = [
   toVisit({ id: "v-101", firstName: "Deniz", lastName: "Aksoy", email: "deniz.aksoy@example.com", day: today, startHour: 9, durationHours: 1.5, actualCheckIn: at(today, 9), actualCheckOut: at(today, 10, 35), visitorCardReturned: false, typeId: "supplier", employeeId: "maya-kara", companyId: "bplas", facilityId: "bplas-merkez", status: "CHECKED_OUT" }),
   toVisit({ id: "v-102", firstName: "Cem", lastName: "Ergin", email: "cem.ergin@example.com", day: today, startHour: 11, durationHours: 1, actualCheckIn: at(today, 10, 50), visitorCardReturned: false, typeId: "meeting", employeeId: "emre-yilmaz", companyId: "bplas", facilityId: "bplas-merkez", status: "CHECKED_IN", note: "Ürün tasarım değerlendirmesi" }),
-  toVisit({ id: "v-103", firstName: "Lara", lastName: "Şen", email: "lara.sen@example.com", day: today, startHour: 14, startMinute: 30, durationHours: 1.5, typeId: "customer", employeeId: "maya-kara", companyId: "bplas", facilityId: "bplas-merkez", status: "PLANNED" }),
-  toVisit({ id: "v-104", creatorEmployeeId: "atahan-bora-bozkurt", firstName: "Ozan", lastName: "Acar", email: "ozan.acar@example.com", day: addDays(today, 1), startHour: 10, durationHours: 2, typeId: "technical-service", employeeId: "emre-yilmaz", companyId: "bplas", facilityId: "bplas-arge", status: "PLANNED", note: "Soğutma sistemi kontrolü" }),
-  toVisit({ id: "v-105", creatorEmployeeId: "atahan-bora-bozkurt", firstName: "Ece", lastName: "Koç", email: "ece.koc@example.com", day: addDays(today, 2), startHour: 13, durationHours: 1, typeId: "audit", employeeId: "selin-aydin", companyId: "bplas-otomotiv", facilityId: "otomotiv-uretim", status: "PLANNED" }),
+  toVisit({ id: "v-103", firstName: "Lara", lastName: "Şen", email: "lara.sen@example.com", phone: "+90 532 111 22 33", day: today, startHour: 14, startMinute: 30, durationHours: 1.5, typeId: "customer", employeeId: "maya-kara", companyId: "bplas", facilityId: "bplas-merkez", status: "PLANNED", invitationStatus: "NOT_SENT", hasAdditionalRequirements: true, additionalRequirementNote: "Tekerlekli sandalye erişimi hazırlanmalı." }),
+  toVisit({ id: "v-104", creatorEmployeeId: "atahan-bora-bozkurt", firstName: "Ozan", lastName: "Acar", email: "ozan.acar@example.com", day: addDays(today, 1), startHour: 10, durationHours: 2, typeId: "technical-service", employeeId: "emre-yilmaz", companyId: "bplas", facilityId: "bplas-arge", status: "PLANNED", invitationStatus: "FAILED", note: "Soğutma sistemi kontrolü" }),
+  toVisit({ id: "v-105", creatorEmployeeId: "atahan-bora-bozkurt", firstName: "Ece", lastName: "Koç", email: "ece.koc@example.com", day: addDays(today, 2), startHour: 13, durationHours: 1, typeId: "audit", employeeId: "selin-aydin", companyId: "bplas-otomotiv", facilityId: "otomotiv-uretim", status: "PLANNED", invitationStatus: "SENDING", hasAdditionalRequirements: true, additionalRequirementNote: "Denetim dosyaları için kilitli dolap gerekli." }),
   toVisit({ id: "v-106", firstName: "Can", lastName: "Öz", email: "can.oz@example.com", day: subDays(today, 1), startHour: 15, durationHours: 1, typeId: "meeting", employeeId: "maya-kara", companyId: "bplas", facilityId: "bplas-merkez", status: "CANCELLED" }),
   toVisit({ id: "v-107", firstName: "Ada", lastName: "Güneş", email: "ada.gunes@example.com", day: subDays(today, 2), startHour: 10, durationHours: 1, typeId: "interview", employeeId: "maya-kara", companyId: "bplas", facilityId: "bplas-merkez", status: "NO_SHOW" }),
   toVisit({ id: "v-108", firstName: "Bora", lastName: "Tuna", email: "bora.tuna@example.com", day: addDays(today, 5), startHour: 9, startMinute: 30, durationHours: 2, typeId: "supplier", employeeId: "kerem-demir", companyId: "anadolu-lojistik", facilityId: "anadolu-lojistik-merkez", status: "PLANNED" }),
