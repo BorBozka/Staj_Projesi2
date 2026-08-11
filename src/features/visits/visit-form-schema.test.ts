@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest"
 
-import { toVisitInput, visitFormSchema } from "@/features/visits/visit-form-schema"
+import { toMeetingInput, visitFormSchema } from "@/features/visits/visit-form-schema"
 
-const validValues = {
+const validVisitor = {
   visitorFirstName: "Deniz",
   visitorLastName: "Aksoy",
   visitorEmail: "deniz.aksoy@example.com",
+}
+
+const validValues = {
+  visitors: [validVisitor],
   visitTypeId: "meeting",
   hostEmployeeName: "Maya Kara",
   hostCompanyId: "bplas",
@@ -16,8 +20,28 @@ const validValues = {
 }
 
 describe("visitFormSchema", () => {
-  it("accepts a valid start and end time", () => {
+  it("requires at least one visitor", () => {
     expect(visitFormSchema.safeParse(validValues).success).toBe(true)
+    expect(visitFormSchema.safeParse({ ...validValues, visitors: [] }).success).toBe(false)
+  })
+
+  it("validates first name, last name, and email separately for every visitor", () => {
+    const result = visitFormSchema.safeParse({
+      ...validValues,
+      visitors: [
+        validVisitor,
+        { visitorFirstName: "", visitorLastName: "", visitorEmail: "invalid-email" },
+      ],
+    })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.map((issue) => issue.path.join("."))).toEqual(expect.arrayContaining([
+        "visitors.1.visitorFirstName",
+        "visitors.1.visitorLastName",
+        "visitors.1.visitorEmail",
+      ]))
+    }
   })
 
   it("rejects an end time that is not after the start time", () => {
@@ -27,23 +51,17 @@ describe("visitFormSchema", () => {
     if (!result.success) expect(result.error.issues.some((issue) => issue.path.includes("endTime"))).toBe(true)
   })
 
-  it("rejects invalid required values", () => {
-    expect(visitFormSchema.safeParse({ ...validValues, visitorEmail: "invalid-email", startTime: "" }).success).toBe(false)
+  it("accepts optional and international visitor phone values independently", () => {
+    expect(visitFormSchema.safeParse({ ...validValues, visitors: [{ ...validVisitor, visitorPhone: "" }] }).success).toBe(true)
+    expect(visitFormSchema.safeParse({ ...validValues, visitors: [{ ...validVisitor, visitorPhone: "532 123 45 67" }] }).success).toBe(true)
+    expect(visitFormSchema.safeParse({ ...validValues, visitors: [{ ...validVisitor, visitorPhone: "0532 123 45 67" }] }).success).toBe(false)
+    expect(visitFormSchema.safeParse({ ...validValues, visitors: [{ ...validVisitor, phoneCountryCode: "+44", visitorPhone: "2079460123" }] }).success).toBe(true)
   })
 
-  it("accepts an optional mobile phone only in the expected format", () => {
-    expect(visitFormSchema.safeParse({ ...validValues, visitorPhone: "" }).success).toBe(true)
-    expect(visitFormSchema.safeParse({ ...validValues, visitorPhone: "532 123 45 67" }).success).toBe(true)
-    expect(visitFormSchema.safeParse({ ...validValues, visitorPhone: "0532 123 45 67" }).success).toBe(false)
-  })
-
-  it("accepts an international phone with a selected country code", () => {
-    expect(visitFormSchema.safeParse({ ...validValues, phoneCountryCode: "+44", visitorPhone: "2079460123" }).success).toBe(true)
-  })
-
-  it("keeps the additional requirement note separate and omits it when the checkbox is off", () => {
+  it("maps several visitors and keeps the additional requirement note separate", () => {
     const selected = visitFormSchema.parse({
       ...validValues,
+      visitors: [validVisitor, { ...validVisitor, visitorFirstName: "Bora", visitorEmail: "bora@example.com" }],
       note: "Genel not",
       hasAdditionalRequirements: true,
       additionalRequirementNote: "Projeksiyon gerekiyor.",
@@ -54,7 +72,11 @@ describe("visitFormSchema", () => {
       additionalRequirementNote: "Gönderilmemeli",
     })
 
-    expect(toVisitInput(selected)).toMatchObject({ note: "Genel not", additionalRequirementNote: "Projeksiyon gerekiyor." })
-    expect(toVisitInput(cleared).additionalRequirementNote).toBeUndefined()
+    expect(toMeetingInput(selected)).toMatchObject({
+      visitors: [{ firstName: "Deniz" }, { firstName: "Bora" }],
+      note: "Genel not",
+      additionalRequirementNote: "Projeksiyon gerekiyor.",
+    })
+    expect(toMeetingInput(cleared).additionalRequirementNote).toBeUndefined()
   })
 })

@@ -7,6 +7,8 @@ import { getDashboardVisitStatus, getDelayMinutes, getNextPlannedVisits, getOper
 function makeVisit(id: string, status: VisitStatus, plannedStart: string, overrides: Partial<Visit> = {}): Visit {
   return {
     id,
+    meetingId: `meeting-${id}`,
+    creatorEmployeeId: "creator-1",
     visitor: { id: `visitor-${id}`, firstName: id, lastName: "Ziyaretçi", email: `${id}@example.com` },
     visitTypeId: "meeting",
     visitTypeName: "Toplantı",
@@ -20,6 +22,7 @@ function makeVisit(id: string, status: VisitStatus, plannedStart: string, overri
     plannedEnd: "2026-08-10T12:00:00+03:00",
     status,
     invitationStatus: "SENT",
+    hasAdditionalRequirements: false,
     createdAt: plannedStart,
     updatedAt: plannedStart,
     ...overrides,

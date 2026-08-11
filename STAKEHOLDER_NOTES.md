@@ -36,22 +36,24 @@ Approved direction (moved to `PRODUCT_SPEC.md` and `UI_SPEC.md`):
 - Meeting rooms are facility-specific resources.
 - Notebooks and projectors are facility-specific pooled quantities, not individually
   serialized assets.
-- The employee records additional requirements as a note; the employee does not select
-  or reserve resources.
-- Managers/human resources assign rooms and equipment after reviewing the note.
+- The employee records additional requirements as a note; the note is not itself a
+  resource request and the employee does not select or reserve resources.
+- Every user with Manager permission may assign rooms and equipment in the future
+  resource phase.
+- Resources and resource assignment are independent of the configured visit type.
+- Room assignment is optional.
 - Availability must be checked against facility, active state, and overlapping
   reservations.
 - The employee creates one meeting and adds its attendees separately. Each attendee
   remains a separate visit record.
-- An unavailable requested resource does not block the meeting. Managers/human resources
-  see availability or shortage information and resolve it operationally.
+- An unavailable resource does not block Meeting or Visit creation. Users with Manager
+  permission see availability or shortage information and resolve it operationally.
 
 Decision needed:
 
-1. Which manager permissions may create, edit, cancel, and override an assignment?
-2. Is resource assignment available only for the `Meeting` visit type, or for every
-   visit type?
-3. Must a room be assigned, or is it always optional?
+1. Who may edit or cancel an existing resource assignment?
+2. Who may override an availability conflict, and what justification or audit details
+   are required?
 
 ## 3. Save and Send Workflow
 
@@ -89,7 +91,9 @@ Approved direction (moved to `PRODUCT_SPEC.md` and `UI_SPEC.md`):
 
 - Use a simple additional-requirement control that reveals a short free-text note.
 - Do not show a resource multi-select or catalogue to the employee.
-- Managers/human resources interpret the note and assign available resources.
+- The note communicates an additional operational need. It does not automatically create
+  a resource request or reserve a resource; an authorized Manager may act on it in the
+  future resource phase.
 - Keep the additional-requirement note separate from the general visit/security note.
 - Show it to the host/organizer and authorized managers/resource administrators, but not
   to security.

@@ -14,10 +14,8 @@ export interface Visitor {
   phone?: string
 }
 
-export interface Visit {
-  id: string
-  creatorEmployeeId?: string
-  visitor: Visitor
+export interface MeetingDetails {
+  creatorEmployeeId: string
   visitTypeId: string
   visitTypeName: string
   hostEmployeeId: string
@@ -28,6 +26,21 @@ export interface Visit {
   facilityName: string
   plannedStart: string
   plannedEnd: string
+  note?: string
+  hasAdditionalRequirements: boolean
+  additionalRequirementNote?: string
+}
+
+export interface Meeting extends MeetingDetails {
+  id: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface VisitRecord {
+  id: string
+  meetingId: string
+  visitor: Visitor
   actualCheckIn?: string
   actualCheckOut?: string
   visitorCardReturned?: boolean
@@ -35,13 +48,14 @@ export interface Visit {
   invitationStatus: InvitationStatus
   invitationSentAt?: string
   invitationError?: string
-  note?: string
-  hasAdditionalRequirements?: boolean
-  additionalRequirementNote?: string
   createdAt: string
   updatedAt: string
   cancelledAt?: string
 }
+
+// Read model used by existing visitor-based screens. Shared fields are projected from
+// Meeting by the service and are never stored as editable VisitRecord state.
+export interface Visit extends VisitRecord, MeetingDetails {}
 
 export interface CompanyOption {
   id: string
@@ -80,11 +94,16 @@ export interface VisitReferenceData {
   }
 }
 
-export interface VisitInput {
-  visitorFirstName: string
-  visitorLastName: string
-  visitorEmail: string
-  visitorPhone?: string
+export interface VisitorInput {
+  visitId?: string
+  firstName: string
+  lastName: string
+  email: string
+  phone?: string
+}
+
+export interface MeetingInput {
+  visitors: VisitorInput[]
   visitTypeId: string
   hostEmployeeName: string
   hostCompanyId: string
@@ -94,6 +113,11 @@ export interface VisitInput {
   note?: string
   hasAdditionalRequirements?: boolean
   additionalRequirementNote?: string
+}
+
+export interface MeetingWithVisits {
+  meeting: Meeting
+  visits: Visit[]
 }
 
 export interface RescheduleVisitInput {

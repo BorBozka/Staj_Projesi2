@@ -113,6 +113,8 @@ function visit(id: string, plannedStart: string, overrides: {
   const type = mockVisitReferenceData.visitTypes.find((item) => item.id === typeId)!
   return {
     id,
+    meetingId: `meeting-${id}`,
+    creatorEmployeeId: "creator-1",
     visitor: { id: `visitor-${id}`, firstName: overrides.firstName, lastName: "Test", email: `${id}@example.com` },
     visitTypeId: typeId,
     visitTypeName: type.name,
@@ -126,7 +128,7 @@ function visit(id: string, plannedStart: string, overrides: {
     plannedEnd: plannedStart,
     status: overrides.status ?? "PLANNED",
     invitationStatus: overrides.invitationStatus ?? "SENT",
-    hasAdditionalRequirements: overrides.hasAdditionalRequirements,
+    hasAdditionalRequirements: overrides.hasAdditionalRequirements ?? false,
     createdAt: plannedStart,
     updatedAt: plannedStart,
   }

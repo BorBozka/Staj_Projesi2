@@ -253,12 +253,13 @@ Cancelled visits remain visible with muted/cancelled treatment.
 
 Compact form.
 
-Visitor:
-- First name
-- Last name
-- Email
+Visitors:
+- At least one visitor is required.
+- Visitors can be added and removed without repeating shared meeting fields.
+- First name, last name, and email are validated separately for every visitor.
+- Phone remains optional.
 
-Visit:
+Shared meeting/visit information, shown once:
 - Visit type
 - Host employee
 - Host company
@@ -269,9 +270,19 @@ Visit:
 
 Additional:
 - Note
+- Additional-requirement indicator and description
 
-Primary action:
-- Send Invitation
+Actions:
+- Save creates one Meeting and a separate Visit for every visitor.
+- Send Invitation remains disabled until Save succeeds.
+- Changing saved shared or visitor data requires another successful save before sending.
+- The first Send Invitation action sends only the Meeting's visitors whose invitations
+  have not already been sent.
+- Invitation success or failure is shown and retained per visitor. Failed invitations can
+  be retried individually.
+
+Keep accessible labels and keyboard behavior, and focus the first invalid field when Save
+validation fails.
 
 Do not force employee to enter all visitor details that can later be completed by the visitor.
 
@@ -316,6 +327,8 @@ Show:
 - rule acceptance,
 - plate,
 - note.
+
+Do not show the additional-requirement description to the Security role.
 
 Before check-in:
 - visitor card selector,
@@ -461,6 +474,7 @@ Limit charts to useful summaries.
 - Persists filters in the URL and paginates the filtered result.
 - Opens visit details in a right-side drawer without leaving the page.
 - Shows invitation delivery and additional-requirement indicators separately from the operational visit status.
+- Continues to show one row per visitor/Visit; do not redesign or group the table by Meeting.
 - Does not expose meeting grouping or resource-assignment actions in this phase.
 
 ---

@@ -13,17 +13,27 @@ interface Props {
 }
 
 export function CancelVisitDialog({ visit, open, onOpenChange, onSaved }: Props) {
-  const { cancelVisit } = useVisits()
+  const { visits, cancelVisit, cancelMeeting } = useVisits()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const meetingVisits = visit ? visits.filter((item) => item.meetingId === visit.meetingId) : []
+  const cancellableMeetingVisits = meetingVisits.filter((item) => item.status === "PLANNED")
+  const protectedMeetingVisits = meetingVisits.filter((item) => item.status === "CHECKED_IN" || item.status === "CHECKED_OUT")
+  const showScopeSelection = cancellableMeetingVisits.length > 1
+  const visitorName = visit ? `${visit.visitor.firstName} ${visit.visitor.lastName}` : "Bu ziyaretçi"
 
-  const cancel = async () => {
+  const cancel = async (scope: "VISIT" | "MEETING") => {
     if (!visit) return
     setIsSubmitting(true)
     setError(null)
     try {
-      await cancelVisit(visit.id)
-      onSaved("Ziyaret iptal edildi. Kayıt takvimde görünmeye devam edecek.")
+      if (scope === "MEETING") {
+        await cancelMeeting(visit.meetingId)
+        onSaved(`${cancellableMeetingVisits.length} iptal edilebilir ziyaret iptal edildi. Kayıtlar geçmişte görünmeye devam edecek.`)
+      } else {
+        await cancelVisit(visit.id)
+        onSaved("Yalnızca seçilen ziyaretçi iptal edildi. Kayıt takvimde görünmeye devam edecek.")
+      }
       onOpenChange(false)
     } catch (cancelError) {
       setError(cancelError instanceof Error ? cancelError.message : "Ziyaret iptal edilemedi.")
@@ -36,19 +46,29 @@ export function CancelVisitDialog({ visit, open, onOpenChange, onSaved }: Props)
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Planlanan ziyaret iptal edilsin mi?</DialogTitle>
+          <DialogTitle>{showScopeSelection ? "İptal kapsamını seçin" : "Planlanan ziyaret iptal edilsin mi?"}</DialogTitle>
           <DialogDescription>
-            {visit ? `${visit.visitor.firstName} ${visit.visitor.lastName} için oluşturulan davet artık geçerli olmayacak.` : "Bu ziyaret iptal edilecek."}
+            {visit
+              ? showScopeSelection
+                ? `${visitorName} tek başına veya aynı ziyaretteki ${cancellableMeetingVisits.length} iptal edilebilir ziyaretçi birlikte iptal edilebilir.`
+                : `${visitorName} için oluşturulan davet artık geçerli olmayacak.`
+              : "Bu ziyaret iptal edilecek."}
           </DialogDescription>
         </DialogHeader>
         <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-800">
           Kayıt silinmeyecek; ziyaret geçmişinizde iptal edilmiş durumuyla kalacaktır.
+          {protectedMeetingVisits.length > 0 && ` İçeride veya çıkış yapmış ${protectedMeetingVisits.length} ziyaret kaydı toplu iptalden etkilenmez.`}
         </div>
         {error && <p className="text-xs text-destructive">{error}</p>}
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Ziyareti Koru</Button>
-          <Button variant="destructive" onClick={cancel} disabled={isSubmitting}>
-            {isSubmitting ? "İptal ediliyor…" : "İptal Et"}
+        <DialogFooter className="sm:flex-col sm:items-stretch">
+          <Button variant="outline" className="w-full" onClick={() => onOpenChange(false)}>Ziyareti Koru</Button>
+          {showScopeSelection && (
+            <Button variant="outline" className="w-full border-red-200 text-destructive hover:bg-red-50 hover:text-destructive" onClick={() => void cancel("VISIT")} disabled={isSubmitting}>
+              {visitorName} · 1 Ziyareti İptal Et
+            </Button>
+          )}
+          <Button className="w-full" variant="destructive" onClick={() => void cancel(showScopeSelection ? "MEETING" : "VISIT")} disabled={isSubmitting}>
+            {isSubmitting ? "İptal ediliyor…" : showScopeSelection ? `${cancellableMeetingVisits.length} Ziyareti Birlikte İptal Et` : `${visitorName} Ziyaretini İptal Et`}
           </Button>
         </DialogFooter>
       </DialogContent>

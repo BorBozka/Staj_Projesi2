@@ -1,24 +1,28 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 
-import type { RescheduleVisitInput, Visit, VisitInput, VisitReferenceData } from "@/domain/visits"
+import type { Meeting, MeetingInput, MeetingWithVisits, RescheduleVisitInput, Visit, VisitReferenceData } from "@/domain/visits"
 import type { VisitService } from "@/services"
 
 interface VisitContextValue {
+  meetings: Meeting[]
   visits: Visit[]
   referenceData: VisitReferenceData | null
   isLoading: boolean
   error: string | null
   reload(): Promise<void>
-  createVisit(input: VisitInput): Promise<Visit>
-  updateVisit(id: string, input: VisitInput): Promise<Visit>
+  createMeeting(input: MeetingInput): Promise<MeetingWithVisits>
+  updateMeeting(id: string, input: MeetingInput): Promise<MeetingWithVisits>
+  sendMeetingInvitations(id: string): Promise<Visit[]>
   sendVisitInvitation(id: string): Promise<Visit>
   rescheduleVisit(id: string, input: RescheduleVisitInput): Promise<Visit>
   cancelVisit(id: string): Promise<Visit>
+  cancelMeeting(id: string): Promise<Visit[]>
 }
 
 const VisitContext = createContext<VisitContextValue | null>(null)
 
 export function VisitProvider({ service, children }: { service: VisitService; children: React.ReactNode }) {
+  const [meetings, setMeetings] = useState<Meeting[]>([])
   const [visits, setVisits] = useState<Visit[]>([])
   const [referenceData, setReferenceData] = useState<VisitReferenceData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -28,10 +32,12 @@ export function VisitProvider({ service, children }: { service: VisitService; ch
     setIsLoading(true)
     setError(null)
     try {
-      const [nextVisits, nextReferenceData] = await Promise.all([
+      const [nextMeetings, nextVisits, nextReferenceData] = await Promise.all([
+        service.listMeetings(),
         service.listVisits(),
         service.getReferenceData(),
       ])
+      setMeetings(nextMeetings)
       setVisits(nextVisits)
       setReferenceData(nextReferenceData)
     } catch (loadError) {
@@ -45,67 +51,92 @@ export function VisitProvider({ service, children }: { service: VisitService; ch
     void load()
   }, [load])
 
-  const refreshVisits = useCallback(async () => setVisits(await service.listVisits()), [service])
+  const refreshData = useCallback(async () => {
+    const [nextMeetings, nextVisits] = await Promise.all([service.listMeetings(), service.listVisits()])
+    setMeetings(nextMeetings)
+    setVisits(nextVisits)
+  }, [service])
 
-  const createVisit = useCallback(
-    async (input: VisitInput) => {
-      const created = await service.createVisit(input)
-      await refreshVisits()
+  const createMeeting = useCallback(
+    async (input: MeetingInput) => {
+      const created = await service.createMeeting(input)
+      await refreshData()
       return created
     },
-    [refreshVisits, service],
+    [refreshData, service],
   )
 
-  const updateVisit = useCallback(
-    async (id: string, input: VisitInput) => {
-      const updated = await service.updateVisit(id, input)
-      await refreshVisits()
+  const updateMeeting = useCallback(
+    async (id: string, input: MeetingInput) => {
+      const updated = await service.updateMeeting(id, input)
+      await refreshData()
       return updated
     },
-    [refreshVisits, service],
+    [refreshData, service],
+  )
+
+  const sendMeetingInvitations = useCallback(
+    async (id: string) => {
+      const updated = await service.sendMeetingInvitations(id)
+      await refreshData()
+      return updated
+    },
+    [refreshData, service],
   )
 
   const sendVisitInvitation = useCallback(
     async (id: string) => {
       const updated = await service.sendVisitInvitation(id)
-      await refreshVisits()
+      await refreshData()
       return updated
     },
-    [refreshVisits, service],
+    [refreshData, service],
   )
 
   const rescheduleVisit = useCallback(
     async (id: string, input: RescheduleVisitInput) => {
       const updated = await service.rescheduleVisit(id, input)
-      await refreshVisits()
+      await refreshData()
       return updated
     },
-    [refreshVisits, service],
+    [refreshData, service],
   )
 
   const cancelVisit = useCallback(
     async (id: string) => {
       const updated = await service.cancelVisit(id)
-      await refreshVisits()
+      await refreshData()
       return updated
     },
-    [refreshVisits, service],
+    [refreshData, service],
+  )
+
+  const cancelMeeting = useCallback(
+    async (id: string) => {
+      const updated = await service.cancelMeeting(id)
+      await refreshData()
+      return updated
+    },
+    [refreshData, service],
   )
 
   const value = useMemo(
     () => ({
+      meetings,
       visits,
       referenceData,
       isLoading,
       error,
       reload: load,
-      createVisit,
-      updateVisit,
+      createMeeting,
+      updateMeeting,
+      sendMeetingInvitations,
       sendVisitInvitation,
       rescheduleVisit,
       cancelVisit,
+      cancelMeeting,
     }),
-    [visits, referenceData, isLoading, error, load, createVisit, updateVisit, sendVisitInvitation, rescheduleVisit, cancelVisit],
+    [meetings, visits, referenceData, isLoading, error, load, createMeeting, updateMeeting, sendMeetingInvitations, sendVisitInvitation, rescheduleVisit, cancelVisit, cancelMeeting],
   )
 
   return <VisitContext.Provider value={value}>{children}</VisitContext.Provider>

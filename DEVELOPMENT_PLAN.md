@@ -25,6 +25,53 @@ Mock data must be provided through replaceable service boundaries.
 
 ---
 
+## Approved Refinement — Meeting–Visit Frontend / Mock Service
+
+Goal:
+
+Introduce the approved Meeting grouping model without changing the visitor-based
+operational screens or starting backend/resource lifecycle work.
+
+Includes:
+
+- a central `Meeting` domain model as the single source of shared visit information,
+- a required `meetingId` on every `Visit`,
+- deterministic one-to-one Meeting records for existing single-visitor mock Visits,
+- creation of one Meeting and one separate Visit per visitor in a single operation,
+- a compact multi-visitor New Visit form with shared fields shown once,
+- Visit-based invitation delivery results and individual retry,
+- individual Visit cancellation and bulk cancellation of only cancellable Visits in a
+  Meeting,
+- combined service projections for existing visitor-based timelines, security lists,
+  notifications, and manager `All Visits`.
+
+The manager `All Visits` table, security lists, employee timeline, and notifications keep
+one record per visitor. Existing filtering, sorting, pagination, URL synchronization,
+details, and Visit-based overdue behavior must remain intact.
+
+Does not include:
+
+- backend, API, database, or persistent storage,
+- resource catalogue, assignment, availability, or conflicts,
+- Meeting end/close/extension/status lifecycle,
+- Meeting source/integration lifecycle,
+- redesign or Meeting-grouped UI for `All Visits`.
+
+Acceptance:
+
+- one visitor creates one Meeting and one Visit,
+- several visitors create distinct Visits with the same `meetingId`,
+- updating a shared Meeting field is reflected in every linked Visit projection,
+- Visit and Meeting cancellation follow existing Visit-state restrictions,
+- bulk invitation results are stored independently per Visit and failures can be retried,
+- Security cannot see the additional-requirement description,
+- existing manager table behavior and project checks continue to pass.
+
+Stop after this refinement and request review. Do not continue to resources or the full
+Meeting lifecycle.
+
+---
+
 # Track A — UI / UX First
 
 ## Phase 0 — Frontend Foundation

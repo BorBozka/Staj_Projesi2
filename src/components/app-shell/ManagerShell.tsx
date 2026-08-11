@@ -179,6 +179,7 @@ function ManagerNotifications({ collapsed }: { collapsed: boolean }) {
             open
             onOpenChange={(open) => !open && setSelectedVisitId(null)}
             visit={selectedVisit}
+            invitationScope="VISIT"
             onSaved={() => undefined}
           />
         </Suspense>
