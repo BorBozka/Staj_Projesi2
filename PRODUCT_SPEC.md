@@ -182,6 +182,46 @@ Previous visitor information may be pre-filled but must remain editable because 
 
 Every individual person has a separate visit record, even when several people arrive together.
 
+### Meeting and Visit grouping
+
+A `Meeting` is the business event that groups one or more individual `Visit` records.
+
+- Every `Visit` belongs to exactly one `Meeting` through a required `meetingId`.
+- Each visitor still has a separate `Visit` record, including when several visitors attend
+  the same meeting.
+- Existing and newly created single-visitor visits are represented by a one-to-one
+  `Meeting` and `Visit` relationship.
+- The `Meeting` domain object is not the same concept as the configurable `Meeting` visit
+  type. Any visit type may use Meeting grouping.
+
+The Meeting is the single source of truth for information shared by its visits:
+
+- creator employee,
+- host company,
+- host facility,
+- host employee,
+- visit type,
+- planned start and end,
+- general meeting/visit note,
+- additional-requirement indicator and description.
+
+The Visit remains the source of truth for visitor-specific and operational information:
+
+- visitor identity and contact details,
+- invitation status, sent time, and delivery error,
+- operational visit status,
+- actual check-in and check-out times,
+- visitor card,
+- rule acceptance and other visitor-specific operational data.
+
+Invitation state and operational state remain independent and are tracked per Visit.
+Cancellation and security overdue behavior also remain Visit-based. Shared Meeting fields
+must not be maintained as a second editable data source on Visit; screens that need both
+sets of data use a combined projection.
+
+Resource reservation, source/integration tracking, Meeting end/close behavior, and a
+separate Meeting status lifecycle are later phases.
+
 ---
 
 ## 7. Visitor Data
@@ -554,6 +594,16 @@ Exports:
 - PDF
 
 Use limited charts; filtered table is primary.
+
+The manager `All Visits` view is read-only and provides:
+
+- URL-persisted date-range and operational filters,
+- compact paginated visit records,
+- invitation and additional-requirement visibility,
+- a right-side read-only visit detail panel.
+
+Meeting grouping and resource assignment are not part of this view in the current phase.
+It continues to show one row per visitor/Visit and is not redesigned for Meeting grouping.
 
 ---
 

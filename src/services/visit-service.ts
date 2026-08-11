@@ -1,10 +1,14 @@
-import type { RescheduleVisitInput, Visit, VisitInput, VisitReferenceData } from "@/domain/visits"
+import type { Meeting, MeetingInput, MeetingWithVisits, RescheduleVisitInput, Visit, VisitReferenceData } from "@/domain/visits"
 
 export interface VisitService {
+  listMeetings(): Promise<Meeting[]>
   listVisits(): Promise<Visit[]>
   getReferenceData(): Promise<VisitReferenceData>
-  createVisit(input: VisitInput): Promise<Visit>
-  updateVisit(id: string, input: VisitInput): Promise<Visit>
+  createMeeting(input: MeetingInput): Promise<MeetingWithVisits>
+  updateMeeting(id: string, input: MeetingInput): Promise<MeetingWithVisits>
+  sendMeetingInvitations(id: string): Promise<Visit[]>
+  sendVisitInvitation(id: string): Promise<Visit>
   rescheduleVisit(id: string, input: RescheduleVisitInput): Promise<Visit>
   cancelVisit(id: string): Promise<Visit>
+  cancelMeeting(id: string): Promise<Visit[]>
 }

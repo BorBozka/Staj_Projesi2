@@ -1,8 +1,8 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { addHours, setMinutes } from "date-fns"
-import { Send } from "lucide-react"
-import { cloneElement, isValidElement, useEffect, useId, useMemo, useState } from "react"
-import { useForm } from "react-hook-form"
+import { Plus, Send, Trash2 } from "lucide-react"
+import { cloneElement, isValidElement, useEffect, useId, useMemo, useRef, useState } from "react"
+import { type FieldErrors, type FieldPath, useFieldArray, useForm } from "react-hook-form"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -17,74 +17,266 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import type { Visit, VisitReferenceData } from "@/domain/visits"
+import type { InvitationStatus, Visit } from "@/domain/visits"
+import { getInvitationActionLabel } from "@/features/visits/invitation-status"
 import { useVisits } from "@/features/visits/visit-context"
-import { toVisitInput, visitFormSchema, type VisitFormValues } from "@/features/visits/visit-form-schema"
+import { toMeetingInput, visitFormSchema, type VisitFormValues } from "@/features/visits/visit-form-schema"
 import { formatTr } from "@/lib/date"
 
-function defaultsFor(visit?: Visit, referenceData?: VisitReferenceData | null): VisitFormValues {
+const phoneCountryCodes = [
+  { value: "+90", label: "Türkiye (+90)" },
+  { value: "+1", label: "ABD / Kanada (+1)" },
+  { value: "+31", label: "Hollanda (+31)" },
+  { value: "+44", label: "Birleşik Krallık (+44)" },
+  { value: "+49", label: "Almanya (+49)" },
+  { value: "other", label: "Diğer ülke" },
+]
+
+const invitationStatusLabels: Record<InvitationStatus, string> = {
+  NOT_SENT: "Gönderilmedi",
+  SENDING: "Gönderiliyor",
+  SENT: "Gönderildi",
+  FAILED: "Gönderilemedi",
+}
+
+function getPhoneDefaults(phone?: string) {
+  if (!phone) return { phoneCountryCode: "+90", customPhoneCountryCode: "", visitorPhone: "" }
+  const selectedCountry = phoneCountryCodes.find((country) => country.value !== "other" && phone.startsWith(`${country.value} `))
+  if (selectedCountry) {
+    const localNumber = phone.slice(selectedCountry.value.length).trim()
+    return {
+      phoneCountryCode: selectedCountry.value,
+      customPhoneCountryCode: "",
+      visitorPhone: selectedCountry.value === "+90" ? formatMobilePhone(localNumber) : localNumber.replace(/\D/g, ""),
+    }
+  }
+  const [countryCode = "", ...numberParts] = phone.split(/\s+/)
+  return { phoneCountryCode: "other", customPhoneCountryCode: countryCode, visitorPhone: numberParts.join("").replace(/\D/g, "") }
+}
+
+function blankVisitor() {
+  return {
+    visitId: undefined,
+    visitorFirstName: "",
+    visitorLastName: "",
+    visitorEmail: "",
+    phoneCountryCode: "+90",
+    customPhoneCountryCode: "",
+    visitorPhone: "",
+  }
+}
+
+function defaultsFor(visits: Visit[] = []): VisitFormValues {
+  const visit = visits[0]
   const roundedNow = setMinutes(addHours(new Date(), 1), 0)
   const end = addHours(roundedNow, 1)
-  const currentEmployee = referenceData?.currentEmployee
   return {
-    visitorFirstName: visit?.visitor.firstName ?? "",
-    visitorLastName: visit?.visitor.lastName ?? "",
-    visitorEmail: visit?.visitor.email ?? "",
+    visitors: visits.length > 0
+      ? visits.map((item) => ({
+          visitId: item.id,
+          visitorFirstName: item.visitor.firstName,
+          visitorLastName: item.visitor.lastName,
+          visitorEmail: item.visitor.email,
+          ...getPhoneDefaults(item.visitor.phone),
+        }))
+      : [blankVisitor()],
     visitTypeId: visit?.visitTypeId ?? "",
     hostEmployeeName: visit?.hostEmployeeName ?? "",
-    hostCompanyId: visit?.hostCompanyId ?? currentEmployee?.companyId ?? "",
-    facilityId: visit?.facilityId ?? currentEmployee?.facilityId ?? "",
+    hostCompanyId: visit?.hostCompanyId ?? "",
+    facilityId: visit?.facilityId ?? "",
     visitDate: formatTr(visit ? new Date(visit.plannedStart) : roundedNow, "yyyy-MM-dd"),
     startTime: formatTr(visit ? new Date(visit.plannedStart) : roundedNow, "HH:mm"),
     endTime: formatTr(visit ? new Date(visit.plannedEnd) : end, "HH:mm"),
     note: visit?.note ?? "",
+    hasAdditionalRequirements: visit?.hasAdditionalRequirements ?? false,
+    additionalRequirementNote: visit?.additionalRequirementNote ?? "",
   }
+}
+
+function formatMobilePhone(value: string) {
+  const digits = value.replace(/\D/g, "").replace(/^0/, "").slice(0, 10)
+  return [digits.slice(0, 3), digits.slice(3, 6), digits.slice(6, 8), digits.slice(8, 10)].filter(Boolean).join(" ")
+}
+
+function findFirstErrorPath(errors: FieldErrors<VisitFormValues>, prefix = ""): FieldPath<VisitFormValues> | undefined {
+  for (const [key, value] of Object.entries(errors)) {
+    if (!value) continue
+    const path = prefix ? `${prefix}.${key}` : key
+    if ("message" in value && value.message) return path as FieldPath<VisitFormValues>
+    const nested = findFirstErrorPath(value as FieldErrors<VisitFormValues>, path)
+    if (nested) return nested
+  }
+  return undefined
 }
 
 interface VisitFormDialogProps {
   open: boolean
   onOpenChange(open: boolean): void
   visit?: Visit
+  invitationScope?: "MEETING" | "VISIT"
   onSaved(message: string): void
 }
 
-export function VisitFormDialog({ open, onOpenChange, visit, onSaved }: VisitFormDialogProps) {
-  const { referenceData, createVisit, updateVisit } = useVisits()
+export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "MEETING", onSaved }: VisitFormDialogProps) {
+  const {
+    visits,
+    referenceData,
+    createMeeting,
+    updateMeeting,
+    sendMeetingInvitations,
+    sendVisitInvitation,
+  } = useVisits()
+  const meetingVisits = useMemo(
+    () => visit ? visits.filter((item) => item.meetingId === visit.meetingId) : [],
+    [visit, visits],
+  )
+  const initialVisits = useMemo(
+    () => meetingVisits.length > 0 ? meetingVisits : visit ? [visit] : [],
+    [meetingVisits, visit],
+  )
+  const initialVisitsRef = useRef(initialVisits)
+  initialVisitsRef.current = initialVisits
   const [submitError, setSubmitError] = useState<string | null>(null)
-  const form = useForm<VisitFormValues>({ resolver: zodResolver(visitFormSchema), defaultValues: defaultsFor(visit, referenceData) })
+  const [saveNotice, setSaveNotice] = useState<string | null>(null)
+  const [savedMeetingId, setSavedMeetingId] = useState<string | null>(visit?.meetingId ?? null)
+  const [savedVisits, setSavedVisits] = useState<Visit[]>(initialVisits)
+  const [isSendingInvitation, setIsSendingInvitation] = useState(false)
+  const [showValidationErrors, setShowValidationErrors] = useState(false)
+  const form = useForm<VisitFormValues>({ resolver: zodResolver(visitFormSchema), defaultValues: defaultsFor(initialVisits), mode: "onChange" })
+  const visitorFields = useFieldArray({ control: form.control, name: "visitors" })
   const companyId = form.watch("hostCompanyId")
+  const hasAdditionalRequirements = form.watch("hasAdditionalRequirements")
+  const note = form.watch("note")
+  const invitationHelpId = useId()
+  const noteTextareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const formContentRef = useRef<HTMLDivElement | null>(null)
+  const { ref: noteFieldRef, ...noteField } = form.register("note")
 
   useEffect(() => {
     if (open) {
-      form.reset(defaultsFor(visit, referenceData))
+      const nextInitialVisits = initialVisitsRef.current
+      form.reset(defaultsFor(nextInitialVisits))
       setSubmitError(null)
+      setSaveNotice(null)
+      setSavedMeetingId(visit?.meetingId ?? null)
+      setSavedVisits(nextInitialVisits)
+      setIsSendingInvitation(false)
+      setShowValidationErrors(false)
     }
-  }, [form, open, referenceData, visit])
+  }, [form, open, visit?.meetingId])
+
+  useEffect(() => {
+    const textarea = noteTextareaRef.current
+    if (!textarea) return
+    textarea.style.height = "auto"
+    textarea.style.height = `${textarea.scrollHeight}px`
+  }, [note])
+
+  useEffect(() => {
+    if (!form.formState.isDirty) return
+    setSaveNotice(null)
+    setSubmitError(null)
+  }, [form.formState.isDirty])
 
   const facilities = useMemo(
     () => referenceData?.facilities.filter((facility) => facility.companyId === companyId) ?? [],
     [companyId, referenceData],
   )
 
-  const onSubmit = form.handleSubmit(async (values) => {
+  const scrollToNextFields = () => {
+    window.requestAnimationFrame(() => formContentRef.current?.scrollBy({ top: 160, behavior: "smooth" }))
+  }
+
+  const saveVisit = async (values: VisitFormValues) => {
     setSubmitError(null)
     try {
-      if (visit) {
-        await updateVisit(visit.id, toVisitInput(values))
-        onSaved("Ziyaret bilgileri güncellendi.")
-      } else {
-        await createVisit(toVisitInput(values))
-        onSaved("Davet hazırlandı ve ziyaret takviminize eklendi.")
-      }
-      onOpenChange(false)
+      const saved = savedMeetingId
+        ? await updateMeeting(savedMeetingId, toMeetingInput(values))
+        : await createMeeting(toMeetingInput(values))
+      setSavedMeetingId(saved.meeting.id)
+      setSavedVisits(saved.visits)
+      form.reset(defaultsFor(saved.visits))
+      await form.trigger()
+      const message = saved.visits.length === 1
+        ? "Ziyaret kaydedildi ve güvenliğe iletildi. Davet henüz gönderilmedi."
+        : `${saved.visits.length} ziyaret kaydedildi ve güvenliğe iletildi. Davetler henüz gönderilmedi.`
+      setSaveNotice(message)
+      onSaved(message)
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : "Ziyaret kaydedilemedi.")
     }
-  })
+  }
 
-  const fieldError = (name: keyof VisitFormValues) => {
-    const message = form.formState.errors[name]?.message
-    return message ? <p className="mt-1 text-xs text-destructive">{message}</p> : null
+  const onInvalidSave = (errors: FieldErrors<VisitFormValues>) => {
+    setShowValidationErrors(true)
+    const firstInvalidField = findFirstErrorPath(errors)
+    if (firstInvalidField) window.requestAnimationFrame(() => form.setFocus(firstInvalidField))
+  }
+
+  const onSave = form.handleSubmit(saveVisit, onInvalidSave)
+
+  const selectedVisit = savedVisits.find((item) => item.id === visit?.id) ?? savedVisits[0]
+  const sendInvitation = async () => {
+    if (!savedMeetingId || form.formState.isDirty || isSendingInvitation) return
+
+    setIsSendingInvitation(true)
+    setSubmitError(null)
+    try {
+      const results = invitationScope === "VISIT" && selectedVisit
+        ? [await sendVisitInvitation(selectedVisit.id)]
+        : await sendMeetingInvitations(savedMeetingId)
+      const resultById = new Map(results.map((item) => [item.id, item]))
+      const nextSavedVisits = savedVisits.map((item) => resultById.get(item.id) ?? item)
+      setSavedVisits(nextSavedVisits)
+      const failed = results.filter((item) => item.invitationStatus === "FAILED")
+      const sent = results.filter((item) => item.invitationStatus === "SENT")
+      if (failed.length > 0) {
+        const message = sent.length > 0
+          ? `${sent.length} davet gönderildi; ${failed.length} davet gönderilemedi.`
+          : failed[0].invitationError ?? "Davet gönderilemedi."
+        setSaveNotice(sent.length > 0 ? message : null)
+        setSubmitError(message)
+        return
+      }
+      const message = results.length > 1 ? `${sent.length} davet başarıyla gönderildi.` : "Davet başarıyla gönderildi."
+      setSaveNotice(message)
+      onSaved(message)
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Davet gönderilemedi.")
+    } finally {
+      setIsSendingInvitation(false)
+    }
+  }
+
+  const invitationTargets = invitationScope === "VISIT" && selectedVisit ? [selectedVisit] : savedVisits
+  const pendingInvitationCount = invitationTargets.filter((item) => item.status === "PLANNED" && (item.invitationStatus === "NOT_SENT" || item.invitationStatus === "FAILED")).length
+  const hasPendingInvitation = pendingInvitationCount > 0
+  const hasSendingInvitation = invitationTargets.some((item) => item.invitationStatus === "SENDING")
+  const canSendInvitation = Boolean(savedMeetingId) && !form.formState.isDirty && hasPendingInvitation && !hasSendingInvitation && !isSendingInvitation
+  const invitationDisabledReason = !savedMeetingId
+    ? "Davet göndermek için önce ziyareti kaydedin."
+    : form.formState.isDirty
+      ? "Davet göndermek için değişiklikleri kaydedin."
+      : isSendingInvitation || hasSendingInvitation
+        ? "Davet gönderiliyor."
+        : !hasPendingInvitation
+          ? "Gönderilmeyi bekleyen davet yok."
+          : invitationScope === "VISIT"
+            ? "Bu ziyaretçinin daveti gönderilmeye hazır."
+            : "Gönderilmemiş davetler gönderilmeye hazır."
+  const invitationActionLabel = invitationScope === "VISIT" && selectedVisit
+    ? getInvitationActionLabel(selectedVisit, isSendingInvitation)
+    : isSendingInvitation
+      ? "Gönderiliyor…"
+      : pendingInvitationCount > 1
+        ? `${pendingInvitationCount} Daveti Gönder`
+        : !savedMeetingId && visitorFields.fields.length > 1
+          ? `${visitorFields.fields.length} Daveti Gönder`
+        : "Daveti Gönder"
+
+  const fieldError = (name: FieldPath<VisitFormValues>) => {
+    const message = form.getFieldState(name).error?.message
+    return showValidationErrors && message ? <p className="mt-1 text-xs text-destructive">{message}</p> : null
   }
 
   return (
@@ -92,88 +284,207 @@ export function VisitFormDialog({ open, onOpenChange, visit, onSaved }: VisitFor
       <DialogContent className="max-w-2xl gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b px-5 py-4 pr-12">
           <DialogTitle>{visit ? "Ziyareti Düzenle" : "Yeni Ziyaret"}</DialogTitle>
-          {visit && <DialogDescription>Davet ve planlama bilgilerini güncelleyin.</DialogDescription>}
+          {visit && <DialogDescription>Ortak ziyaret bilgilerini ve ziyaretçileri güncelleyin.</DialogDescription>}
         </DialogHeader>
 
-        <form onSubmit={onSubmit} className="flex min-h-0 flex-col" noValidate>
-          <div className="max-h-[calc(90vh-142px)] space-y-4 overflow-y-auto px-5 py-4 scrollbar-thin">
-          <fieldset className="space-y-3 rounded-md border bg-slate-50/60 p-3">
-            <legend className="px-1 text-xs font-semibold text-slate-700">Ziyaretçi</legend>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <FormField label="Ad" required error={fieldError("visitorFirstName")}>
-                <Input autoFocus {...form.register("visitorFirstName")} />
-              </FormField>
-              <FormField label="Soyad" required error={fieldError("visitorLastName")}>
-                <Input {...form.register("visitorLastName")} />
-              </FormField>
-              <FormField label="E-posta" required error={fieldError("visitorEmail")} className="sm:col-span-2">
-                <Input type="email" placeholder="ziyaretci@firma.com" {...form.register("visitorEmail")} />
-              </FormField>
-            </div>
-          </fieldset>
-
-          <fieldset className="space-y-3 rounded-md border bg-slate-50/60 p-3">
-            <legend className="px-1 text-xs font-semibold text-slate-700">Ziyaret Bilgileri</legend>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <FormField label="Ziyaret Türü" required error={fieldError("visitTypeId")}>
-                <Select {...form.register("visitTypeId")}>
-                  <option value="">Ziyaret türü seçin</option>
-                  {referenceData?.visitTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
-                </Select>
-              </FormField>
-              <FormField label="Ziyaret Edilecek Şirket" required error={fieldError("hostCompanyId")}>
-                <Select
-                  {...form.register("hostCompanyId", {
-                    onChange: () => {
-                      form.setValue("facilityId", "")
-                    },
-                  })}
+        <form onSubmit={onSave} className="flex min-h-0 flex-col" noValidate>
+          <div ref={formContentRef} className="max-h-[calc(90vh-142px)] space-y-4 overflow-y-auto px-5 py-4 scrollbar-thin">
+            <section className="space-y-3" aria-labelledby="visitors-heading">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 id="visitors-heading" className="text-xs font-semibold text-slate-700">Ziyaretçiler</h3>
+                  <p className="mt-0.5 text-[11px] text-slate-500">Her kişi için ayrı bir ziyaret kaydı oluşturulur.</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => visitorFields.append(blankVisitor(), { focusName: `visitors.${visitorFields.fields.length}.visitorFirstName` })}
                 >
-                  <option value="">Şirket seçin</option>
-                  {referenceData?.companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
-                </Select>
-              </FormField>
-              <FormField label="Tesis" required error={fieldError("facilityId")}>
-                <Select
-                  {...form.register("facilityId")}
-                  disabled={!companyId}
-                >
-                  <option value="">Tesis seçin</option>
-                  {facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}
-                </Select>
-              </FormField>
-              <FormField label="İlgili Personel" required error={fieldError("hostEmployeeName")}>
-                <Input placeholder="Ad Soyad" {...form.register("hostEmployeeName")} />
-              </FormField>
-              <FormField label="Tarih" required error={fieldError("visitDate")}>
-                <Input type="date" {...form.register("visitDate")} />
-              </FormField>
-              <div className="grid grid-cols-2 gap-2">
-                <FormField label="Başlangıç" required error={fieldError("startTime")}>
-                  <Input type="time" {...form.register("startTime")} />
-                </FormField>
-                <FormField label="Bitiş" required error={fieldError("endTime")}>
-                  <Input type="time" {...form.register("endTime")} />
-                </FormField>
+                  <Plus />Ziyaretçi Ekle
+                </Button>
               </div>
-            </div>
-          </fieldset>
 
-          <fieldset className="space-y-3 rounded-md border bg-slate-50/60 p-3">
-            <legend className="px-1 text-xs font-semibold text-slate-700">Ek Bilgi</legend>
-            <FormField label="Not / Açıklama" error={fieldError("note")}>
-              <Textarea rows={3} placeholder="Güvenlik veya ilgili personel için isteğe bağlı açıklama" {...form.register("note")} />
-            </FormField>
-          </fieldset>
+              {visitorFields.fields.map((field, index) => {
+                const phoneCountryCode = form.watch(`visitors.${index}.phoneCountryCode`)
+                const canRemove = visitorFields.fields.length > 1 && !field.visitId
+                const { ref: phoneFieldRef, onChange: onPhoneChange, ...phoneField } = form.register(`visitors.${index}.visitorPhone`)
+                return (
+                  <fieldset key={field.id} className="space-y-3 rounded-md border bg-slate-50/60 p-3">
+                    <legend className="px-1 text-xs font-semibold text-slate-700">Ziyaretçi {index + 1}</legend>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <FormField label="Ad" required error={fieldError(`visitors.${index}.visitorFirstName`)}>
+                        <Input autoFocus={index === 0} {...form.register(`visitors.${index}.visitorFirstName`)} />
+                      </FormField>
+                      <FormField label="Soyad" required error={fieldError(`visitors.${index}.visitorLastName`)}>
+                        <Input {...form.register(`visitors.${index}.visitorLastName`)} />
+                      </FormField>
+                      <FormField label="E-posta" required error={fieldError(`visitors.${index}.visitorEmail`)} className="sm:col-span-2">
+                        <Input type="email" placeholder="ziyaretci@firma.com" {...form.register(`visitors.${index}.visitorEmail`)} />
+                      </FormField>
+                      <FormField label="Telefon (opsiyonel)" error={fieldError(`visitors.${index}.visitorPhone`)} className="sm:col-span-2">
+                        <div className={phoneCountryCode === "other" ? "grid gap-2 sm:grid-cols-[150px_96px_minmax(0,1fr)]" : "grid gap-2 sm:grid-cols-[150px_minmax(0,1fr)]"}>
+                          <Select {...form.register(`visitors.${index}.phoneCountryCode`)} aria-label={`Ziyaretçi ${index + 1} telefon ülke kodu`}>
+                            {phoneCountryCodes.map((country) => <option key={country.value} value={country.value}>{country.label}</option>)}
+                          </Select>
+                          {phoneCountryCode === "other" && (
+                            <Input
+                              placeholder="+ kod"
+                              inputMode="numeric"
+                              maxLength={4}
+                              aria-label={`Ziyaretçi ${index + 1} özel ülke kodu`}
+                              {...form.register(`visitors.${index}.customPhoneCountryCode`, {
+                                onChange: (event) => {
+                                  event.target.value = `+${event.target.value.replace(/\D/g, "").slice(0, 3)}`
+                                },
+                              })}
+                            />
+                          )}
+                          <Input
+                            {...phoneField}
+                            ref={phoneFieldRef}
+                            type="tel"
+                            inputMode="numeric"
+                            maxLength={phoneCountryCode === "+90" ? 13 : 15}
+                            placeholder={phoneCountryCode === "+90" ? "5XX XXX XX XX" : "Ulusal numara"}
+                            onChange={(event) => {
+                              event.target.value = phoneCountryCode === "+90"
+                                ? formatMobilePhone(event.target.value)
+                                : event.target.value.replace(/\D/g, "").slice(0, 15)
+                              onPhoneChange(event)
+                            }}
+                          />
+                        </div>
+                      </FormField>
+                    </div>
+                    {canRemove && (
+                      <div className="flex justify-end">
+                        <Button type="button" variant="ghost" size="sm" className="text-destructive hover:bg-red-50 hover:text-destructive" onClick={() => visitorFields.remove(index)} aria-label={`Ziyaretçi ${index + 1} kaydını kaldır`}>
+                          <Trash2 />Ziyaretçiyi Kaldır
+                        </Button>
+                      </div>
+                    )}
+                    {field.visitId && visitorFields.fields.length > 1 && (
+                      <p className="text-[11px] text-slate-500">Kaydedilmiş ziyaretçi silinmez; gerektiğinde ziyaret detayından ayrı olarak iptal edilir.</p>
+                    )}
+                  </fieldset>
+                )
+              })}
+            </section>
 
-          {submitError && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{submitError}</p>}
+            <fieldset className="space-y-3 rounded-md border bg-slate-50/60 p-3">
+              <legend className="px-1 text-xs font-semibold text-slate-700">Ziyaret Bilgileri</legend>
+              <p className="text-[11px] text-slate-500">Tüm ziyaretçiler için ortak.</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <FormField label="Ziyaret Türü" required error={fieldError("visitTypeId")}>
+                  <Select {...form.register("visitTypeId", { onChange: scrollToNextFields })}>
+                    <option value="" disabled hidden>Ziyaret türü seçin</option>
+                    {referenceData?.visitTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
+                  </Select>
+                </FormField>
+                <FormField label="Ziyaret Edilecek Şirket" required error={fieldError("hostCompanyId")}>
+                  <Select
+                    {...form.register("hostCompanyId", {
+                      onChange: () => {
+                        form.setValue("facilityId", "", { shouldDirty: true, shouldValidate: true })
+                        scrollToNextFields()
+                      },
+                    })}
+                  >
+                    <option value="" disabled hidden>Şirket seçin</option>
+                    {referenceData?.companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
+                  </Select>
+                </FormField>
+                <FormField label="Tesis" required error={fieldError("facilityId")}>
+                  <Select {...form.register("facilityId")} disabled={!companyId}>
+                    <option value="" disabled hidden>Tesis seçin</option>
+                    {facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}
+                  </Select>
+                </FormField>
+                <FormField label="İlgili Personel" required error={fieldError("hostEmployeeName")}>
+                  <Input placeholder="Ad Soyad" {...form.register("hostEmployeeName")} />
+                </FormField>
+                <FormField label="Tarih" required error={fieldError("visitDate")}>
+                  <Input type="date" {...form.register("visitDate")} />
+                </FormField>
+                <div className="grid grid-cols-2 gap-2">
+                  <FormField label="Başlangıç" required error={fieldError("startTime")}>
+                    <Input type="time" {...form.register("startTime")} />
+                  </FormField>
+                  <FormField label="Bitiş" required error={fieldError("endTime")}>
+                    <Input type="time" {...form.register("endTime")} />
+                  </FormField>
+                </div>
+              </div>
+            </fieldset>
+
+            <fieldset className="space-y-2 rounded-md border bg-slate-50/60 p-2.5">
+              <legend className="px-1 text-xs font-semibold text-slate-700">Ek Bilgi</legend>
+              <label className="flex min-h-9 cursor-pointer items-center gap-2 rounded-md border bg-white px-3 text-sm font-medium text-slate-700">
+                <input
+                  type="checkbox"
+                  className="size-4 rounded border-slate-300 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  {...form.register("hasAdditionalRequirements")}
+                />
+                <span>İlave gereksinim var</span>
+              </label>
+              {hasAdditionalRequirements && (
+                <FormField label="İlave gereksinim notu" error={fieldError("additionalRequirementNote")}>
+                  <Textarea rows={2} className="min-h-16 resize-y" placeholder="Erişilebilir giriş hazırlanmalı." {...form.register("additionalRequirementNote")} />
+                </FormField>
+              )}
+              <FormField label="Not / Açıklama" error={fieldError("note")}>
+                <Textarea
+                  {...noteField}
+                  ref={(element) => {
+                    noteFieldRef(element)
+                    noteTextareaRef.current = element
+                  }}
+                  rows={1}
+                  className="min-h-9 resize-none overflow-hidden"
+                  placeholder="Güvenlik veya ilgili personel için isteğe bağlı açıklama"
+                />
+              </FormField>
+            </fieldset>
+
+            {savedVisits.length > 0 && savedMeetingId && (
+              <ul className="grid gap-1.5 rounded-md border bg-white p-2.5 text-xs" aria-label="Ziyaretçi davet durumları">
+                {savedVisits.map((item) => (
+                  <li key={item.id} className="flex items-center justify-between gap-3">
+                    <span className="truncate font-medium text-slate-700">{item.visitor.firstName} {item.visitor.lastName}</span>
+                    <span className={item.invitationStatus === "FAILED" ? "font-semibold text-red-700" : item.invitationStatus === "SENT" ? "font-semibold text-emerald-700" : "font-medium text-amber-700"}>
+                      {invitationStatusLabels[item.invitationStatus]}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {submitError && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700" role="alert">{submitError}</p>}
+            {saveNotice && <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800" role="status">{saveNotice}</p>}
           </div>
 
-          <DialogFooter className="border-t bg-card px-5 py-3">
-            <Button type="submit" disabled={form.formState.isSubmitting}>
-              <Send />
-              {form.formState.isSubmitting ? "Kaydediliyor…" : visit ? "Değişiklikleri Kaydet" : "Daveti Gönder"}
-            </Button>
+          <DialogFooter className="items-stretch border-t bg-card px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p id={invitationHelpId} className="text-xs text-slate-500" aria-live="polite">{invitationDisabledReason}</p>
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+              <Button
+                type="submit"
+                variant="outline"
+                disabled={form.formState.isSubmitting || isSendingInvitation || (Boolean(savedMeetingId) && !form.formState.isDirty)}
+              >
+                {form.formState.isSubmitting ? "Kaydediliyor…" : savedMeetingId && form.formState.isDirty ? "Değişiklikleri Kaydet" : savedMeetingId ? "Kaydedildi" : "Ziyareti Kaydet"}
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void sendInvitation()}
+                disabled={!canSendInvitation || form.formState.isSubmitting}
+                aria-describedby={invitationHelpId}
+                aria-label={`${invitationActionLabel}. ${invitationDisabledReason}`}
+              >
+                <Send />
+                {invitationActionLabel}
+              </Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>

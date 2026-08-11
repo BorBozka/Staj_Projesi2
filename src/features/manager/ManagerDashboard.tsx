@@ -1,8 +1,9 @@
 import { format } from "date-fns"
-import { CircleAlert, PackageCheck, UserRound } from "lucide-react"
+import { CircleAlert, PackageCheck, RefreshCw, UserRound } from "lucide-react"
 import { useEffect, useMemo, useState, type ReactElement } from "react"
 import { Link } from "react-router-dom"
 
+import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import type { ExpectedAfterHoursDelivery } from "@/domain/manager-dashboard"
 import type { Visit } from "@/domain/visits"
@@ -48,7 +49,7 @@ const statusMeta: { status: DashboardVisitStatus; label: string; color: string }
 
 export function ManagerDashboard() {
   const { visits, referenceData, isLoading } = useVisits()
-  const { companyId, currentTime, facilityId, refreshVersion, lastUpdated } = useManagerRefresh()
+  const { companyId, currentTime, facilityId, isRefreshing, refresh, refreshVersion, lastUpdated } = useManagerRefresh()
   const [deliveries, setDeliveries] = useState<ExpectedAfterHoursDelivery[]>([])
   const [selection, setSelection] = useState<SelectionDescriptor | null>(null)
   const [viewingVisit, setViewingVisit] = useState<Visit | null>(null)
@@ -83,10 +84,28 @@ export function ManagerDashboard() {
 
   return (
     <div className="grid min-w-0 gap-4">
-      <ManagerDashboardFilters placement="content" className="flex xl:hidden" />
-
       <section className="grid items-stretch gap-4 xl:grid-cols-[minmax(0,7fr)_minmax(280px,3fr)]">
-        <InsideVisits visits={insideVisits} now={now} />
+        <InsideVisits
+          visits={insideVisits}
+          now={now}
+          controls={(
+            <div className="flex min-w-0 max-w-full items-center gap-1.5">
+              <ManagerDashboardFilters />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="shrink-0 gap-1.5 px-2 text-slate-600"
+                onClick={() => void refresh()}
+                disabled={isRefreshing}
+                aria-label={`Dashboard verilerini yenile. Son güncelleme: Bugün ${formatTr(lastUpdated, "HH:mm")}`}
+                title={`Son güncelleme: Bugün ${formatTr(lastUpdated, "HH:mm")}`}
+              >
+                <RefreshCw className={cn("size-3.5", isRefreshing && "animate-spin")} />
+                <span className="tabular-nums">{formatTr(lastUpdated, "HH:mm")}</span>
+              </Button>
+            </div>
+          )}
+        />
         <Distribution
           counts={counts}
           selection={selection}
@@ -116,24 +135,26 @@ export function ManagerDashboard() {
         onReschedule={noopVisitAction}
         onCancel={noopVisitAction}
         readOnly
+        viewerRole="MANAGER"
       />
     </div>
   )
 }
 
-function InsideVisits({ visits, now }: { visits: Visit[]; now: Date }) {
+function InsideVisits({ visits, now, controls }: { visits: Visit[]; now: Date; controls: ReactElement }) {
   return (
-    <section className="h-[340px] overflow-hidden rounded-lg border border-emerald-200 bg-card shadow-panel">
-      <div className="flex min-h-12 items-center justify-between gap-3 border-l-[3px] border-emerald-500 bg-emerald-50/35 px-4 py-2.5">
+    <section className="flex h-[340px] flex-col overflow-hidden rounded-lg border border-emerald-200 bg-card shadow-panel">
+      <div className="flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-2 border-l-[3px] border-emerald-500 bg-emerald-50/35 px-3 py-2 sm:px-4">
         <div className="flex min-w-0 items-center gap-2">
           <span className="size-3 shrink-0 rounded-full bg-emerald-500" />
           <h2 className="truncate text-lg font-semibold">Şu Anda İçeride</h2>
         </div>
+        {controls}
       </div>
       {visits.length === 0 ? (
         <p className="px-4 py-7 text-center text-sm text-slate-600">Seçili bağlamda içeride ziyaretçi bulunmuyor.</p>
       ) : (
-        <div className="max-h-[286px] overflow-auto">
+        <div className="min-h-0 flex-1 overflow-auto">
           <table className="w-full min-w-[760px] table-fixed text-left text-[13px]">
             <thead className="sticky top-0 z-[1] border-y border-emerald-100 bg-white text-xs font-semibold text-slate-600">
               <tr>
@@ -411,7 +432,7 @@ function SelectionPopoverContent({ selection, side, onVisitOpen }: { selection: 
         {rows.map((row) => row.kind === "visit" ? (
           <DropdownMenuItem
             key={row.id}
-            className="grid min-h-11 grid-cols-[42px_minmax(0,1fr)_auto] items-center gap-2 px-2 py-1.5 text-xs focus:bg-transparent"
+            className="group grid min-h-11 cursor-pointer grid-cols-[42px_minmax(0,1fr)_auto] items-center gap-2 px-2 py-1.5 text-xs transition-colors hover:bg-blue-50 focus:bg-blue-50 focus-visible:outline-none"
             onSelect={(event) => {
               event.preventDefault()
               onVisitOpen(row.visit)
@@ -419,7 +440,7 @@ function SelectionPopoverContent({ selection, side, onVisitOpen }: { selection: 
           >
             <span className="tabular-nums text-slate-600">{formatTr(row.date, "HH:mm")}</span>
             <span className="min-w-0">
-              <span className="block truncate font-semibold text-slate-900">{row.visit.visitor.firstName} {row.visit.visitor.lastName}</span>
+              <span className="block truncate font-semibold text-slate-900 transition-colors group-hover:text-blue-700 group-focus:text-blue-700">{row.visit.visitor.firstName} {row.visit.visitor.lastName}</span>
               <span className="block truncate text-[11px] text-slate-600">{row.visit.visitTypeName}</span>
             </span>
             <VisitStatusBadge status={row.visit.status} compact />

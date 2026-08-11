@@ -8,6 +8,8 @@ function visitAt(hour: number, minute: number, endHour: number, endMinute: numbe
   const end = new Date(2026, 7, 10, endHour, endMinute)
   return {
     id: `${hour}-${minute}`,
+    meetingId: `meeting-${hour}-${minute}`,
+    creatorEmployeeId: "creator-1",
     visitor: { id: "visitor", firstName: "Test", lastName: "Kisi", email: "test@example.com" },
     visitTypeId: "meeting",
     visitTypeName: "Toplanti",
@@ -20,6 +22,8 @@ function visitAt(hour: number, minute: number, endHour: number, endMinute: numbe
     plannedStart: start.toISOString(),
     plannedEnd: end.toISOString(),
     status: "PLANNED",
+    invitationStatus: "SENT",
+    hasAdditionalRequirements: false,
     createdAt: start.toISOString(),
     updatedAt: start.toISOString(),
   }

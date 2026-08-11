@@ -1,9 +1,10 @@
-import { Building2, CalendarClock, Mail, MapPin, Pencil, UserRound, XCircle } from "lucide-react"
+import { Building2, CalendarClock, ClipboardList, Mail, MapPin, Pencil, Phone, UserRound, XCircle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import type { Visit } from "@/domain/visits"
 import { VisitStatusBadge } from "@/features/visits/VisitStatusBadge"
+import { getVisibleAdditionalRequirementNote, type VisitViewerRole } from "@/features/visits/visit-visibility"
 import { formatTr } from "@/lib/date"
 
 interface Props {
@@ -14,10 +15,13 @@ interface Props {
   onReschedule(visit: Visit): void
   onCancel(visit: Visit): void
   readOnly?: boolean
+  viewerRole?: VisitViewerRole
 }
 
-export function VisitDetailsDialog({ visit, open, onOpenChange, onEdit, onReschedule, onCancel, readOnly = false }: Props) {
+export function VisitDetailsDialog({ visit, open, onOpenChange, onEdit, onReschedule, onCancel, readOnly = false, viewerRole = "SECURITY" }: Props) {
   if (!visit) return null
+
+  const additionalRequirementNote = getVisibleAdditionalRequirementNote(visit, viewerRole)
 
   const openAction = (action: (visit: Visit) => void) => {
     onOpenChange(false)
@@ -37,12 +41,14 @@ export function VisitDetailsDialog({ visit, open, onOpenChange, onEdit, onResche
 
         <dl className="grid gap-3 rounded-md border bg-slate-50/60 p-3 text-[13px] sm:grid-cols-2">
           <Detail icon={Mail} label="E-posta" value={visit.visitor.email} className="sm:col-span-2" />
+          {visit.visitor.phone && <Detail icon={Phone} label="Telefon" value={visit.visitor.phone} className="sm:col-span-2" />}
           <Detail icon={CalendarClock} label="Tarih ve saat" value={`${formatTr(new Date(visit.plannedStart), "d MMMM yyyy EEEE · HH:mm")}–${formatTr(new Date(visit.plannedEnd), "HH:mm")}`} className="sm:col-span-2" />
           <Detail icon={UserRound} label="İlgili personel" value={visit.hostEmployeeName} />
           <Detail icon={Building2} label="Şirket" value={visit.hostCompanyName} />
           <Detail icon={MapPin} label="Tesis" value={visit.facilityName} />
           <Detail icon={CalendarClock} label="Ziyaret türü" value={visit.visitTypeName} />
           {visit.note && <Detail icon={Pencil} label="Not / Açıklama" value={visit.note} className="sm:col-span-2" />}
+          {additionalRequirementNote && <Detail icon={ClipboardList} label="İlave gereksinim notu" value={additionalRequirementNote} className="sm:col-span-2" />}
         </dl>
 
         {!readOnly && visit.status === "PLANNED" && (

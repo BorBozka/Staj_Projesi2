@@ -6,6 +6,8 @@ import { getUpcomingVisits } from "@/features/visits/upcoming-visits"
 function visitWithStatus(id: string, plannedStart: string, status: VisitStatus): Visit {
   return {
     id,
+    meetingId: `meeting-${id}`,
+    creatorEmployeeId: "creator-1",
     visitor: { id: `visitor-${id}`, firstName: "Test", lastName: "Kisi", email: "test@example.com" },
     visitTypeId: "meeting",
     visitTypeName: "Toplanti",
@@ -18,6 +20,8 @@ function visitWithStatus(id: string, plannedStart: string, status: VisitStatus):
     plannedStart,
     plannedEnd: plannedStart,
     status,
+    invitationStatus: "SENT",
+    hasAdditionalRequirements: false,
     createdAt: plannedStart,
     updatedAt: plannedStart,
   }
