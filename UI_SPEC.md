@@ -477,6 +477,20 @@ Limit charts to useful summaries.
 - Continues to show one row per visitor/Visit; do not redesign or group the table by Meeting.
 - Does not expose meeting grouping or resource-assignment actions in this phase.
 
+### Manager Resource Catalog
+
+- Uses the existing compact management pattern with a contextual title, Add action,
+  company/facility/type/active filters, and a dense resource list.
+- Shows resource name, user-facing type label, company/facility, quantity, and status.
+- Displays `—` for room quantity and a numeric total only for pooled equipment.
+- Uses one compact create/edit dialog with required type, name, company, and facility.
+- Shows and validates quantity only for pooled equipment.
+- Clears an invalid facility selection when company changes.
+- Uses active/inactive actions instead of deletion.
+- Provides loading, error, unfiltered-empty, and filtered-empty states.
+- Reflows without page-level horizontal overflow at tablet and narrow widths.
+- Does not expose assignment, reservation, availability, or conflict controls.
+
 ---
 
 ## 21. Admin

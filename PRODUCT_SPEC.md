@@ -607,6 +607,29 @@ It continues to show one row per visitor/Visit and is not redesigned for Meeting
 
 ---
 
+## 22A. Resource Catalog
+
+Managers maintain a frontend/mock-service catalog of facility resources independently
+from visit types.
+
+Supported catalog records:
+
+- `ROOM`: one named meeting room belonging to one company and one facility; it has no
+  quantity field.
+- `POOLED_EQUIPMENT`: a named facility equipment pool belonging to one company and one
+  facility; it stores a positive total quantity rather than serialized devices.
+
+Every resource has an active/inactive lifecycle. Resources are not deleted in this
+phase. The selected facility must belong to the selected company.
+
+The catalog phase includes listing, filtering, creating, editing, and activating or
+deactivating resources. It does not include Meeting assignment, reservation,
+availability, conflict detection, override, audit history, or employee notification.
+Resource availability does not block Meeting or Visit creation, and an additional-
+requirement note is not a resource request.
+
+---
+
 ## 23. After-Hours Goods Delivery
 
 Separate module.

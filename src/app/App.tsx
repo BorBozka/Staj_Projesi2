@@ -13,6 +13,9 @@ const ManagerDashboard = lazy(() =>
 const AllVisitsPage = lazy(() =>
   import("@/features/manager/AllVisitsPage").then((module) => ({ default: module.AllVisitsPage })),
 )
+const ResourceCatalogPage = lazy(() =>
+  import("@/features/resources/ResourceCatalogPage").then((module) => ({ default: module.ResourceCatalogPage })),
+)
 
 export function App() {
   return (
@@ -38,6 +41,7 @@ export function App() {
           }
         />
         <Route path="all-visits" element={<Suspense fallback={<RouteSkeleton />}><AllVisitsPage /></Suspense>} />
+        <Route path="resources" element={<Suspense fallback={<RouteSkeleton />}><ResourceCatalogPage /></Suspense>} />
         <Route index element={<Navigate to="dashboard" replace />} />
       </Route>
       <Route path="*" element={<Navigate to="/manager/dashboard" replace />} />

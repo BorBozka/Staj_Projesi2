@@ -1,5 +1,6 @@
 import {
   Bell,
+  Boxes,
   CalendarDays,
   FileBarChart,
   LayoutDashboard,
@@ -34,6 +35,7 @@ const VisitFormDialog = lazy(() =>
 const managementNavigationItems = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/manager/dashboard" },
   { label: "Tüm Ziyaretler", icon: CalendarDays, to: "/manager/all-visits" },
+  { label: "Kaynaklar", icon: Boxes, to: "/manager/resources" },
   { label: "Mal Girişi / Teslimat", icon: PackageCheck },
   { label: "Raporlar", icon: FileBarChart },
 ]
