@@ -1,8 +1,8 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { addHours, setMinutes } from "date-fns"
-import { Send } from "lucide-react"
-import { cloneElement, isValidElement, useEffect, useId, useMemo, useState } from "react"
-import { useForm } from "react-hook-form"
+import { BellRing, Send } from "lucide-react"
+import { cloneElement, isValidElement, useEffect, useId, useMemo, useRef, useState } from "react"
+import { type FieldErrors, useForm } from "react-hook-form"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -17,28 +17,58 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import type { Visit, VisitReferenceData } from "@/domain/visits"
+import type { Visit } from "@/domain/visits"
 import { useVisits } from "@/features/visits/visit-context"
 import { toVisitInput, visitFormSchema, type VisitFormValues } from "@/features/visits/visit-form-schema"
 import { formatTr } from "@/lib/date"
 
-function defaultsFor(visit?: Visit, referenceData?: VisitReferenceData | null): VisitFormValues {
+const phoneCountryCodes = [
+  { value: "+90", label: "Türkiye (+90)" },
+  { value: "+1", label: "ABD / Kanada (+1)" },
+  { value: "+31", label: "Hollanda (+31)" },
+  { value: "+44", label: "Birleşik Krallık (+44)" },
+  { value: "+49", label: "Almanya (+49)" },
+  { value: "other", label: "Diğer ülke" },
+]
+
+function getPhoneDefaults(phone?: string) {
+  if (!phone) return { phoneCountryCode: "+90", customPhoneCountryCode: "", visitorPhone: "" }
+  const selectedCountry = phoneCountryCodes.find((country) => country.value !== "other" && phone.startsWith(`${country.value} `))
+  if (selectedCountry) {
+    const localNumber = phone.slice(selectedCountry.value.length).trim()
+    return {
+      phoneCountryCode: selectedCountry.value,
+      customPhoneCountryCode: "",
+      visitorPhone: selectedCountry.value === "+90" ? formatMobilePhone(localNumber) : localNumber.replace(/\D/g, ""),
+    }
+  }
+  const [countryCode = "", ...numberParts] = phone.split(/\s+/)
+  return { phoneCountryCode: "other", customPhoneCountryCode: countryCode, visitorPhone: numberParts.join("").replace(/\D/g, "") }
+}
+
+function defaultsFor(visit?: Visit): VisitFormValues {
   const roundedNow = setMinutes(addHours(new Date(), 1), 0)
   const end = addHours(roundedNow, 1)
-  const currentEmployee = referenceData?.currentEmployee
   return {
     visitorFirstName: visit?.visitor.firstName ?? "",
     visitorLastName: visit?.visitor.lastName ?? "",
     visitorEmail: visit?.visitor.email ?? "",
+    ...getPhoneDefaults(visit?.visitor.phone),
     visitTypeId: visit?.visitTypeId ?? "",
     hostEmployeeName: visit?.hostEmployeeName ?? "",
-    hostCompanyId: visit?.hostCompanyId ?? currentEmployee?.companyId ?? "",
-    facilityId: visit?.facilityId ?? currentEmployee?.facilityId ?? "",
+    hostCompanyId: visit?.hostCompanyId ?? "",
+    facilityId: visit?.facilityId ?? "",
     visitDate: formatTr(visit ? new Date(visit.plannedStart) : roundedNow, "yyyy-MM-dd"),
     startTime: formatTr(visit ? new Date(visit.plannedStart) : roundedNow, "HH:mm"),
     endTime: formatTr(visit ? new Date(visit.plannedEnd) : end, "HH:mm"),
     note: visit?.note ?? "",
+    hasAdditionalRequirements: visit?.hasAdditionalRequirements ?? false,
   }
+}
+
+function formatMobilePhone(value: string) {
+  const digits = value.replace(/\D/g, "").replace(/^0/, "").slice(0, 10)
+  return [digits.slice(0, 3), digits.slice(3, 6), digits.slice(6, 8), digits.slice(8, 10)].filter(Boolean).join(" ")
 }
 
 interface VisitFormDialogProps {
@@ -51,40 +81,79 @@ interface VisitFormDialogProps {
 export function VisitFormDialog({ open, onOpenChange, visit, onSaved }: VisitFormDialogProps) {
   const { referenceData, createVisit, updateVisit } = useVisits()
   const [submitError, setSubmitError] = useState<string | null>(null)
-  const form = useForm<VisitFormValues>({ resolver: zodResolver(visitFormSchema), defaultValues: defaultsFor(visit, referenceData) })
+  const [saveNotice, setSaveNotice] = useState<string | null>(null)
+  const [savedVisit, setSavedVisit] = useState<Visit | null>(null)
+  const [showValidationErrors, setShowValidationErrors] = useState(false)
+  const form = useForm<VisitFormValues>({ resolver: zodResolver(visitFormSchema), defaultValues: defaultsFor(visit), mode: "onChange" })
   const companyId = form.watch("hostCompanyId")
+  const phoneCountryCode = form.watch("phoneCountryCode")
+  const note = form.watch("note")
+  const noteTextareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const formContentRef = useRef<HTMLDivElement | null>(null)
+  const { ref: noteFieldRef, ...noteField } = form.register("note")
+  const { ref: phoneFieldRef, onChange: onPhoneChange, ...phoneField } = form.register("visitorPhone")
 
   useEffect(() => {
     if (open) {
-      form.reset(defaultsFor(visit, referenceData))
+      form.reset(defaultsFor(visit))
       setSubmitError(null)
+      setSaveNotice(null)
+      setSavedVisit(visit ?? null)
+      setShowValidationErrors(false)
     }
   }, [form, open, referenceData, visit])
+
+  useEffect(() => {
+    const textarea = noteTextareaRef.current
+    if (!textarea) return
+    textarea.style.height = "auto"
+    textarea.style.height = `${textarea.scrollHeight}px`
+  }, [note])
 
   const facilities = useMemo(
     () => referenceData?.facilities.filter((facility) => facility.companyId === companyId) ?? [],
     [companyId, referenceData],
   )
 
-  const onSubmit = form.handleSubmit(async (values) => {
+  const scrollToNextFields = () => {
+    window.requestAnimationFrame(() => formContentRef.current?.scrollBy({ top: 160, behavior: "smooth" }))
+  }
+
+  const saveVisit = async (values: VisitFormValues) => {
     setSubmitError(null)
     try {
-      if (visit) {
-        await updateVisit(visit.id, toVisitInput(values))
-        onSaved("Ziyaret bilgileri güncellendi.")
-      } else {
-        await createVisit(toVisitInput(values))
-        onSaved("Davet hazırlandı ve ziyaret takviminize eklendi.")
-      }
-      onOpenChange(false)
+      const currentVisit = savedVisit ?? visit
+      const saved = currentVisit
+        ? await updateVisit(currentVisit.id, toVisitInput(values))
+        : await createVisit(toVisitInput(values))
+      setSavedVisit(saved)
+      form.reset(defaultsFor(saved))
+      await form.trigger()
+      setSaveNotice("Ziyaret kaydedildi. Daveti gönderebilirsiniz.")
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : "Ziyaret kaydedilemedi.")
     }
-  })
+  }
+
+  const onInvalidSave = (errors: FieldErrors<VisitFormValues>) => {
+    setShowValidationErrors(true)
+    const firstInvalidField = Object.keys(errors)[0] as keyof VisitFormValues | undefined
+    if (firstInvalidField) window.requestAnimationFrame(() => form.setFocus(firstInvalidField))
+  }
+
+  const onSave = form.handleSubmit(saveVisit, onInvalidSave)
+
+  const sendInvitation = () => {
+    if (!(savedVisit ?? visit) || form.formState.isDirty) return
+    onSaved("Davet gönderim için sıraya alındı.")
+    onOpenChange(false)
+  }
+
+  const isSaved = Boolean(savedVisit ?? visit) && !form.formState.isDirty
 
   const fieldError = (name: keyof VisitFormValues) => {
     const message = form.formState.errors[name]?.message
-    return message ? <p className="mt-1 text-xs text-destructive">{message}</p> : null
+    return showValidationErrors && message ? <p className="mt-1 text-xs text-destructive">{message}</p> : null
   }
 
   return (
@@ -95,8 +164,8 @@ export function VisitFormDialog({ open, onOpenChange, visit, onSaved }: VisitFor
           {visit && <DialogDescription>Davet ve planlama bilgilerini güncelleyin.</DialogDescription>}
         </DialogHeader>
 
-        <form onSubmit={onSubmit} className="flex min-h-0 flex-col" noValidate>
-          <div className="max-h-[calc(90vh-142px)] space-y-4 overflow-y-auto px-5 py-4 scrollbar-thin">
+        <form onSubmit={onSave} className="flex min-h-0 flex-col" noValidate>
+          <div ref={formContentRef} className="max-h-[calc(90vh-142px)] space-y-4 overflow-y-auto px-5 py-4 scrollbar-thin">
           <fieldset className="space-y-3 rounded-md border bg-slate-50/60 p-3">
             <legend className="px-1 text-xs font-semibold text-slate-700">Ziyaretçi</legend>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -109,6 +178,40 @@ export function VisitFormDialog({ open, onOpenChange, visit, onSaved }: VisitFor
               <FormField label="E-posta" required error={fieldError("visitorEmail")} className="sm:col-span-2">
                 <Input type="email" placeholder="ziyaretci@firma.com" {...form.register("visitorEmail")} />
               </FormField>
+              <FormField label="Telefon" error={fieldError("visitorPhone")} className="sm:col-span-2">
+                <div className={phoneCountryCode === "other" ? "grid gap-2 sm:grid-cols-[150px_96px_minmax(0,1fr)]" : "grid gap-2 sm:grid-cols-[150px_minmax(0,1fr)]"}>
+                  <Select {...form.register("phoneCountryCode")} aria-label="Telefon ülke kodu">
+                    {phoneCountryCodes.map((country) => <option key={country.value} value={country.value}>{country.label}</option>)}
+                  </Select>
+                  {phoneCountryCode === "other" && (
+                    <Input
+                      placeholder="+ kod"
+                      inputMode="numeric"
+                      maxLength={4}
+                      aria-label="Özel ülke kodu"
+                      {...form.register("customPhoneCountryCode", {
+                        onChange: (event) => {
+                          event.target.value = `+${event.target.value.replace(/\D/g, "").slice(0, 3)}`
+                        },
+                      })}
+                    />
+                  )}
+                  <Input
+                    {...phoneField}
+                    ref={phoneFieldRef}
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={phoneCountryCode === "+90" ? 13 : 15}
+                    placeholder={phoneCountryCode === "+90" ? "5XX XXX XX XX" : "Ulusal numara"}
+                    onChange={(event) => {
+                      event.target.value = phoneCountryCode === "+90"
+                        ? formatMobilePhone(event.target.value)
+                        : event.target.value.replace(/\D/g, "").slice(0, 15)
+                      onPhoneChange(event)
+                    }}
+                  />
+                </div>
+              </FormField>
             </div>
           </fieldset>
 
@@ -116,8 +219,8 @@ export function VisitFormDialog({ open, onOpenChange, visit, onSaved }: VisitFor
             <legend className="px-1 text-xs font-semibold text-slate-700">Ziyaret Bilgileri</legend>
             <div className="grid gap-3 sm:grid-cols-2">
               <FormField label="Ziyaret Türü" required error={fieldError("visitTypeId")}>
-                <Select {...form.register("visitTypeId")}>
-                  <option value="">Ziyaret türü seçin</option>
+                <Select {...form.register("visitTypeId", { onChange: scrollToNextFields })}>
+                  <option value="" disabled hidden>Ziyaret türü seçin</option>
                   {referenceData?.visitTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
                 </Select>
               </FormField>
@@ -126,10 +229,11 @@ export function VisitFormDialog({ open, onOpenChange, visit, onSaved }: VisitFor
                   {...form.register("hostCompanyId", {
                     onChange: () => {
                       form.setValue("facilityId", "")
+                      scrollToNextFields()
                     },
                   })}
                 >
-                  <option value="">Şirket seçin</option>
+                  <option value="" disabled hidden>Şirket seçin</option>
                   {referenceData?.companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
                 </Select>
               </FormField>
@@ -138,7 +242,7 @@ export function VisitFormDialog({ open, onOpenChange, visit, onSaved }: VisitFor
                   {...form.register("facilityId")}
                   disabled={!companyId}
                 >
-                  <option value="">Tesis seçin</option>
+                  <option value="" disabled hidden>Tesis seçin</option>
                   {facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}
                 </Select>
               </FormField>
@@ -159,21 +263,47 @@ export function VisitFormDialog({ open, onOpenChange, visit, onSaved }: VisitFor
             </div>
           </fieldset>
 
-          <fieldset className="space-y-3 rounded-md border bg-slate-50/60 p-3">
+          <fieldset className="space-y-2 rounded-md border bg-slate-50/60 p-2.5">
             <legend className="px-1 text-xs font-semibold text-slate-700">Ek Bilgi</legend>
+            <Button
+              type="button"
+              variant={form.watch("hasAdditionalRequirements") ? "secondary" : "outline"}
+              size="sm"
+              className={form.watch("hasAdditionalRequirements") ? "border border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100" : "bg-white text-slate-700"}
+              aria-pressed={form.watch("hasAdditionalRequirements")}
+              onClick={() => form.setValue("hasAdditionalRequirements", !form.getValues("hasAdditionalRequirements"), { shouldDirty: true })}
+            >
+              <BellRing className="size-3.5" />
+              İlave gereksinim
+            </Button>
+            {form.watch("hasAdditionalRequirements") && <p className="-mt-1 text-xs text-amber-800">Kayıt oluşturulduğunda yönetici yetkililerine uygulama içi bildirim gönderilir.</p>}
             <FormField label="Not / Açıklama" error={fieldError("note")}>
-              <Textarea rows={3} placeholder="Güvenlik veya ilgili personel için isteğe bağlı açıklama" {...form.register("note")} />
+              <Textarea
+                {...noteField}
+                ref={(element) => {
+                  noteFieldRef(element)
+                  noteTextareaRef.current = element
+                }}
+                rows={1}
+                className="min-h-9 resize-none overflow-hidden"
+                placeholder="Güvenlik veya ilgili personel için isteğe bağlı açıklama"
+              />
             </FormField>
           </fieldset>
 
           {submitError && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{submitError}</p>}
+          {saveNotice && <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800" role="status">{saveNotice}</p>}
           </div>
 
-          <DialogFooter className="border-t bg-card px-5 py-3">
-            <Button type="submit" disabled={form.formState.isSubmitting}>
+          <DialogFooter className="flex-row items-center justify-end border-t bg-card px-5 py-3 sm:justify-end [&>p]:hidden">
+            <p className="text-xs text-slate-500">{isSaved ? "Ziyaret kaydedildi." : "Davet göndermek için önce ziyareti kaydedin."}</p>
+            <div className="flex items-center gap-2">
+            <Button type="submit" variant="outline" disabled={form.formState.isSubmitting}>Ziyareti Kaydet</Button>
+            <Button type="button" onClick={sendInvitation} disabled={!isSaved || form.formState.isSubmitting}>
               <Send />
               {form.formState.isSubmitting ? "Kaydediliyor…" : visit ? "Değişiklikleri Kaydet" : "Daveti Gönder"}
             </Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>

@@ -1,5 +1,6 @@
 import type { RescheduleVisitInput, Visit, VisitInput, VisitReferenceData } from "@/domain/visits"
 import { initialMockVisits, mockVisitReferenceData } from "@/services/mock-visit-data"
+import { managerNotificationService } from "@/services/manager-notification-service"
 import type { VisitService } from "@/services/visit-service"
 
 const clone = <T,>(value: T): T => structuredClone(value)
@@ -18,6 +19,7 @@ export class MockVisitService implements VisitService {
   async createVisit(input: VisitInput): Promise<Visit> {
     const visit = this.fromInput(`v-${crypto.randomUUID()}`, input)
     this.visits = [...this.visits, visit]
+    if (visit.hasAdditionalRequirements) managerNotificationService.createAdditionalRequirementNotification(visit)
     return clone(visit)
   }
 
@@ -73,6 +75,7 @@ export class MockVisitService implements VisitService {
         firstName: input.visitorFirstName.trim(),
         lastName: input.visitorLastName.trim(),
         email: input.visitorEmail.trim(),
+        phone: input.visitorPhone?.trim() || undefined,
       },
       visitTypeId: visitType.id,
       visitTypeName: visitType.name,
@@ -89,6 +92,7 @@ export class MockVisitService implements VisitService {
       visitorCardReturned: existing?.visitorCardReturned,
       status: existing?.status ?? "PLANNED",
       note: input.note?.trim() || undefined,
+      hasAdditionalRequirements: input.hasAdditionalRequirements ?? false,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
       cancelledAt: existing?.cancelledAt,

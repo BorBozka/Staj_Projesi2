@@ -7,6 +7,7 @@ export interface Visitor {
   firstName: string
   lastName: string
   email: string
+  phone?: string
 }
 
 export interface Visit {
@@ -28,6 +29,7 @@ export interface Visit {
   visitorCardReturned?: boolean
   status: VisitStatus
   note?: string
+  hasAdditionalRequirements?: boolean
   createdAt: string
   updatedAt: string
   cancelledAt?: string
@@ -74,6 +76,7 @@ export interface VisitInput {
   visitorFirstName: string
   visitorLastName: string
   visitorEmail: string
+  visitorPhone?: string
   visitTypeId: string
   hostEmployeeName: string
   hostCompanyId: string
@@ -81,6 +84,7 @@ export interface VisitInput {
   plannedStart: string
   plannedEnd: string
   note?: string
+  hasAdditionalRequirements?: boolean
 }
 
 export interface RescheduleVisitInput {

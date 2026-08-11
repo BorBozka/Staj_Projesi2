@@ -47,7 +47,7 @@ export function MyVisitsPage() {
   const isManagerView = location.pathname.startsWith("/manager/")
 
   return (
-    <div className="space-y-2">
+    <div>
       {error && (
         <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
           <Info className="size-4" />{error}
@@ -61,7 +61,7 @@ export function MyVisitsPage() {
         </div>
       )}
 
-      <div className={"mt-2 grid gap-3 xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_320px] " + (isManagerView ? "xl:h-[calc(100dvh-30px)]" : "xl:h-[calc(100dvh-82px)]")}>
+      <div className={"grid gap-3 xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_320px] " + (isManagerView ? "xl:h-[calc(111.112dvh-36px)]" : "xl:h-[calc(100dvh-16px)]")}>
         <VisitTimeline
           visits={ownVisits}
           view={view}

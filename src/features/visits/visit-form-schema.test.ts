@@ -30,4 +30,13 @@ describe("visitFormSchema", () => {
   it("rejects invalid required values", () => {
     expect(visitFormSchema.safeParse({ ...validValues, visitorEmail: "invalid-email", startTime: "" }).success).toBe(false)
   })
+
+  it("accepts an optional mobile phone only in the expected format", () => {
+    expect(visitFormSchema.safeParse({ ...validValues, visitorPhone: "532 123 45 67" }).success).toBe(true)
+    expect(visitFormSchema.safeParse({ ...validValues, visitorPhone: "0532 123 45 67" }).success).toBe(false)
+  })
+
+  it("accepts an international phone with a selected country code", () => {
+    expect(visitFormSchema.safeParse({ ...validValues, phoneCountryCode: "+44", visitorPhone: "2079460123" }).success).toBe(true)
+  })
 })
