@@ -1,6 +1,6 @@
 import type { FacilityResource, ResourceType } from "@/domain/resources"
 
-export const RESOURCE_PAGE_SIZE = 9
+export const RESOURCE_PAGE_SIZE = 8
 
 export type ResourceSortField = "name" | "type" | "location" | "quantity" | "status"
 export type SortDirection = "asc" | "desc"
@@ -10,6 +10,7 @@ export interface ResourceSort {
 }
 
 export interface ResourceFilters {
+  search: string
   companyId: string
   facilityId: string
   type: "all" | ResourceType
@@ -17,6 +18,7 @@ export interface ResourceFilters {
 }
 
 export const defaultResourceFilters: ResourceFilters = {
+  search: "",
   companyId: "all",
   facilityId: "all",
   type: "all",
@@ -24,12 +26,24 @@ export const defaultResourceFilters: ResourceFilters = {
 }
 
 export function filterResources(resources: FacilityResource[], filters: ResourceFilters) {
+  const searchQuery = filters.search.trim().toLowerCase()
+
   return resources.filter((resource) => {
     if (filters.companyId !== "all" && resource.companyId !== filters.companyId) return false
     if (filters.facilityId !== "all" && resource.facilityId !== filters.facilityId) return false
     if (filters.type !== "all" && resource.type !== filters.type) return false
     if (filters.active === "active" && !resource.isActive) return false
     if (filters.active === "inactive" && resource.isActive) return false
+
+    if (searchQuery) {
+      const name = getResourceName(resource).toLowerCase()
+      const company = resource.companyName.toLowerCase()
+      const facility = resource.facilityName.toLowerCase()
+      const detail = (getResourceDetail(resource) ?? "").toLowerCase()
+      const matches = name.includes(searchQuery) || company.includes(searchQuery) || facility.includes(searchQuery) || detail.includes(searchQuery)
+      if (!matches) return false
+    }
+
     return true
   })
 }
@@ -75,7 +89,13 @@ function compareResources(left: FacilityResource, right: FacilityResource, sortF
 }
 
 export function hasActiveResourceFilters(filters: ResourceFilters) {
-  return Object.values(filters).some((value) => value !== "all")
+  return (
+    filters.search.trim() !== "" ||
+    filters.companyId !== "all" ||
+    filters.facilityId !== "all" ||
+    filters.type !== "all" ||
+    filters.active !== "all"
+  )
 }
 
 export function paginateResources(resources: FacilityResource[], page: number, pageSize = RESOURCE_PAGE_SIZE) {
@@ -98,6 +118,17 @@ function getResourceName(resource: FacilityResource) {
     : resource.type === "DRIVER"
       ? resource.fullName
       : resource.name
+}
+
+function getResourceDetail(resource: FacilityResource) {
+  switch (resource.type) {
+    case "VEHICLE":
+      return resource.licensePlate
+    case "DRIVER":
+      return resource.licenseClasses.join(", ") || null
+    default:
+      return null
+  }
 }
 
 function getQuantity(resource: FacilityResource) {

@@ -1,8 +1,9 @@
-import { AlertCircle, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Boxes, ChevronDown, Plus, RotateCcw, X } from "lucide-react"
+import { AlertCircle, ArrowDown, ArrowUp, Boxes, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FilterX, Plus, Search, X } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
 import { getResourceDisplayName, resourceTypeLabels, resourceTypes, type FacilityResource, type ResourceInput } from "@/domain/resources"
 import {
   defaultResourceFilters,
@@ -100,13 +101,12 @@ export function ResourceCatalogPage() {
       setFeedback({ tone: "success", message: `${displayName} güncellendi.` })
     } else {
       await createResource(input)
-      setFeedback({ tone: "success", message: `${displayName} kataloğa eklendi.` })
+      setFeedback({ tone: "success", message: `${displayName} oluşturuldu.` })
     }
   }
 
   const toggleResource = async (resource: FacilityResource) => {
     setTransitioningResourceId(resource.id)
-    setFeedback(null)
     try {
       const updated = await setResourceActive(resource.id, !resource.isActive)
       setSelectedResource((current) => current?.id === updated.id ? updated : current)
@@ -125,11 +125,35 @@ export function ResourceCatalogPage() {
   }
 
   return (
-    <div className="min-w-0 space-y-3">
-      <h1 className="sr-only">Kaynaklar</h1>
-
+    <div className="min-w-0 space-y-3 md:space-y-3.5">
       <section className="rounded-lg border bg-card p-3 shadow-panel" aria-label="Kaynak filtreleri">
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-[repeat(4,minmax(128px,1fr))_auto]">
+        <div className="flex items-center justify-between pb-1">
+          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Kaynak Filtreleri</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className={cn("h-5 gap-1 border-none px-1 text-[11px] font-medium text-slate-500 shadow-none hover:bg-transparent hover:text-slate-900", !activeFilters && "invisible")}
+            onClick={clearFilters}
+          >
+            <FilterX className="size-3 text-slate-500" />
+            Filtreleri temizle
+          </Button>
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(200px,1.5fr)_repeat(4,minmax(120px,1fr))_auto]">
+          <FilterField label="Arama" htmlFor="resource-search" className="sm:col-span-2 xl:col-span-1">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="resource-search"
+                value={filters.search}
+                onChange={(event) => updateFilters((current) => ({ ...current, search: event.target.value }))}
+                placeholder="Kaynak, plaka, şoför, şirket veya tesis ara"
+                className="pl-8 h-9 text-xs"
+              />
+            </div>
+          </FilterField>
           <FilterField label="Şirket" htmlFor="resource-company">
             <FilterSelect
               id="resource-company"
@@ -148,46 +172,59 @@ export function ResourceCatalogPage() {
           <FilterField label="Durum" htmlFor="resource-status">
             <FilterSelect id="resource-status" value={filters.active} emptyLabel="Tüm durumlar" options={[{ value: "active", label: "Aktif" }, { value: "inactive", label: "Pasif" }]} onValueChange={(value) => updateFilters((current) => ({ ...current, active: value as ResourceFilters["active"] }))} />
           </FilterField>
-          <div className="flex flex-col gap-1 sm:col-span-2 sm:items-end xl:col-span-1 xl:row-span-2 xl:items-stretch">
-            <div className="flex h-4 items-center xl:justify-end">
-              {activeFilters && <Button variant="ghost" size="sm" className="h-auto px-0 py-0 text-xs font-normal text-slate-600 hover:bg-transparent hover:text-slate-900" onClick={clearFilters}><RotateCcw />Filtreleri temizle</Button>}
-            </div>
-            <Button className="w-full xl:mt-1" onClick={(event) => openCreateDialog(event.currentTarget)}><Plus />Yeni kaynak</Button>
+          <div className="flex flex-col justify-end">
+            <Button className="h-9 w-full gap-1 text-xs" onClick={(event) => openCreateDialog(event.currentTarget)}><Plus className="size-3.5" />Yeni kaynak</Button>
           </div>
         </div>
+
+        {activeFilters && (
+          <div className="mt-1.5 flex justify-start sm:hidden">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-6 gap-1 border-none px-1 text-xs font-medium text-slate-500 shadow-none hover:bg-transparent hover:text-slate-900"
+              onClick={clearFilters}
+            >
+              <FilterX className="size-3.5 text-slate-500" />
+              Filtreleri temizle
+            </Button>
+          </div>
+        )}
       </section>
 
       {feedback && (
         <div
+          role="status"
           className={cn(
-            "flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-xs",
-            feedback.tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800",
+            "flex items-center justify-between rounded-lg border px-3 py-2 text-xs shadow-xs",
+            feedback.tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-red-200 bg-red-50 text-red-900",
           )}
-          role={feedback.tone === "error" ? "alert" : "status"}
         >
           <span>{feedback.message}</span>
-          <Button variant="ghost" size="icon-sm" className="shrink-0" aria-label="Bildirimi kapat" onClick={() => setFeedback(null)}><X /></Button>
+          <button type="button" className="rounded p-0.5 hover:bg-black/5" onClick={() => setFeedback(null)} aria-label="Geri bildirimi kapat"><X className="size-3" /></button>
         </div>
       )}
 
-      <section ref={tableSectionRef} className="scroll-mt-3 overflow-hidden rounded-lg border bg-card shadow-panel" aria-label="Kaynak kataloğu">
+      <section ref={tableSectionRef} className="scroll-mt-3 flex flex-col justify-between overflow-hidden rounded-lg border bg-card shadow-panel" aria-label="Kaynak kataloğu">
         {filteredResources.length === 0 ? (
-          <ResourceEmptyState
-            filtered={resources.length > 0 && activeFilters}
-            onClear={clearFilters}
-            onCreate={openCreateDialog}
-          />
+          <div className="flex flex-1 flex-col items-center justify-center px-4 py-24 text-center">
+            <Boxes className="mx-auto size-8 text-slate-400" />
+            <h2 className="mt-3 text-sm font-semibold text-slate-900">Eşleşen kaynak bulunamadı</h2>
+            <p className="mt-1 text-xs text-slate-600">Seçilen filtrelerle eşleşen herhangi bir kaynak bulunmuyor.</p>
+            {activeFilters && <Button variant="outline" size="sm" className="mt-4" onClick={clearFilters}>Filtreleri temizle</Button>}
+          </div>
         ) : (
-          <>
-            <div className="hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[760px] table-fixed text-left text-xs">
+          <div className="flex-1">
+            <div className="hidden md:block overflow-x-auto scrollbar-thin">
+              <table className="w-full min-w-[920px] table-fixed text-left text-xs">
                 <thead className="sticky top-0 z-10 border-b bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                   <tr>
-                    <SortableHeader label="Kaynak" sort={sorts.find((sort) => sort.field === "name")} className="w-[25%]" onClick={() => setSorts((current) => toggleResourceSort(current, "name"))} />
-                    <SortableHeader label="Tür" sort={sorts.find((sort) => sort.field === "type")} className="w-[17%]" onClick={() => setSorts((current) => toggleResourceSort(current, "type"))} />
-                    <SortableHeader label="Şirket / tesis" sort={sorts.find((sort) => sort.field === "location")} className="w-[25%]" onClick={() => setSorts((current) => toggleResourceSort(current, "location"))} />
-                    <SortableHeader label="Miktar" sort={sorts.find((sort) => sort.field === "quantity")} className="w-[10%]" onClick={() => setSorts((current) => toggleResourceSort(current, "quantity"))} />
-                    <SortableHeader label="Durum" sort={sorts.find((sort) => sort.field === "status")} className="w-[10%]" onClick={() => setSorts((current) => toggleResourceSort(current, "status"))} />
+                    <th className="w-[30%] px-3 py-2.5"><SortButton label="KAYNAK" field="name" sorts={sorts} onToggle={(field) => setSorts((current) => toggleResourceSort(current, field))} /></th>
+                    <th className="w-[18%] px-3 py-2.5"><SortButton label="TÜR" field="type" sorts={sorts} onToggle={(field) => setSorts((current) => toggleResourceSort(current, field))} /></th>
+                    <th className="w-[24%] px-3 py-2.5"><SortButton label="ŞİRKET / TESİS" field="location" sorts={sorts} onToggle={(field) => setSorts((current) => toggleResourceSort(current, field))} /></th>
+                    <th className="w-[14%] px-3 py-2.5"><SortButton label="MİKTAR / DETAY" field="quantity" sorts={sorts} onToggle={(field) => setSorts((current) => toggleResourceSort(current, field))} /></th>
+                    <th className="w-[14%] px-3 py-2.5"><SortButton label="DURUM" field="status" sorts={sorts} onToggle={(field) => setSorts((current) => toggleResourceSort(current, field))} /></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -204,14 +241,26 @@ export function ResourceCatalogPage() {
                         }
                       }}
                     >
-                      <td className="px-3 py-2.5"><ResourceIdentity resource={resource} /></td>
-                      <td className="px-3 py-2.5">{resourceTypeLabels[resource.type]}</td>
-                      <td className="px-3 py-2.5">
-                        <p className="truncate">{resource.companyName}</p>
+                      <td className="px-3 py-2.5 sm:py-3"><ResourceIdentity resource={resource} /></td>
+                      <td className="px-3 py-2.5 sm:py-3">{resourceTypeLabels[resource.type]}</td>
+                      <td className="px-3 py-2.5 sm:py-3">
+                        <p className="truncate font-normal text-slate-900">{resource.companyName}</p>
                         <p className="mt-0.5 truncate text-[11px] text-slate-500">{resource.facilityName}</p>
                       </td>
-                      <td className="px-3 py-2.5 tabular-nums">{formatQuantity(resource)}</td>
-                      <td className="px-3 py-2.5"><ResourceStatus active={resource.isActive} /></td>
+                      <td className="px-3 py-2.5 sm:py-3 tabular-nums">{formatQuantity(resource)}</td>
+                      <td className="px-3 py-2.5 sm:py-3"><ResourceStatus active={resource.isActive} /></td>
+                    </tr>
+                  ))}
+                  {Array.from({ length: Math.max(0, RESOURCE_PAGE_SIZE - paginatedResources.length) }).map((_, index) => (
+                    <tr key={`filler-${index}`} aria-hidden="true" className={cn("pointer-events-none select-none", index > 0 && "border-transparent")}>
+                      <td className="px-3 py-2.5 sm:py-3">
+                        <p className="truncate font-semibold text-transparent">&nbsp;</p>
+                        <p className="mt-0.5 truncate text-[11px] text-transparent">&nbsp;</p>
+                      </td>
+                      <td className="px-3 py-2.5 sm:py-3 text-transparent">&nbsp;</td>
+                      <td className="px-3 py-2.5 sm:py-3 text-transparent">&nbsp;</td>
+                      <td className="px-3 py-2.5 sm:py-3 text-transparent">&nbsp;</td>
+                      <td className="px-3 py-2.5 sm:py-3 text-transparent">&nbsp;</td>
                     </tr>
                   ))}
                 </tbody>
@@ -223,7 +272,7 @@ export function ResourceCatalogPage() {
                 <article
                   key={resource.id}
                   tabIndex={0}
-                  className={cn("cursor-pointer select-none p-3 transition-colors hover:bg-slate-50 focus-visible:bg-blue-50/60 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-blue-500", !resource.isActive && "bg-slate-50/70 hover:bg-slate-100/70")}
+                  className={cn("cursor-pointer select-none p-3.5 transition-colors hover:bg-slate-50 focus-visible:bg-blue-50/60 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-blue-500", !resource.isActive && "bg-slate-50/70 hover:bg-slate-100/70")}
                   onClick={(event) => openEditDialog(resource, event.currentTarget)}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
@@ -248,21 +297,122 @@ export function ResourceCatalogPage() {
                 </article>
               ))}
             </div>
-
-            <div className="flex flex-col gap-2 border-t bg-slate-50/50 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-xs tabular-nums text-slate-600">{pageCount > 1 ? `${filteredResources.length} kaydın ${visibleStart}–${visibleEnd}’u` : `${filteredResources.length} kayıt`}</p>
-              {pageCount > 1 && (
-                <nav className="flex items-center gap-1" aria-label="Kaynak sayfaları">
-                  {page > 1 && <Button variant="outline" size="sm" onClick={() => changePage(page - 1)}><ArrowLeft />Önceki</Button>}
-                  {getVisibleResourcePageNumbers(page, pageCount).map((pageNumber) => (
-                    <Button key={pageNumber} variant={pageNumber === page ? "default" : "outline"} size="icon-sm" aria-current={pageNumber === page ? "page" : undefined} aria-label={`${pageNumber}. sayfa`} onClick={() => changePage(pageNumber)}>{pageNumber}</Button>
-                  ))}
-                  {page < pageCount && <Button variant="outline" size="sm" onClick={() => changePage(page + 1)}>Sonraki<ArrowRight /></Button>}
-                </nav>
-              )}
-            </div>
-          </>
+          </div>
         )}
+
+        <div className="flex flex-col gap-2 border-t bg-slate-50/50 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs tabular-nums text-slate-600">{visibleStart}–{visibleEnd} / {filteredResources.length} kayıt</p>
+          <nav className="flex items-center gap-1" aria-label="Kaynak sayfaları">
+            {page > 1 && (
+              <>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  className="h-8 w-8 text-xs"
+                  onClick={() => changePage(1)}
+                  title="İlk sayfa"
+                  aria-label="İlk sayfa"
+                >
+                  <ChevronsLeft className="size-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  className="h-8 w-8 text-xs"
+                  onClick={() => changePage(page - 1)}
+                  title="Önceki sayfa"
+                  aria-label="Önceki sayfa"
+                >
+                  <ChevronLeft className="size-4" />
+                </Button>
+              </>
+            )}
+            {(() => {
+              const visible = getVisibleResourcePageNumbers(page, Math.max(1, pageCount))
+              const num1 = visible[0] ?? null
+              const num2 = visible[1] ?? null
+              const num3 = visible[2] ?? null
+              return (
+                <>
+                  {num1 !== null ? (
+                    <Button
+                      key={num1}
+                      variant={num1 === page ? "default" : "outline"}
+                      size="icon-sm"
+                      className="h-8 w-8 text-xs"
+                      aria-current={num1 === page ? "page" : undefined}
+                      aria-label={`${num1}. sayfa`}
+                      onClick={() => changePage(num1)}
+                    >
+                      {num1}
+                    </Button>
+                  ) : (
+                    <span key="slot-num-1" className="h-8 w-8 invisible" aria-hidden="true" />
+                  )}
+                  {num2 !== null ? (
+                    <Button
+                      key={num2}
+                      variant={num2 === page ? "default" : "outline"}
+                      size="icon-sm"
+                      className="h-8 w-8 text-xs"
+                      aria-current={num2 === page ? "page" : undefined}
+                      aria-label={`${num2}. sayfa`}
+                      onClick={() => changePage(num2)}
+                    >
+                      {num2}
+                    </Button>
+                  ) : (
+                    <span key="slot-num-2" className="h-8 w-8 invisible" aria-hidden="true" />
+                  )}
+                  {num3 !== null ? (
+                    <Button
+                      key={num3}
+                      variant={num3 === page ? "default" : "outline"}
+                      size="icon-sm"
+                      className="h-8 w-8 text-xs"
+                      aria-current={num3 === page ? "page" : undefined}
+                      aria-label={`${num3}. sayfa`}
+                      onClick={() => changePage(num3)}
+                    >
+                      {num3}
+                    </Button>
+                  ) : (
+                    <span key="slot-num-3" className="h-8 w-8 invisible" aria-hidden="true" />
+                  )}
+                </>
+              )
+            })()}
+            {page < pageCount ? (
+              <>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  className="h-8 w-8 text-xs"
+                  onClick={() => changePage(page + 1)}
+                  title="Sonraki sayfa"
+                  aria-label="Sonraki sayfa"
+                >
+                  <ChevronRight className="size-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  className="h-8 w-8 text-xs"
+                  onClick={() => changePage(pageCount)}
+                  title="Son sayfa"
+                  aria-label="Son sayfa"
+                >
+                  <ChevronsRight className="size-4" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <span key="slot-next" className="h-8 w-8 invisible" aria-hidden="true" />
+                <span key="slot-last" className="h-8 w-8 invisible" aria-hidden="true" />
+              </>
+            )}
+          </nav>
+        </div>
       </section>
 
       <ResourceFormDialog
@@ -279,17 +429,12 @@ export function ResourceCatalogPage() {
   )
 }
 
-function FilterField({ label, htmlFor, children }: { label: string; htmlFor: string; children: React.ReactNode }) {
-  return <div><label id={`${htmlFor}-label`} htmlFor={htmlFor} className="mb-1 block text-[11px] font-medium text-slate-600">{label}</label>{children}</div>
-}
-
-function SortableHeader({ label, sort, className, onClick }: { label: string; sort?: ResourceSort; className: string; onClick(): void }) {
+function FilterField({ label, htmlFor, className, children }: { label: string; htmlFor: string; className?: string; children: React.ReactNode }) {
   return (
-    <th className={cn(className, "px-3 py-2")} aria-sort={sort?.direction === "asc" ? "ascending" : sort?.direction === "desc" ? "descending" : "none"}>
-      <button type="button" className="inline-flex items-center gap-1 rounded-sm hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-blue-600" onClick={onClick}>
-        {label}{sort?.direction === "asc" ? <ArrowUp className="size-3" /> : sort?.direction === "desc" ? <ArrowDown className="size-3" /> : null}
-      </button>
-    </th>
+    <div className={className}>
+      <label id={`${htmlFor}-label`} htmlFor={htmlFor} className="mb-1 block text-[11px] font-medium text-slate-600">{label}</label>
+      {children}
+    </div>
   )
 }
 
@@ -300,72 +445,99 @@ function FilterSelect({ id, value, emptyLabel, options, onValueChange }: {
   options: { value: string; label: string }[]
   onValueChange(value: string): void
 }) {
-  const selectedLabel = options.find((option) => option.value === value)?.label ?? emptyLabel
+  const fullOptions = useMemo(() => {
+    if (options.some((option) => option.value === "all")) return options
+    return [{ value: "all", label: emptyLabel }, ...options]
+  }, [emptyLabel, options])
+
+  const selectedLabel = fullOptions.find((option) => option.value === value)?.label ?? emptyLabel
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button id={id} variant="outline" className="h-9 w-full justify-between px-3 text-left text-sm font-normal" aria-labelledby={`${id}-label ${id}`}>
+        <Button id={id} variant="outline" className="h-9 w-full justify-between px-3 text-left text-xs font-normal" aria-labelledby={`${id}-label ${id}`}>
           <span className="truncate">{selectedLabel}</span><ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="max-h-64 min-w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto">
         <DropdownMenuRadioGroup value={value} onValueChange={onValueChange}>
-          <DropdownMenuRadioItem value="all">{emptyLabel}</DropdownMenuRadioItem>
-          {options.map((option) => <DropdownMenuRadioItem key={option.value} value={option.value}>{option.label}</DropdownMenuRadioItem>)}
+          {fullOptions.map((option) => (
+            <DropdownMenuRadioItem key={option.value} value={option.value}>
+              {option.label}
+            </DropdownMenuRadioItem>
+          ))}
         </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   )
 }
 
-function ResourceStatus({ active }: { active: boolean }) {
+function SortButton({ label, field, sorts, onToggle }: {
+  label: string
+  field: ResourceSort["field"]
+  sorts: ResourceSort[]
+  onToggle(field: ResourceSort["field"]): void
+}) {
+  const activeSort = sorts.find((sort) => sort.field === field)
   return (
-    <span className={cn(
-      "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium",
-      active ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-slate-100 text-slate-600",
-    )}>
-      {active ? "Aktif" : "Pasif"}
-    </span>
+    <button
+      type="button"
+      className="inline-flex items-center gap-1 rounded-sm hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-blue-600"
+      onClick={() => onToggle(field)}
+      aria-label={`${label} sütununu ${activeSort?.direction === "asc" ? "azalan" : "artan"} sırala`}
+    >
+      {label}
+      {activeSort ? (
+        activeSort.direction === "asc" ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />
+      ) : null}
+    </button>
   )
-}
-
-function ResourceEmptyState({ filtered, onClear, onCreate }: { filtered: boolean; onClear(): void; onCreate(trigger: HTMLElement): void }) {
-  return (
-    <div className="px-4 py-14 text-center">
-      <Boxes className="mx-auto size-8 text-slate-400" />
-      <h3 className="mt-3 text-sm font-semibold text-slate-900">{filtered ? "Filtrelerle eşleşen kaynak yok" : "Kaynak kataloğu boş"}</h3>
-      <p className="mt-1 text-xs text-slate-600">{filtered ? "Filtreleri değiştirerek yeniden deneyin." : "İlk katalog kaynağını ekleyin."}</p>
-      <Button variant="outline" size="sm" className="mt-4" onClick={(event) => filtered ? onClear() : onCreate(event.currentTarget)}>{filtered ? "Filtreleri temizle" : "Yeni kaynak"}</Button>
-    </div>
-  )
-}
-
-function formatQuantity(resource: FacilityResource) {
-  return resource.type === "POOLED_EQUIPMENT" ? resource.totalQuantity : "—"
 }
 
 function ResourceIdentity({ resource }: { resource: FacilityResource }) {
   const displayName = getResourceDisplayName(resource)
   const detail = getResourceDetail(resource)
+
   return (
-    <div className="min-w-0">
-      <p className="truncate font-semibold text-slate-900">{displayName}</p>
-      {detail && <p className="mt-0.5 truncate text-[11px] text-slate-500">{detail}</p>}
+    <div>
+      <p className="truncate font-semibold text-slate-900" title={displayName}>{displayName}</p>
+      {detail && <p className="mt-0.5 truncate text-[11px] text-slate-500" title={detail}>{detail}</p>}
     </div>
   )
+}
+
+function ResourceStatus({ active }: { active: boolean }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium",
+        active ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-slate-100 text-slate-600",
+      )}
+    >
+      {active ? "Aktif" : "Pasif"}
+    </span>
+  )
+}
+
+function formatQuantity(resource: FacilityResource) {
+  switch (resource.type) {
+    case "POOLED_EQUIPMENT":
+      return `${resource.totalQuantity} adet`
+    case "VEHICLE":
+      return resource.licensePlate
+    case "DRIVER":
+      return resource.licenseClasses.join(", ") || "—"
+    case "ROOM":
+      return "1 oda"
+  }
 }
 
 function getResourceDetail(resource: FacilityResource) {
   switch (resource.type) {
     case "VEHICLE":
-      return `Plaka: ${resource.licensePlate}`
-    case "DRIVER": {
-      const documentSummary = resource.documents.length === 0
-        ? "Belge: Yok"
-        : `Belgeler: ${resource.documents[0]}${resource.documents.length > 1 ? ` +${resource.documents.length - 1}` : ""}`
-      return `Ehliyet: ${resource.licenseClasses.join(", ")} · Ticari araç: ${resource.canDriveCommercialVehicles ? "Evet" : "Hayır"} · ${documentSummary}`
-    }
+      return resource.licensePlate
+    case "DRIVER":
+      return resource.licenseClasses.join(", ") || null
     default:
       return null
   }
@@ -373,17 +545,15 @@ function getResourceDetail(resource: FacilityResource) {
 
 function ResourceCatalogSkeleton() {
   return (
-    <div className="space-y-3" aria-label="Kaynak kataloğu yükleniyor" role="status">
+    <div className="space-y-3" aria-label="Kaynaklar yükleniyor" role="status">
       <div className="rounded-lg border bg-white p-3 shadow-panel">
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-[repeat(4,minmax(128px,1fr))_auto]">
-          {Array.from({ length: 4 }, (_, index) => <div key={index} className="h-12 animate-pulse rounded bg-slate-100" />)}
-          <div className="h-9 w-full animate-pulse self-end rounded bg-slate-200 sm:col-span-2 sm:w-28 sm:justify-self-end xl:col-span-1" />
+        <div className="mt-2.5 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+          {Array.from({ length: 5 }, (_, index) => <div key={index} className="h-9 animate-pulse rounded bg-slate-100" />)}
         </div>
       </div>
       <div className="overflow-hidden rounded-lg border bg-white shadow-panel">
-        <div className="h-9 animate-pulse border-b bg-slate-100" />
-        {Array.from({ length: RESOURCE_PAGE_SIZE }, (_, index) => <div key={index} className="h-12 animate-pulse border-b bg-white p-3"><div className="h-full rounded bg-slate-100" /></div>)}
-        <div className="h-12 animate-pulse bg-slate-50" />
+        <div className="h-10 animate-pulse border-b bg-slate-100" />
+        {Array.from({ length: 9 }, (_, index) => <div key={index} className="h-12 animate-pulse border-b bg-white px-3 py-2.5"><div className="h-full rounded bg-slate-100" /></div>)}
       </div>
     </div>
   )

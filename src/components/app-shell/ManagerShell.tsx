@@ -92,7 +92,7 @@ export function ManagerShell() {
           </Button>
         </header>
 
-        <main className="mx-auto w-full max-w-[1440px] min-w-0 px-4 py-4 md:px-5 lg:px-6"><Outlet /></main>
+        <main className="mx-auto w-full max-w-[1440px] min-w-0 px-4 py-2.5 md:px-5 md:py-3 lg:px-6"><Outlet /></main>
       </div>
     </ManagerRefreshProvider>
   )

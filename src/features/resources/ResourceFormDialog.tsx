@@ -128,6 +128,9 @@ export function ResourceFormDialog({ open, resource, referenceData, returnFocusR
       <DialogContent
         className="max-w-xl"
         aria-describedby={undefined}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault()
+        }}
         onCloseAutoFocus={(event) => {
           event.preventDefault()
           returnFocusRef.current?.focus()

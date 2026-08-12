@@ -94,3 +94,77 @@ export function getResourceDisplayName(resource: FacilityResource | ResourceInpu
       return resource.fullName
   }
 }
+
+// ---------------------------------------------------------------------------
+// Resource Assignments
+// Normalized stored records — resource identity is resolved from the catalog.
+// ---------------------------------------------------------------------------
+
+export interface RoomAssignment {
+  id: string
+  meetingId: string
+  resourceId: string
+  resourceType: "ROOM"
+  createdAt: string
+}
+
+export interface EquipmentAssignment {
+  id: string
+  meetingId: string
+  resourceId: string
+  resourceType: "POOLED_EQUIPMENT"
+  requestedQuantity: number
+  createdAt: string
+}
+
+export type ResourceAssignment = RoomAssignment | EquipmentAssignment
+
+// Input types for assignment operations
+export interface AssignRoomInput {
+  resourceId: string
+}
+
+export interface AssignEquipmentInput {
+  resourceId: string
+  requestedQuantity: number
+}
+
+// Projected views enriched with catalog data — used only by the UI layer
+export interface RoomAssignmentView extends RoomAssignment {
+  resourceName: string
+  companyId: string
+  facilityId: string
+}
+
+export interface EquipmentAssignmentView extends EquipmentAssignment {
+  resourceName: string
+  totalQuantity: number
+  companyId: string
+  facilityId: string
+}
+
+export type ResourceAssignmentView = RoomAssignmentView | EquipmentAssignmentView
+
+// Availability information returned for the eligible-resource selectors
+export interface RoomAvailabilityInfo {
+  resource: RoomResource
+  isAvailable: boolean
+  conflictReason?: string
+}
+
+export interface EquipmentAvailabilityInfo {
+  resource: PooledEquipmentResource
+  usedQuantity: number
+  remainingQuantity: number
+}
+
+/**
+ * The complete desired resource state the Manager wants to persist for a Meeting.
+ * Sent to saveMeetingAssignments for atomic validation and replacement.
+ */
+export interface DesiredResourceState {
+  /** null means remove any existing room assignment. */
+  roomResourceId: string | null
+  /** Each entry is a unique resourceId + positive quantity. */
+  equipment: { resourceId: string; requestedQuantity: number }[]
+}

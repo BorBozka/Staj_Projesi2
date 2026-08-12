@@ -1,18 +1,20 @@
 import {
   AlertCircle,
   ArrowDown,
-  ArrowLeft,
-  ArrowRight,
   ArrowUp,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   ChevronUp,
   ClipboardList,
+  FilterX,
   LoaderCircle,
   Search,
   Send,
   SlidersHorizontal,
-  X,
 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "react-router-dom"
@@ -24,6 +26,7 @@ import type { InvitationStatus, Visit, VisitStatus } from "@/domain/visits"
 import {
   ALL_VISITS_PAGE_SIZE,
   clearAllVisitsSearchParams,
+  countVisitsWithAdditionalRequirements,
   filterAndSortVisits,
   getFacilitiesForCompany,
   getPageCount,
@@ -32,7 +35,10 @@ import {
   isDateRangeInvalid,
   paginateVisits,
   parseAllVisitsQuery,
+  toggleVisitSort,
   updateAllVisitsSearchParams,
+  type VisitSort,
+  type VisitSortField,
 } from "@/features/manager/all-visits-utils"
 import { ManagerVisitDetailsSheet } from "@/features/manager/ManagerVisitDetailsSheet"
 import { VisitStatusBadge } from "@/features/visits/VisitStatusBadge"
@@ -61,6 +67,7 @@ export function AllVisitsPage() {
   const { visits, referenceData, isLoading, error, reload } = useVisits()
   const [searchParams, setSearchParams] = useSearchParams()
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null)
+  const [sorts, setSorts] = useState<VisitSort[]>([])
   const tableSectionRef = useRef<HTMLElement>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
 
@@ -69,9 +76,15 @@ export function AllVisitsPage() {
     [referenceData, searchParams],
   )
   const filters = queryState?.filters
-  const filteredVisits = useMemo(
-    () => filters ? filterAndSortVisits(visits, filters) : [],
+
+  const additionalCount = useMemo(
+    () => filters ? countVisitsWithAdditionalRequirements(visits, filters) : 0,
     [filters, visits],
+  )
+
+  const filteredVisits = useMemo(
+    () => filters ? filterAndSortVisits(visits, filters, sorts) : [],
+    [filters, visits, sorts],
   )
   const pageCount = getPageCount(filteredVisits.length)
   const page = queryState?.page ?? 1
@@ -100,12 +113,17 @@ export function AllVisitsPage() {
   }
 
   const facilities = getFacilitiesForCompany(referenceData, filters.companyId)
-  const activeFilters = hasActiveAllVisitsFilters(filters)
+  const activeFilters = hasActiveAllVisitsFilters(filters) || sorts.length > 0
   const visibleStart = filteredVisits.length === 0 ? 0 : (page - 1) * ALL_VISITS_PAGE_SIZE + 1
   const visibleEnd = Math.min(page * ALL_VISITS_PAGE_SIZE, filteredVisits.length)
 
   const setFilter = (key: string, value: string, replace = false) => {
     setSearchParams(updateAllVisitsSearchParams(searchParams, key, value), { replace })
+  }
+
+  const clearFilters = () => {
+    setSearchParams(clearAllVisitsSearchParams(searchParams))
+    setSorts([])
   }
 
   const setPage = (nextPage: number) => {
@@ -122,28 +140,34 @@ export function AllVisitsPage() {
   }
 
   return (
-    <div className="min-w-0 space-y-3">
+    <div className="min-w-0 space-y-3 md:space-y-3.5">
       <section className="rounded-lg border bg-card p-3 shadow-panel" aria-label="Ziyaret filtreleri">
-        <div className="flex justify-end">
-          {activeFilters && (
-            <Button variant="ghost" size="sm" className="text-slate-600" onClick={() => setSearchParams(clearAllVisitsSearchParams(searchParams))}>
-              <X />Filtreleri temizle
-            </Button>
-          )}
+        <div className="flex items-center justify-between pb-1">
+          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Ziyaret Filtreleri</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className={cn("h-5 gap-1 border-none px-1 text-[11px] font-medium text-slate-500 shadow-none hover:bg-transparent hover:text-slate-900", !activeFilters && "invisible")}
+            onClick={clearFilters}
+          >
+            <FilterX className="size-3 text-slate-500" />
+            Filtreleri temizle
+          </Button>
         </div>
 
-        <div className={cn("grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(240px,1.7fr)_repeat(5,minmax(128px,1fr))_auto]", activeFilters && "mt-2")}>
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(200px,1.5fr)_repeat(5,minmax(120px,1fr))_auto_auto]">
           <FilterField label="Arama" htmlFor="all-visits-search" className="sm:col-span-2 xl:col-span-1">
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input id="all-visits-search" value={filters.search} onChange={(event) => setFilter("q", event.target.value, true)} placeholder="Ziyaretçi, ev sahibi, şirket veya tesis ara" className="pl-8" />
+              <Input id="all-visits-search" value={filters.search} onChange={(event) => setFilter("q", event.target.value, true)} placeholder="Ziyaretçi, ev sahibi, şirket veya tesis ara" className="pl-8 h-9 text-xs" />
             </div>
           </FilterField>
           <FilterField label="Başlangıç" htmlFor="all-visits-from">
-            <Input id="all-visits-from" type="date" value={filters.startDate} aria-invalid={dateRangeInvalid} onChange={(event) => setFilter("from", event.target.value)} />
+            <Input id="all-visits-from" type="date" value={filters.startDate} aria-invalid={dateRangeInvalid} onChange={(event) => setFilter("from", event.target.value)} className="h-9 text-xs" />
           </FilterField>
           <FilterField label="Bitiş" htmlFor="all-visits-to">
-            <Input id="all-visits-to" type="date" value={filters.endDate} aria-invalid={dateRangeInvalid} onChange={(event) => setFilter("to", event.target.value)} />
+            <Input id="all-visits-to" type="date" value={filters.endDate} aria-invalid={dateRangeInvalid} onChange={(event) => setFilter("to", event.target.value)} className="h-9 text-xs" />
           </FilterField>
           <FilterField label="Şirket" htmlFor="all-visits-company">
             <FilterSelect id="all-visits-company" value={filters.companyId} emptyLabel="Tüm şirketler" options={referenceData.companies.map((company) => ({ value: company.id, label: company.name }))} onValueChange={(value) => setFilter("company", value)} />
@@ -154,26 +178,62 @@ export function AllVisitsPage() {
           <FilterField label="Durum" htmlFor="all-visits-status">
             <FilterSelect id="all-visits-status" value={filters.status} emptyLabel="Tüm durumlar" options={statusOptions.filter((option) => option.value !== "all")} onValueChange={(value) => setFilter("status", value)} />
           </FilterField>
-          <Button
-            variant="outline"
-            className="self-end"
-            aria-expanded={queryState.showOtherFilters}
-            aria-controls="all-visits-other-filters"
-            onClick={() => {
-              const next = new URLSearchParams(searchParams)
-              if (queryState.showOtherFilters) next.delete("more")
-              else next.set("more", "1")
-              setSearchParams(next)
-            }}
-          >
-            <SlidersHorizontal />Diğer filtreler{queryState.showOtherFilters ? <ChevronUp /> : <ChevronDown />}
-          </Button>
+
+          {/* First-class "İlave gereksinim" Quick Filter */}
+          <div className="flex flex-col justify-end">
+            <Button
+              type="button"
+              variant={filters.additionalRequirement === "with" ? "default" : "outline"}
+              className={cn(
+                "h-9 gap-1 text-xs transition-colors",
+                filters.additionalRequirement === "with"
+                  ? "border-violet-700 bg-violet-700 text-white hover:bg-violet-800 shadow-xs font-medium"
+                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+              )}
+              onClick={() => {
+                const nextVal = filters.additionalRequirement === "with" ? "all" : "with"
+                setFilter("additional", nextVal)
+              }}
+              title="İlave gereksinimi olan ziyaretleri filtrele"
+              aria-pressed={filters.additionalRequirement === "with"}
+            >
+              <ClipboardList className="size-3.5 shrink-0" />
+              <span>İlave gereksinim</span>
+              <span
+                className={cn(
+                  "ml-0.5 inline-flex items-center justify-center rounded-full px-1.5 py-0.2 text-[10px] font-semibold",
+                  filters.additionalRequirement === "with"
+                    ? "bg-violet-900 text-violet-100"
+                    : "bg-violet-100 text-violet-800",
+                )}
+              >
+                {additionalCount}
+              </span>
+            </Button>
+          </div>
+
+          <div className="flex flex-col justify-end">
+            <Button
+              variant="outline"
+              className="h-9 gap-1 text-xs"
+              aria-expanded={queryState.showOtherFilters}
+              aria-controls="all-visits-other-filters"
+              onClick={() => {
+                const next = new URLSearchParams(searchParams)
+                if (queryState.showOtherFilters) next.delete("more")
+                else next.set("more", "1")
+                setSearchParams(next)
+              }}
+            >
+              <SlidersHorizontal className="size-3.5" />Diğer{queryState.showOtherFilters ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+            </Button>
+          </div>
         </div>
 
         {dateRangeInvalid && <p className="mt-2 text-xs font-medium text-red-700" role="alert">Başlangıç tarihi bitiş tarihinden sonra olamaz.</p>}
 
         {queryState.showOtherFilters && (
-          <div id="all-visits-other-filters" className="mt-2 grid gap-2 rounded-md border bg-slate-50/70 p-2.5 sm:grid-cols-2 lg:grid-cols-4">
+          <div id="all-visits-other-filters" className="mt-2.5 grid gap-2 rounded-md border bg-slate-50/70 p-2.5 sm:grid-cols-2 lg:grid-cols-3">
             <FilterField label="Ziyaret türü" htmlFor="all-visits-type">
               <FilterSelect id="all-visits-type" value={filters.visitTypeId} emptyLabel="Tüm ziyaret türleri" options={referenceData.visitTypes.map((type) => ({ value: type.id, label: type.name }))} onValueChange={(value) => setFilter("type", value)} />
             </FilterField>
@@ -183,88 +243,202 @@ export function AllVisitsPage() {
             <FilterField label="Davet durumu" htmlFor="all-visits-invitation">
               <FilterSelect id="all-visits-invitation" value={filters.invitationStatus} emptyLabel="Tüm davet durumları" options={invitationOptions.filter((option) => option.value !== "all")} onValueChange={(value) => setFilter("invitation", value)} />
             </FilterField>
-            <FilterField label="İlave gereksinim" htmlFor="all-visits-additional">
-              <FilterSelect id="all-visits-additional" value={filters.additionalRequirement} emptyLabel="Tümü" options={[{ value: "with", label: "Var" }, { value: "without", label: "Yok" }]} onValueChange={(value) => setFilter("additional", value)} />
-            </FilterField>
           </div>
         )}
       </section>
 
-      <section ref={tableSectionRef} className="scroll-mt-3 overflow-hidden rounded-lg border bg-card shadow-panel" aria-label="Ziyaret kayıtları">
+      <section ref={tableSectionRef} className="overflow-hidden rounded-lg border bg-card shadow-panel min-h-[460px] flex flex-col justify-between" aria-label="Ziyaret listesi">
         {filteredVisits.length === 0 ? (
-          <div className="px-4 py-14 text-center">
+          <div className="flex flex-1 flex-col items-center justify-center px-4 py-24 text-center">
             <Search className="mx-auto size-8 text-slate-400" />
             <h3 className="mt-3 text-sm font-semibold text-slate-900">Eşleşen ziyaret bulunamadı</h3>
             <p className="mt-1 text-xs text-slate-600">Arama veya filtre ölçütlerini değiştirerek yeniden deneyin.</p>
-            {activeFilters && <Button variant="outline" size="sm" className="mt-4" onClick={() => setSearchParams(clearAllVisitsSearchParams(searchParams))}>Filtreleri temizle</Button>}
+            {activeFilters && <Button variant="outline" size="sm" className="mt-4" onClick={clearFilters}>Filtreleri temizle</Button>}
           </div>
         ) : (
-          <>
-            <div className="overflow-x-auto scrollbar-thin">
-              <table className="w-full min-w-[1080px] table-fixed text-left text-xs">
-                <thead className="sticky top-0 z-10 border-b bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  <tr>
-                    <th className="w-[17%] px-3 py-2">Ziyaretçi</th>
-                    <th className="w-[15%] px-3 py-2">Ev sahibi</th>
-                    <th className="w-[18%] px-3 py-2">Şirket / tesis</th>
-                    <th className="w-[18%] px-3 py-2">
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1 rounded-sm hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-blue-600"
-                        onClick={() => setFilter("sort", filters.sortDirection === "asc" ? "desc" : "asc")}
-                        aria-label={`Planlanan zamanı ${filters.sortDirection === "asc" ? "azalan" : "artan"} sırala`}
-                      >
-                        Planlanan zaman{filters.sortDirection === "asc" ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />}
-                      </button>
-                    </th>
-                    <th className="w-[18%] px-3 py-2">Takip</th>
-                    <th className="w-[14%] px-3 py-2">Durum</th>
+          <div className="flex-1 overflow-x-auto scrollbar-thin">
+            <table className="w-full min-w-[1080px] table-fixed text-left text-xs">
+              <thead className="sticky top-0 z-10 border-b bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  <th className="w-[16%] px-3 py-2.5">
+                    <SortButton label="ZİYARETÇİ" field="visitor" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
+                  </th>
+                  <th className="w-[14%] px-3 py-2.5">
+                    <SortButton label="EV SAHİBİ" field="host" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
+                  </th>
+                  <th className="w-[17%] px-3 py-2.5">
+                    <SortButton label="ŞİRKET / TESİS" field="companyFacility" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
+                  </th>
+                  <th className="w-[18%] px-3 py-2.5">
+                    <SortButton label="PLANLANAN ZAMAN" field="plannedStart" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
+                  </th>
+                  <th className="w-[23%] px-3 py-2.5">
+                    <SortButton label="TAKİP" field="invitation" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
+                  </th>
+                  <th className="w-[12%] px-3 py-2.5">
+                    <SortButton label="DURUM" field="status" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {paginatedVisits.map((visit) => (
+                  <tr
+                    key={visit.id}
+                    tabIndex={0}
+                    className="cursor-pointer select-none transition-colors hover:bg-slate-50 focus:bg-blue-50/60 focus:outline focus:outline-1 focus:-outline-offset-1 focus:outline-blue-500"
+                    onClick={(event) => openVisit(visit, event.currentTarget)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault()
+                        openVisit(visit, event.currentTarget)
+                      }
+                    }}
+                  >
+                    <td className="px-3 py-2.5 sm:py-3">
+                      <p className="truncate font-semibold text-slate-900" title={`${visit.visitor.firstName} ${visit.visitor.lastName}`}>{visit.visitor.firstName} {visit.visitor.lastName}</p>
+                      <p className="mt-0.5 truncate text-[11px] text-slate-500" title={visit.visitTypeName}>{visit.visitTypeName}</p>
+                    </td>
+                    <td className="px-3 py-2.5 sm:py-3"><p className="truncate" title={visit.hostEmployeeName}>{visit.hostEmployeeName}</p></td>
+                    <td className="px-3 py-2.5 sm:py-3">
+                      <p className="truncate" title={visit.hostCompanyName}>{visit.hostCompanyName}</p>
+                      <p className="mt-0.5 truncate text-[11px] text-slate-500" title={visit.facilityName}>{visit.facilityName}</p>
+                    </td>
+                    <td className="px-3 py-2.5 sm:py-3 tabular-nums">{formatTr(new Date(visit.plannedStart), "d MMM yyyy · HH:mm")}–{formatTr(new Date(visit.plannedEnd), "HH:mm")}</td>
+                    <td className="px-3 py-2.5 sm:py-3"><TrackingBadges visit={visit} /></td>
+                    <td className="px-3 py-2.5 sm:py-3"><VisitStatusBadge status={visit.status} compact /></td>
                   </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {paginatedVisits.map((visit) => (
-                    <tr
-                      key={visit.id}
-                      tabIndex={0}
-                      className="cursor-pointer select-none transition-colors hover:bg-slate-50 focus:bg-blue-50/60 focus:outline focus:outline-1 focus:-outline-offset-1 focus:outline-blue-500"
-                      onClick={(event) => openVisit(visit, event.currentTarget)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault()
-                          openVisit(visit, event.currentTarget)
-                        }
-                      }}
-                    >
-                      <td className="px-3 py-2.5">
-                        <p className="truncate font-semibold text-slate-900" title={`${visit.visitor.firstName} ${visit.visitor.lastName}`}>{visit.visitor.firstName} {visit.visitor.lastName}</p>
-                        <p className="mt-0.5 truncate text-[11px] text-slate-500" title={visit.visitTypeName}>{visit.visitTypeName}</p>
-                      </td>
-                      <td className="px-3 py-2.5"><p className="truncate" title={visit.hostEmployeeName}>{visit.hostEmployeeName}</p></td>
-                      <td className="px-3 py-2.5">
-                        <p className="truncate" title={visit.hostCompanyName}>{visit.hostCompanyName}</p>
-                        <p className="mt-0.5 truncate text-[11px] text-slate-500" title={visit.facilityName}>{visit.facilityName}</p>
-                      </td>
-                      <td className="px-3 py-2.5 tabular-nums">{formatTr(new Date(visit.plannedStart), "d MMM yyyy · HH:mm")}–{formatTr(new Date(visit.plannedEnd), "HH:mm")}</td>
-                      <td className="px-3 py-2.5"><TrackingBadges visit={visit} /></td>
-                      <td className="px-3 py-2.5"><VisitStatusBadge status={visit.status} compact /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="flex flex-col gap-2 border-t bg-slate-50/50 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-xs tabular-nums text-slate-600">{visibleStart}–{visibleEnd} / {filteredVisits.length} kayıt</p>
-              <nav className="flex items-center gap-1" aria-label="Ziyaret sayfaları">
-                <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(page - 1)}><ArrowLeft />Önceki</Button>
-                {getVisiblePageNumbers(page, pageCount).map((pageNumber) => (
-                  <Button key={pageNumber} variant={pageNumber === page ? "default" : "outline"} size="icon-sm" aria-current={pageNumber === page ? "page" : undefined} aria-label={`${pageNumber}. sayfa`} onClick={() => setPage(pageNumber)}>{pageNumber}</Button>
                 ))}
-                <Button variant="outline" size="sm" disabled={page === pageCount} onClick={() => setPage(page + 1)}>Sonraki<ArrowRight /></Button>
-              </nav>
-            </div>
-          </>
+                {Array.from({ length: Math.max(0, ALL_VISITS_PAGE_SIZE - paginatedVisits.length) }).map((_, index) => (
+                  <tr key={`filler-${index}`} aria-hidden="true" className={cn("pointer-events-none select-none", index > 0 && "border-transparent")}>
+                    <td className="px-3 py-2.5 sm:py-3">
+                      <p className="truncate font-semibold text-transparent">&nbsp;</p>
+                      <p className="mt-0.5 truncate text-[11px] text-transparent">&nbsp;</p>
+                    </td>
+                    <td className="px-3 py-2.5 sm:py-3 text-transparent">&nbsp;</td>
+                    <td className="px-3 py-2.5 sm:py-3 text-transparent">&nbsp;</td>
+                    <td className="px-3 py-2.5 sm:py-3 text-transparent">&nbsp;</td>
+                    <td className="px-3 py-2.5 sm:py-3 text-transparent">&nbsp;</td>
+                    <td className="px-3 py-2.5 sm:py-3 text-transparent">&nbsp;</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
+
+        <div className="flex flex-col gap-2 border-t bg-slate-50/50 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs tabular-nums text-slate-600">{visibleStart}–{visibleEnd} / {filteredVisits.length} kayıt</p>
+          <nav className="flex items-center gap-1" aria-label="Ziyaret sayfaları">
+            {page > 1 && (
+              <>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  className="h-8 w-8 text-xs"
+                  onClick={() => setPage(1)}
+                  title="İlk sayfa"
+                  aria-label="İlk sayfa"
+                >
+                  <ChevronsLeft className="size-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  className="h-8 w-8 text-xs"
+                  onClick={() => setPage(page - 1)}
+                  title="Önceki sayfa"
+                  aria-label="Önceki sayfa"
+                >
+                  <ChevronLeft className="size-4" />
+                </Button>
+              </>
+            )}
+            {(() => {
+              const visible = getVisiblePageNumbers(page, Math.max(1, pageCount))
+              const num1 = visible[0] ?? null
+              const num2 = visible[1] ?? null
+              const num3 = visible[2] ?? null
+              return (
+                <>
+                  {num1 !== null ? (
+                    <Button
+                      key={num1}
+                      variant={num1 === page ? "default" : "outline"}
+                      size="icon-sm"
+                      className="h-8 w-8 text-xs"
+                      aria-current={num1 === page ? "page" : undefined}
+                      aria-label={`${num1}. sayfa`}
+                      onClick={() => setPage(num1)}
+                    >
+                      {num1}
+                    </Button>
+                  ) : (
+                    <span key="slot-num-1" className="h-8 w-8 invisible" aria-hidden="true" />
+                  )}
+                  {num2 !== null ? (
+                    <Button
+                      key={num2}
+                      variant={num2 === page ? "default" : "outline"}
+                      size="icon-sm"
+                      className="h-8 w-8 text-xs"
+                      aria-current={num2 === page ? "page" : undefined}
+                      aria-label={`${num2}. sayfa`}
+                      onClick={() => setPage(num2)}
+                    >
+                      {num2}
+                    </Button>
+                  ) : (
+                    <span key="slot-num-2" className="h-8 w-8 invisible" aria-hidden="true" />
+                  )}
+                  {num3 !== null ? (
+                    <Button
+                      key={num3}
+                      variant={num3 === page ? "default" : "outline"}
+                      size="icon-sm"
+                      className="h-8 w-8 text-xs"
+                      aria-current={num3 === page ? "page" : undefined}
+                      aria-label={`${num3}. sayfa`}
+                      onClick={() => setPage(num3)}
+                    >
+                      {num3}
+                    </Button>
+                  ) : (
+                    <span key="slot-num-3" className="h-8 w-8 invisible" aria-hidden="true" />
+                  )}
+                </>
+              )
+            })()}
+            {page < pageCount ? (
+              <>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  className="h-8 w-8 text-xs"
+                  onClick={() => setPage(page + 1)}
+                  title="Sonraki sayfa"
+                  aria-label="Sonraki sayfa"
+                >
+                  <ChevronRight className="size-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  className="h-8 w-8 text-xs"
+                  onClick={() => setPage(pageCount)}
+                  title="Son sayfa"
+                  aria-label="Son sayfa"
+                >
+                  <ChevronsRight className="size-4" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <span key="slot-next" className="h-8 w-8 invisible" aria-hidden="true" />
+                <span key="slot-last" className="h-8 w-8 invisible" aria-hidden="true" />
+              </>
+            )}
+          </nav>
+        </div>
       </section>
 
       <ManagerVisitDetailsSheet
@@ -293,18 +467,27 @@ function FilterSelect({ id, value, emptyLabel, options, onValueChange }: {
   options: { value: string; label: string }[]
   onValueChange(value: string): void
 }) {
-  const selectedLabel = options.find((option) => option.value === value)?.label ?? emptyLabel
+  const fullOptions = useMemo(() => {
+    if (options.some((option) => option.value === "all")) return options
+    return [{ value: "all", label: emptyLabel }, ...options]
+  }, [emptyLabel, options])
+
+  const selectedLabel = fullOptions.find((option) => option.value === value)?.label ?? emptyLabel
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button id={id} variant="outline" className="h-9 w-full justify-between px-3 text-left text-sm font-normal" aria-labelledby={`${id}-label ${id}`}>
+        <Button id={id} variant="outline" className="h-9 w-full justify-between px-3 text-left text-xs font-normal" aria-labelledby={`${id}-label ${id}`}>
           <span className="truncate">{selectedLabel}</span><ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="max-h-64 min-w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto">
-        <DropdownMenuRadioGroup value={value === "all" ? "" : value} onValueChange={onValueChange}>
-          {options.map((option) => <DropdownMenuRadioItem key={option.value} value={option.value}>{option.label}</DropdownMenuRadioItem>)}
+        <DropdownMenuRadioGroup value={value} onValueChange={onValueChange}>
+          {fullOptions.map((option) => (
+            <DropdownMenuRadioItem key={option.value} value={option.value}>
+              {option.label}
+            </DropdownMenuRadioItem>
+          ))}
         </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -322,16 +505,44 @@ function TrackingBadges({ visit }: { visit: Visit }) {
   const invitation = invitationTracking[visit.invitationStatus]
   const InvitationIcon = invitation.icon
   return (
-    <div className="flex flex-wrap gap-1">
-      <span className={cn("inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium", invitation.className)}>
-        <InvitationIcon className={cn("size-2.5", visit.invitationStatus === "SENDING" && "animate-spin")} />{invitation.label}
-      </span>
+    <div className="flex items-center gap-1.5 whitespace-nowrap overflow-hidden">
+      <div className="w-[146px] shrink-0">
+        <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium shrink-0", invitation.className)}>
+          <InvitationIcon className={cn("size-3", visit.invitationStatus === "SENDING" && "animate-spin")} />{invitation.label}
+        </span>
+      </div>
       {visit.hasAdditionalRequirements && (
-        <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-800">
-          <ClipboardList className="size-2.5" />İlave gereksinim var
+        <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-800 shrink-0">
+          <ClipboardList className="size-3" />İlave gereksinim var
         </span>
       )}
     </div>
+  )
+}
+
+function SortButton({ label, field, sorts, onToggle }: {
+  label: string
+  field: VisitSortField
+  sorts: VisitSort[]
+  onToggle(field: VisitSortField): void
+}) {
+  const activeSort = field === "visitor"
+    ? sorts.find((sort) => sort.field === "visitor" || sort.field === "visitType")
+    : sorts.find((sort) => sort.field === field)
+
+  return (
+    <button
+      type="button"
+      className="inline-flex items-center gap-1 rounded-sm hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-blue-600"
+      onClick={() => onToggle(field)}
+      aria-label={`${label} sütununu ${activeSort?.direction === "asc" ? "azalan" : "artan"} sırala`}
+      title={activeSort?.field === "visitType" ? "Ziyaret türüne göre sıralı" : undefined}
+    >
+      {label}
+      {activeSort ? (
+        activeSort.direction === "asc" ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />
+      ) : null}
+    </button>
   )
 }
 
@@ -339,14 +550,14 @@ function AllVisitsSkeleton() {
   return (
     <div className="space-y-3" aria-label="Tüm ziyaretler yükleniyor" role="status">
       <div className="rounded-lg border bg-white p-3 shadow-panel">
-        <div className="h-5 w-32 animate-pulse rounded bg-slate-200" />
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
-          {Array.from({ length: 6 }, (_, index) => <div key={index} className="h-11 animate-pulse rounded bg-slate-100" />)}
+        <div className="h-4 w-32 animate-pulse rounded bg-slate-200" />
+        <div className="mt-2.5 grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
+          {Array.from({ length: 6 }, (_, index) => <div key={index} className="h-9 animate-pulse rounded bg-slate-100" />)}
         </div>
       </div>
       <div className="overflow-hidden rounded-lg border bg-white shadow-panel">
         <div className="h-10 animate-pulse border-b bg-slate-100" />
-        {Array.from({ length: 10 }, (_, index) => <div key={index} className="h-12 animate-pulse border-b bg-white px-3 py-3"><div className="h-full rounded bg-slate-100" /></div>)}
+        {Array.from({ length: 10 }, (_, index) => <div key={index} className="h-12 animate-pulse border-b bg-white px-3 py-2.5"><div className="h-full rounded bg-slate-100" /></div>)}
       </div>
     </div>
   )

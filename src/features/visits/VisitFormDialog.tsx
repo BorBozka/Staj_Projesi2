@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -284,7 +283,6 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
       <DialogContent className="max-w-2xl gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b px-5 py-4 pr-12">
           <DialogTitle>{visit ? "Ziyareti Düzenle" : "Yeni Ziyaret"}</DialogTitle>
-          {visit && <DialogDescription>Ortak ziyaret bilgilerini ve ziyaretçileri güncelleyin.</DialogDescription>}
         </DialogHeader>
 
         <form onSubmit={onSave} className="flex min-h-0 flex-col" noValidate>
