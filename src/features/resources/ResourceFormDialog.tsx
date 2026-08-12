@@ -1,5 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useEffect, useMemo, useState } from "react"
+import { Power, PowerOff } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useForm } from "react-hook-form"
 
 import { Button } from "@/components/ui/button"
@@ -28,6 +29,8 @@ interface ResourceFormDialogProps {
   returnFocusRef: React.RefObject<HTMLElement | null>
   onOpenChange(open: boolean): void
   onSave(input: ResourceInput): Promise<void>
+  onToggleActive(resource: FacilityResource): Promise<void>
+  isTogglingActive: boolean
 }
 
 const blankValues: ResourceFormValues = {
@@ -57,8 +60,9 @@ const typeSpecificFields: (keyof ResourceFormValues)[] = [
   "canDriveCommercialVehicles",
 ]
 
-export function ResourceFormDialog({ open, resource, referenceData, returnFocusRef, onOpenChange, onSave }: ResourceFormDialogProps) {
+export function ResourceFormDialog({ open, resource, referenceData, returnFocusRef, onOpenChange, onSave, onToggleActive, isTogglingActive }: ResourceFormDialogProps) {
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [statusNotice, setStatusNotice] = useState<string | null>(null)
   const form = useForm<ResourceFormValues>({
     resolver: zodResolver(resourceFormSchema),
     defaultValues: blankValues,
@@ -66,6 +70,8 @@ export function ResourceFormDialog({ open, resource, referenceData, returnFocusR
   })
   const resourceType = form.watch("type")
   const companyId = form.watch("companyId")
+  const documents = form.watch("documents")
+  const documentsTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const facilities = useMemo(
     () => referenceData.facilities.filter((facility) => facility.companyId === companyId),
     [companyId, referenceData.facilities],
@@ -75,10 +81,19 @@ export function ResourceFormDialog({ open, resource, referenceData, returnFocusR
     if (!open) return
     form.reset(resource ? getResourceFormValues(resource) : blankValues)
     setSubmitError(null)
+    setStatusNotice(null)
   }, [form, open, resource])
+
+  useEffect(() => {
+    const textarea = documentsTextareaRef.current
+    if (!textarea) return
+    textarea.style.height = "auto"
+    textarea.style.height = `${textarea.scrollHeight}px`
+  }, [documents, resourceType])
 
   const typeRegistration = form.register("type")
   const companyRegistration = form.register("companyId")
+  const documentsRegistration = form.register("documents")
 
   const submit = form.handleSubmit(
     async (values) => {
@@ -96,6 +111,17 @@ export function ResourceFormDialog({ open, resource, referenceData, returnFocusR
       if (firstInvalidField) form.setFocus(firstInvalidField)
     },
   )
+
+  const toggleActive = async () => {
+    if (!resource || form.formState.isDirty) return
+    setStatusNotice(null)
+    try {
+      await onToggleActive(resource)
+      setStatusNotice(resource.isActive ? "Kaynak pasife alındı." : "Kaynak aktife alındı.")
+    } catch {
+      // The catalog page surfaces operational errors in its shared feedback area.
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -161,10 +187,21 @@ export function ResourceFormDialog({ open, resource, referenceData, returnFocusR
                 <Input {...form.register("fullName")} aria-invalid={Boolean(form.formState.errors.fullName)} autoComplete="name" />
               </FormField>
               <FormField label="Ehliyet sınıfları" required error={form.formState.errors.licenseClasses?.message}>
-                <Input {...form.register("licenseClasses")} aria-invalid={Boolean(form.formState.errors.licenseClasses)} placeholder="B, C" autoComplete="off" />
+                <Input {...form.register("licenseClasses")} aria-invalid={Boolean(form.formState.errors.licenseClasses)} placeholder="Örn. B, C — virgülle ayırın" autoComplete="off" />
+                <p className="mt-1 text-[11px] text-slate-500">Birden fazla ehliyet sınıfını virgülle ayırın.</p>
               </FormField>
               <FormField label="Belgeler" className="sm:col-span-2">
-                <Textarea {...form.register("documents")} rows={2} placeholder="SRC2, Psikoteknik (isteğe bağlı)" />
+                <Textarea
+                  {...documentsRegistration}
+                  ref={(element) => {
+                    documentsTextareaRef.current = element
+                    documentsRegistration.ref(element)
+                  }}
+                  rows={1}
+                  className="h-9 min-h-9 resize-none overflow-hidden"
+                  placeholder="Örn. SRC2, Psikoteknik — virgülle ayırın"
+                />
+                <p className="mt-1 text-[11px] text-slate-500">Birden fazla belgeyi virgülle ayırın.</p>
               </FormField>
               <FormField label="Ticari araç kullanabilir" required className="sm:col-span-2">
                 <Select {...form.register("canDriveCommercialVehicles")}>
@@ -218,10 +255,24 @@ export function ResourceFormDialog({ open, resource, referenceData, returnFocusR
         </form>
 
         <DialogFooter>
+          {resource && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isTogglingActive || form.formState.isSubmitting || form.formState.isDirty}
+              onClick={() => void toggleActive()}
+              title={form.formState.isDirty ? "Durumu değiştirmek için form değişikliklerini önce kaydedin." : undefined}
+            >
+              {resource.isActive ? <PowerOff /> : <Power />}
+              {resource.isActive ? "Pasife al" : "Aktife al"}
+            </Button>
+          )}
           <Button type="submit" form="resource-form" disabled={form.formState.isSubmitting}>
             {form.formState.isSubmitting ? "Kaydediliyor…" : "Kaydet"}
           </Button>
         </DialogFooter>
+        {resource && form.formState.isDirty && <p className="text-right text-[11px] text-slate-500">Durumu değiştirmek için form değişikliklerini önce kaydedin.</p>}
+        {statusNotice && <p className="text-right text-xs text-emerald-700" role="status">{statusNotice}</p>}
       </DialogContent>
     </Dialog>
   )

@@ -9,7 +9,7 @@ import {
   Send,
 } from "lucide-react"
 import { lazy, Suspense, useCallback, useEffect, useState } from "react"
-import { NavLink, Outlet } from "react-router-dom"
+import { NavLink, Outlet, useLocation } from "react-router-dom"
 
 import bplasLogo from "@/assets/bplas-logo.svg"
 import {
@@ -240,7 +240,8 @@ function ManagerMobileNavigation({ open, onOpenChange }: { open: boolean; onOpen
 }
 
 function NavigationGroup({ label, collapsed, items, className }: { label: string; collapsed: boolean; items: { label: string; icon: typeof CalendarDays; to?: string }[]; className?: string }) {
-  return <div className={className}><p className="h-6 overflow-hidden px-2 pb-2 text-xs font-medium text-slate-400"><span className={cn("whitespace-nowrap", collapsed && "invisible")}>{label}</span></p>{items.map(({ label: itemLabel, icon: Icon, to }) => to ? <NavLink key={itemLabel} to={to} title={collapsed ? itemLabel : undefined} className={({ isActive }) => cn("mb-1 flex h-11 items-center whitespace-nowrap rounded-md text-sm font-medium transition-[padding,gap,colors] duration-200", collapsed ? "justify-center" : "gap-3 pl-3 pr-3", isActive ? "bg-blue-600 text-white shadow-sm" : "text-slate-300 hover:bg-slate-800 hover:text-white")}><Icon className="size-5 shrink-0" />{!collapsed && <span className="truncate">{itemLabel}</span>}</NavLink> : <div key={itemLabel} className={cn("mb-1 flex h-11 cursor-not-allowed items-center whitespace-nowrap rounded-md text-sm text-slate-600 transition-[padding,gap] duration-200", collapsed ? "justify-center" : "gap-3 pl-3 pr-3")} aria-disabled="true"><Icon className="size-5 shrink-0" />{!collapsed && <span className="truncate">{itemLabel}</span>}</div>)}</div>
+  const { pathname } = useLocation()
+  return <div className={className}><p className="h-6 overflow-hidden px-2 pb-2 text-xs font-medium text-slate-400"><span className={cn("whitespace-nowrap", collapsed && "invisible")}>{label}</span></p>{items.map(({ label: itemLabel, icon: Icon, to }) => to ? <NavLink key={itemLabel} to={to} title={collapsed ? itemLabel : undefined} aria-label={collapsed ? itemLabel : undefined} aria-current={pathname === to ? "page" : undefined} className={({ isActive }) => cn("mb-1 flex h-11 items-center whitespace-nowrap rounded-md text-sm font-medium transition-[padding,gap,colors] duration-200", collapsed ? "justify-center" : "gap-3 pl-3 pr-3", isActive ? "bg-blue-600 text-white shadow-sm" : "text-slate-300 hover:bg-slate-800 hover:text-white")}><Icon className="size-5 shrink-0" />{!collapsed && <span className="truncate">{itemLabel}</span>}</NavLink> : <div key={itemLabel} className={cn("mb-1 flex h-11 cursor-not-allowed items-center whitespace-nowrap rounded-md text-sm text-slate-600 transition-[padding,gap] duration-200", collapsed ? "justify-center" : "gap-3 pl-3 pr-3")} aria-disabled="true"><Icon className="size-5 shrink-0" />{!collapsed && <span className="truncate">{itemLabel}</span>}</div>)}</div>
 }
 
 function MobileNavigationGroup({ label, items, onNavigate, className }: { label: string; items: { label: string; icon: typeof CalendarDays; to?: string }[]; onNavigate(): void; className?: string }) {

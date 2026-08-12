@@ -1,4 +1,4 @@
-import { AlertCircle, ArrowLeft, ArrowRight, Boxes, ChevronDown, Pencil, Plus, Power, PowerOff, X } from "lucide-react"
+import { AlertCircle, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Boxes, ChevronDown, Plus, RotateCcw, X } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 
 import { Button } from "@/components/ui/button"
@@ -13,6 +13,9 @@ import {
   paginateResources,
   RESOURCE_PAGE_SIZE,
   type ResourceFilters,
+  type ResourceSort,
+  sortResources,
+  toggleResourceSort,
 } from "@/features/resources/resource-filters"
 import { ResourceFormDialog } from "@/features/resources/ResourceFormDialog"
 import { useResources } from "@/features/resources/resource-context"
@@ -23,6 +26,7 @@ export function ResourceCatalogPage() {
   const { resources, isLoading, error, reload, createResource, updateResource, setResourceActive } = useResources()
   const { referenceData, isLoading: visitsLoading, error: visitsError, reload: reloadVisits } = useVisits()
   const [filters, setFilters] = useState<ResourceFilters>(defaultResourceFilters)
+  const [sorts, setSorts] = useState<ResourceSort[]>([])
   const [page, setPage] = useState(1)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [selectedResource, setSelectedResource] = useState<FacilityResource | null>(null)
@@ -35,7 +39,10 @@ export function ResourceCatalogPage() {
     () => referenceData?.facilities.filter((facility) => filters.companyId === "all" || facility.companyId === filters.companyId) ?? [],
     [filters.companyId, referenceData?.facilities],
   )
-  const filteredResources = useMemo(() => filterResources(resources, filters), [filters, resources])
+  const filteredResources = useMemo(
+    () => sortResources(filterResources(resources, filters), sorts),
+    [filters, resources, sorts],
+  )
   const pageCount = getResourcePageCount(filteredResources.length)
   const paginatedResources = paginateResources(filteredResources, page)
   const activeFilters = hasActiveResourceFilters(filters)
@@ -101,7 +108,8 @@ export function ResourceCatalogPage() {
     setTransitioningResourceId(resource.id)
     setFeedback(null)
     try {
-      await setResourceActive(resource.id, !resource.isActive)
+      const updated = await setResourceActive(resource.id, !resource.isActive)
+      setSelectedResource((current) => current?.id === updated.id ? updated : current)
       setFeedback({
         tone: "success",
         message: `${getResourceDisplayName(resource)} ${resource.isActive ? "pasife" : "aktife"} alındı.`,
@@ -121,13 +129,7 @@ export function ResourceCatalogPage() {
       <h1 className="sr-only">Kaynaklar</h1>
 
       <section className="rounded-lg border bg-card p-3 shadow-panel" aria-label="Kaynak filtreleri">
-        <div className="flex justify-end">
-          {activeFilters && (
-            <Button variant="ghost" size="sm" className="text-slate-600" onClick={clearFilters}><X />Filtreleri temizle</Button>
-          )}
-        </div>
-
-        <div className={cn("grid gap-2 sm:grid-cols-2 xl:grid-cols-[repeat(4,minmax(128px,1fr))_auto]", activeFilters && "mt-2")}>
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-[repeat(4,minmax(128px,1fr))_auto]">
           <FilterField label="Şirket" htmlFor="resource-company">
             <FilterSelect
               id="resource-company"
@@ -146,7 +148,12 @@ export function ResourceCatalogPage() {
           <FilterField label="Durum" htmlFor="resource-status">
             <FilterSelect id="resource-status" value={filters.active} emptyLabel="Tüm durumlar" options={[{ value: "active", label: "Aktif" }, { value: "inactive", label: "Pasif" }]} onValueChange={(value) => updateFilters((current) => ({ ...current, active: value as ResourceFilters["active"] }))} />
           </FilterField>
-          <Button className="w-full self-end sm:col-span-2 sm:w-auto sm:justify-self-end xl:col-span-1" onClick={(event) => openCreateDialog(event.currentTarget)}><Plus />Yeni kaynak</Button>
+          <div className="flex flex-col gap-1 sm:col-span-2 sm:items-end xl:col-span-1 xl:row-span-2 xl:items-stretch">
+            <div className="flex h-4 items-center xl:justify-end">
+              {activeFilters && <Button variant="ghost" size="sm" className="h-auto px-0 py-0 text-xs font-normal text-slate-600 hover:bg-transparent hover:text-slate-900" onClick={clearFilters}><RotateCcw />Filtreleri temizle</Button>}
+            </div>
+            <Button className="w-full xl:mt-1" onClick={(event) => openCreateDialog(event.currentTarget)}><Plus />Yeni kaynak</Button>
+          </div>
         </div>
       </section>
 
@@ -176,26 +183,35 @@ export function ResourceCatalogPage() {
               <table className="w-full min-w-[760px] table-fixed text-left text-xs">
                 <thead className="sticky top-0 z-10 border-b bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                   <tr>
-                    <th className="w-[25%] px-3 py-2">Kaynak</th>
-                    <th className="w-[17%] px-3 py-2">Tür</th>
-                    <th className="w-[25%] px-3 py-2">Şirket / tesis</th>
-                    <th className="w-[10%] px-3 py-2">Miktar</th>
-                    <th className="w-[10%] px-3 py-2">Durum</th>
-                    <th className="w-[13%] px-3 py-2 text-right">İşlemler</th>
+                    <SortableHeader label="Kaynak" sort={sorts.find((sort) => sort.field === "name")} className="w-[25%]" onClick={() => setSorts((current) => toggleResourceSort(current, "name"))} />
+                    <SortableHeader label="Tür" sort={sorts.find((sort) => sort.field === "type")} className="w-[17%]" onClick={() => setSorts((current) => toggleResourceSort(current, "type"))} />
+                    <SortableHeader label="Şirket / tesis" sort={sorts.find((sort) => sort.field === "location")} className="w-[25%]" onClick={() => setSorts((current) => toggleResourceSort(current, "location"))} />
+                    <SortableHeader label="Miktar" sort={sorts.find((sort) => sort.field === "quantity")} className="w-[10%]" onClick={() => setSorts((current) => toggleResourceSort(current, "quantity"))} />
+                    <SortableHeader label="Durum" sort={sorts.find((sort) => sort.field === "status")} className="w-[10%]" onClick={() => setSorts((current) => toggleResourceSort(current, "status"))} />
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {paginatedResources.map((resource) => (
-                    <tr key={resource.id} className="hover:bg-slate-50">
+                    <tr
+                      key={resource.id}
+                      tabIndex={0}
+                      className={cn("cursor-pointer select-none transition-colors hover:bg-slate-50 focus-visible:bg-blue-50/60 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-blue-500", !resource.isActive && "bg-slate-50/70 hover:bg-slate-100/70")}
+                      onClick={(event) => openEditDialog(resource, event.currentTarget)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault()
+                          openEditDialog(resource, event.currentTarget)
+                        }
+                      }}
+                    >
                       <td className="px-3 py-2.5"><ResourceIdentity resource={resource} /></td>
                       <td className="px-3 py-2.5">{resourceTypeLabels[resource.type]}</td>
                       <td className="px-3 py-2.5">
-                        <p className="truncate" title={resource.companyName}>{resource.companyName}</p>
-                        <p className="mt-0.5 truncate text-[11px] text-slate-500" title={resource.facilityName}>{resource.facilityName}</p>
+                        <p className="truncate">{resource.companyName}</p>
+                        <p className="mt-0.5 truncate text-[11px] text-slate-500">{resource.facilityName}</p>
                       </td>
                       <td className="px-3 py-2.5 tabular-nums">{formatQuantity(resource)}</td>
                       <td className="px-3 py-2.5"><ResourceStatus active={resource.isActive} /></td>
-                      <td className="px-3 py-2.5"><ResourceActions resource={resource} busy={transitioningResourceId === resource.id} onEdit={openEditDialog} onToggle={toggleResource} /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -204,12 +220,23 @@ export function ResourceCatalogPage() {
 
             <div className="divide-y md:hidden">
               {paginatedResources.map((resource) => (
-                <article key={resource.id} className="p-3">
+                <article
+                  key={resource.id}
+                  tabIndex={0}
+                  className={cn("cursor-pointer select-none p-3 transition-colors hover:bg-slate-50 focus-visible:bg-blue-50/60 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-blue-500", !resource.isActive && "bg-slate-50/70 hover:bg-slate-100/70")}
+                  onClick={(event) => openEditDialog(resource, event.currentTarget)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault()
+                      openEditDialog(resource, event.currentTarget)
+                    }
+                  }}
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <h3 className="truncate text-sm font-semibold text-slate-900" title={getResourceDisplayName(resource)}>{getResourceDisplayName(resource)}</h3>
+                      <h3 className="truncate text-sm font-semibold text-slate-900">{getResourceDisplayName(resource)}</h3>
                       <p className="mt-0.5 text-xs text-slate-600">{resourceTypeLabels[resource.type]}</p>
-                      {getResourceDetail(resource) && <p className="mt-0.5 truncate text-[11px] text-slate-500" title={getResourceDetail(resource) ?? undefined}>{getResourceDetail(resource)}</p>}
+                      {getResourceDetail(resource) && <p className="mt-0.5 truncate text-[11px] text-slate-500">{getResourceDetail(resource)}</p>}
                     </div>
                     <ResourceStatus active={resource.isActive} />
                   </div>
@@ -218,20 +245,21 @@ export function ResourceCatalogPage() {
                     <div><dt className="text-slate-500">Tesis</dt><dd className="mt-0.5 font-medium text-slate-800">{resource.facilityName}</dd></div>
                     <div><dt className="text-slate-500">Miktar</dt><dd className="mt-0.5 font-medium tabular-nums text-slate-800">{formatQuantity(resource)}</dd></div>
                   </dl>
-                  <div className="mt-3 border-t pt-2"><ResourceActions resource={resource} busy={transitioningResourceId === resource.id} onEdit={openEditDialog} onToggle={toggleResource} /></div>
                 </article>
               ))}
             </div>
 
             <div className="flex flex-col gap-2 border-t bg-slate-50/50 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-xs tabular-nums text-slate-600">{visibleStart}–{visibleEnd} / {filteredResources.length} kayıt</p>
-              <nav className="flex items-center gap-1" aria-label="Kaynak sayfaları">
-                <Button variant="outline" size="sm" disabled={page === 1} onClick={() => changePage(page - 1)}><ArrowLeft />Önceki</Button>
-                {getVisibleResourcePageNumbers(page, pageCount).map((pageNumber) => (
-                  <Button key={pageNumber} variant={pageNumber === page ? "default" : "outline"} size="icon-sm" aria-current={pageNumber === page ? "page" : undefined} aria-label={`${pageNumber}. sayfa`} onClick={() => changePage(pageNumber)}>{pageNumber}</Button>
-                ))}
-                <Button variant="outline" size="sm" disabled={page === pageCount} onClick={() => changePage(page + 1)}>Sonraki<ArrowRight /></Button>
-              </nav>
+              <p className="text-xs tabular-nums text-slate-600">{pageCount > 1 ? `${filteredResources.length} kaydın ${visibleStart}–${visibleEnd}’u` : `${filteredResources.length} kayıt`}</p>
+              {pageCount > 1 && (
+                <nav className="flex items-center gap-1" aria-label="Kaynak sayfaları">
+                  {page > 1 && <Button variant="outline" size="sm" onClick={() => changePage(page - 1)}><ArrowLeft />Önceki</Button>}
+                  {getVisibleResourcePageNumbers(page, pageCount).map((pageNumber) => (
+                    <Button key={pageNumber} variant={pageNumber === page ? "default" : "outline"} size="icon-sm" aria-current={pageNumber === page ? "page" : undefined} aria-label={`${pageNumber}. sayfa`} onClick={() => changePage(pageNumber)}>{pageNumber}</Button>
+                  ))}
+                  {page < pageCount && <Button variant="outline" size="sm" onClick={() => changePage(page + 1)}>Sonraki<ArrowRight /></Button>}
+                </nav>
+              )}
             </div>
           </>
         )}
@@ -244,6 +272,8 @@ export function ResourceCatalogPage() {
         returnFocusRef={dialogReturnFocusRef}
         onOpenChange={setDialogOpen}
         onSave={saveResource}
+        onToggleActive={toggleResource}
+        isTogglingActive={transitioningResourceId === selectedResource?.id}
       />
     </div>
   )
@@ -251,6 +281,16 @@ export function ResourceCatalogPage() {
 
 function FilterField({ label, htmlFor, children }: { label: string; htmlFor: string; children: React.ReactNode }) {
   return <div><label id={`${htmlFor}-label`} htmlFor={htmlFor} className="mb-1 block text-[11px] font-medium text-slate-600">{label}</label>{children}</div>
+}
+
+function SortableHeader({ label, sort, className, onClick }: { label: string; sort?: ResourceSort; className: string; onClick(): void }) {
+  return (
+    <th className={cn(className, "px-3 py-2")} aria-sort={sort?.direction === "asc" ? "ascending" : sort?.direction === "desc" ? "descending" : "none"}>
+      <button type="button" className="inline-flex items-center gap-1 rounded-sm hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-blue-600" onClick={onClick}>
+        {label}{sort?.direction === "asc" ? <ArrowUp className="size-3" /> : sort?.direction === "desc" ? <ArrowDown className="size-3" /> : null}
+      </button>
+    </th>
+  )
 }
 
 function FilterSelect({ id, value, emptyLabel, options, onValueChange }: {
@@ -270,7 +310,8 @@ function FilterSelect({ id, value, emptyLabel, options, onValueChange }: {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="max-h-64 min-w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto">
-        <DropdownMenuRadioGroup value={value === "all" ? "" : value} onValueChange={onValueChange}>
+        <DropdownMenuRadioGroup value={value} onValueChange={onValueChange}>
+          <DropdownMenuRadioItem value="all">{emptyLabel}</DropdownMenuRadioItem>
           {options.map((option) => <DropdownMenuRadioItem key={option.value} value={option.value}>{option.label}</DropdownMenuRadioItem>)}
         </DropdownMenuRadioGroup>
       </DropdownMenuContent>
@@ -286,23 +327,6 @@ function ResourceStatus({ active }: { active: boolean }) {
     )}>
       {active ? "Aktif" : "Pasif"}
     </span>
-  )
-}
-
-function ResourceActions({ resource, busy, onEdit, onToggle }: {
-  resource: FacilityResource
-  busy: boolean
-  onEdit(resource: FacilityResource, trigger: HTMLElement): void
-  onToggle(resource: FacilityResource): Promise<void>
-}) {
-  const displayName = getResourceDisplayName(resource)
-  return (
-    <div className="flex justify-end gap-1">
-      <Button variant="ghost" size="sm" onClick={(event) => onEdit(resource, event.currentTarget)} aria-label={`${displayName} kaynağını düzenle`}><Pencil />Düzenle</Button>
-      <Button variant="outline" size="sm" disabled={busy} onClick={() => void onToggle(resource)} aria-label={`${displayName} kaynağını ${resource.isActive ? "pasife" : "aktife"} al`}>
-        {resource.isActive ? <PowerOff /> : <Power />}{resource.isActive ? "Pasife al" : "Aktife al"}
-      </Button>
-    </div>
   )
 }
 
@@ -326,8 +350,8 @@ function ResourceIdentity({ resource }: { resource: FacilityResource }) {
   const detail = getResourceDetail(resource)
   return (
     <div className="min-w-0">
-      <p className="truncate font-semibold text-slate-900" title={displayName}>{displayName}</p>
-      {detail && <p className="mt-0.5 truncate text-[11px] text-slate-500" title={detail}>{detail}</p>}
+      <p className="truncate font-semibold text-slate-900">{displayName}</p>
+      {detail && <p className="mt-0.5 truncate text-[11px] text-slate-500">{detail}</p>}
     </div>
   )
 }
@@ -340,7 +364,7 @@ function getResourceDetail(resource: FacilityResource) {
       const documentSummary = resource.documents.length === 0
         ? "Belge: Yok"
         : `Belgeler: ${resource.documents[0]}${resource.documents.length > 1 ? ` +${resource.documents.length - 1}` : ""}`
-      return `Ehliyet: ${resource.licenseClasses.join(", ")} · Ticari: ${resource.canDriveCommercialVehicles ? "Evet" : "Hayır"} · ${documentSummary}`
+      return `Ehliyet: ${resource.licenseClasses.join(", ")} · Ticari araç: ${resource.canDriveCommercialVehicles ? "Evet" : "Hayır"} · ${documentSummary}`
     }
     default:
       return null

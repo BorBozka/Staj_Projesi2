@@ -58,7 +58,7 @@ export function toResourceInput(values: ResourceFormValues): ResourceInput {
         type: "VEHICLE",
         brand: values.brand.trim(),
         model: values.model.trim(),
-        licensePlate: values.licensePlate.trim(),
+        licensePlate: normalizeLicensePlate(values.licensePlate),
       }
     case "DRIVER":
       return {
@@ -85,4 +85,8 @@ function addRequiredIssue(
 
 function parseList(value: string) {
   return value.split(/[,\n]/).map((item) => item.trim()).filter(Boolean)
+}
+
+function normalizeLicensePlate(value: string) {
+  return value.trim().replace(/\s+/g, " ").toUpperCase()
 }

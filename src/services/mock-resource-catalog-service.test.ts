@@ -80,6 +80,36 @@ describe("MockResourceCatalogService", () => {
     expect("totalQuantity" in created).toBe(false)
   })
 
+  it("normalizes vehicle plates and rejects duplicates within the same company", async () => {
+    const service = new MockResourceCatalogService()
+    const created = await service.createResource({ ...vehicleInput, licensePlate: " 16  bpl\t303 " })
+
+    expect(created.type === "VEHICLE" && created.licensePlate).toBe("16 BPL 303")
+    await expect(service.createResource({ ...vehicleInput, facilityId: "bplas-arge", licensePlate: "16 bpl 303" }))
+      .rejects.toThrow("aynı plakaya sahip bir araç zaten kayıtlı")
+  })
+
+  it("allows the same vehicle plate at another company", async () => {
+    const created = await new MockResourceCatalogService().createResource({
+      ...vehicleInput,
+      companyId: "bplas-otomotiv",
+      facilityId: "otomotiv-uretim",
+      licensePlate: "16 BPL 101",
+    })
+
+    expect(created.type === "VEHICLE" && created.licensePlate).toBe("16 BPL 101")
+  })
+
+  it("rejects a duplicate vehicle plate when updating a vehicle", async () => {
+    const service = new MockResourceCatalogService()
+    await service.createResource({ ...vehicleInput, licensePlate: "16 BPL 303" })
+
+    await expect(service.updateResource("resource-vehicle-transit-merkez", {
+      ...vehicleInput,
+      licensePlate: "16 bpl 303",
+    })).rejects.toThrow("aynı plakaya sahip bir araç zaten kayıtlı")
+  })
+
   it.each(["brand", "model", "licensePlate"] as const)("rejects a vehicle without %s", async (field) => {
     await expect(new MockResourceCatalogService().createResource({ ...vehicleInput, [field]: " " })).rejects.toThrow("zorunludur")
   })

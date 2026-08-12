@@ -83,10 +83,17 @@ export class MockResourceCatalogService implements ResourceCatalogService {
       case "VEHICLE": {
         const brand = input.brand.trim()
         const model = input.model.trim()
-        const licensePlate = input.licensePlate.trim()
+        const licensePlate = normalizeLicensePlate(input.licensePlate)
         if (!brand) throw new Error("Araç markası zorunludur.")
         if (!model) throw new Error("Araç modeli zorunludur.")
         if (!licensePlate) throw new Error("Araç plakası zorunludur.")
+        const duplicateVehicle = this.resources.find((resource) =>
+          resource.id !== id
+          && resource.type === "VEHICLE"
+          && resource.companyId === company.id
+          && normalizeLicensePlate(resource.licensePlate) === licensePlate,
+        )
+        if (duplicateVehicle) throw new Error("Bu şirket için aynı plakaya sahip bir araç zaten kayıtlı.")
         return { ...common, type: "VEHICLE", brand, model, licensePlate }
       }
       case "DRIVER": {
@@ -113,4 +120,8 @@ export class MockResourceCatalogService implements ResourceCatalogService {
 
 function normalizeList(values: string[]) {
   return values.map((value) => value.trim()).filter(Boolean)
+}
+
+function normalizeLicensePlate(value: string) {
+  return value.trim().replace(/\s+/g, " ").toUpperCase()
 }

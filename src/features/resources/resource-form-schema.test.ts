@@ -44,7 +44,7 @@ describe("resourceFormSchema", () => {
       name: "",
       brand: " Ford ",
       model: " Transit ",
-      licensePlate: " 16 BPL 101 ",
+      licensePlate: " 16  bpl\t101 ",
     })
 
     expect(toResourceInput(values)).toEqual({
@@ -55,6 +55,18 @@ describe("resourceFormSchema", () => {
       companyId: "bplas",
       facilityId: "bplas-merkez",
     })
+  })
+
+  it("normalizes vehicle plate whitespace and casing", () => {
+    const values = resourceFormSchema.parse({
+      ...validRoom,
+      type: "VEHICLE",
+      brand: "Ford",
+      model: "Transit",
+      licensePlate: " 16  bpl\t101 ",
+    })
+
+    expect(toResourceInput(values)).toMatchObject({ licensePlate: "16 BPL 101" })
   })
 
   it.each(["brand", "model", "licensePlate"] as const)("requires vehicle %s", (field) => {

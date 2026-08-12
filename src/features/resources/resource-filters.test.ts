@@ -8,6 +8,8 @@ import {
   getVisibleResourcePageNumbers,
   paginateResources,
   RESOURCE_PAGE_SIZE,
+  sortResources,
+  toggleResourceSort,
 } from "@/features/resources/resource-filters"
 
 describe("resource catalog filters", () => {
@@ -24,6 +26,24 @@ describe("resource catalog filters", () => {
 
   it("returns every resource for default filters", () => {
     expect(filterResources(initialMockResources, defaultResourceFilters)).toHaveLength(initialMockResources.length)
+  })
+
+  it("sorts resources in ascending groups by the selected column", () => {
+    expect(sortResources(initialMockResources, [{ field: "type", direction: "asc" }]).map((resource) => resource.type)).toEqual([
+      "DRIVER", "DRIVER", "POOLED_EQUIPMENT", "POOLED_EQUIPMENT", "POOLED_EQUIPMENT", "ROOM", "ROOM", "VEHICLE", "VEHICLE",
+    ])
+    expect(sortResources(initialMockResources, [{ field: "status", direction: "asc" }]).map((resource) => resource.isActive)).toEqual([false, false, true, true, true, true, true, true, true])
+  })
+
+  it("cycles individual sorts without clearing other sort fields", () => {
+    const first = toggleResourceSort([], "type")
+    const second = toggleResourceSort(first, "status")
+    const third = toggleResourceSort(second, "type")
+
+    expect(first).toEqual([{ field: "type", direction: "asc" }])
+    expect(second).toEqual([{ field: "type", direction: "asc" }, { field: "status", direction: "asc" }])
+    expect(third).toEqual([{ field: "type", direction: "desc" }, { field: "status", direction: "asc" }])
+    expect(toggleResourceSort(third, "type")).toEqual([{ field: "status", direction: "asc" }])
   })
 
   it.each([

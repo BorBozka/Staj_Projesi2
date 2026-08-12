@@ -1,5 +1,5 @@
-import { lazy, Suspense } from "react"
-import { Navigate, Route, Routes } from "react-router-dom"
+import { lazy, Suspense, useEffect } from "react"
+import { Navigate, Route, Routes, useLocation } from "react-router-dom"
 
 import { AppShell } from "@/components/app-shell/AppShell"
 import { ManagerShell } from "@/components/app-shell/ManagerShell"
@@ -18,6 +18,19 @@ const ResourceCatalogPage = lazy(() =>
 )
 
 export function App() {
+  const { pathname } = useLocation()
+
+  useEffect(() => {
+    const pageTitles: Record<string, string> = {
+      "/manager/dashboard": "BPLAS — Dashboard",
+      "/manager/all-visits": "BPLAS — Tüm Ziyaretler",
+      "/manager/resources": "BPLAS — Kaynaklar",
+      "/manager/my-visits": "BPLAS — Ziyaretlerim",
+      "/my-visits": "BPLAS — Ziyaretlerim",
+    }
+    document.title = pageTitles[pathname] ?? "BPLAS — Ziyaret Yönetimi"
+  }, [pathname])
+
   return (
     <Routes>
       <Route element={<AppShell />}>
