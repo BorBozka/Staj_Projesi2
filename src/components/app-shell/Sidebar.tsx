@@ -41,6 +41,7 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
             )
           }
           title={collapsed ? "Ziyaretlerim" : undefined}
+          aria-label={collapsed ? "Ziyaretlerim" : undefined}
         >
           <CalendarDays className="size-4 shrink-0" />
           {!collapsed && <span>Ziyaretlerim</span>}

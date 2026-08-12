@@ -22,6 +22,10 @@
     --radius: 0.5rem;
   }
 
+  html {
+    scrollbar-gutter: stable;
+  }
+
   * {
     @apply border-border;
   }
@@ -37,6 +41,17 @@
   select,
   textarea {
     font: inherit;
+  }
+
+  /* Hide native browser number input spinners */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
   }
 
   :focus-visible {
