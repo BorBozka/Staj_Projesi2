@@ -1,5 +1,5 @@
-import { lazy, Suspense } from "react"
-import { Navigate, Route, Routes } from "react-router-dom"
+import { lazy, Suspense, useEffect } from "react"
+import { Navigate, Route, Routes, useLocation } from "react-router-dom"
 
 import { AppShell } from "@/components/app-shell/AppShell"
 import { ManagerShell } from "@/components/app-shell/ManagerShell"
@@ -13,8 +13,24 @@ const ManagerDashboard = lazy(() =>
 const AllVisitsPage = lazy(() =>
   import("@/features/manager/AllVisitsPage").then((module) => ({ default: module.AllVisitsPage })),
 )
+const ResourceCatalogPage = lazy(() =>
+  import("@/features/resources/ResourceCatalogPage").then((module) => ({ default: module.ResourceCatalogPage })),
+)
 
 export function App() {
+  const { pathname } = useLocation()
+
+  useEffect(() => {
+    const pageTitles: Record<string, string> = {
+      "/manager/dashboard": "BPLAS — Dashboard",
+      "/manager/all-visits": "BPLAS — Tüm Ziyaretler",
+      "/manager/resources": "BPLAS — Kaynaklar",
+      "/manager/my-visits": "BPLAS — Ziyaretlerim",
+      "/my-visits": "BPLAS — Ziyaretlerim",
+    }
+    document.title = pageTitles[pathname] ?? "BPLAS — Ziyaret Yönetimi"
+  }, [pathname])
+
   return (
     <Routes>
       <Route element={<AppShell />}>
@@ -38,6 +54,7 @@ export function App() {
           }
         />
         <Route path="all-visits" element={<Suspense fallback={<RouteSkeleton />}><AllVisitsPage /></Suspense>} />
+        <Route path="resources" element={<Suspense fallback={<RouteSkeleton />}><ResourceCatalogPage /></Suspense>} />
         <Route index element={<Navigate to="dashboard" replace />} />
       </Route>
       <Route path="*" element={<Navigate to="/manager/dashboard" replace />} />

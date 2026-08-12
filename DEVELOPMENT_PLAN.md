@@ -72,6 +72,54 @@ Meeting lifecycle.
 
 ---
 
+## Approved Phase — Resource Catalog Frontend / Mock Service
+
+Goal:
+
+Allow Manager users to maintain facility meeting rooms, pooled equipment, individual
+vehicles, and individual drivers without starting resource assignment or reservation
+behavior.
+
+Includes:
+
+- central discriminated-union `ROOM`, `POOLED_EQUIPMENT`, `VEHICLE`, and `DRIVER`
+  resource catalog domain types,
+- company/facility validation against existing organization reference data,
+- replaceable mock-service list, create, update, and active/inactive operations,
+- deterministic room, equipment-pool, vehicle, and driver seed data across multiple
+  facilities,
+- Manager navigation and a compact responsive catalog page,
+- combined company, facility, type, and active-state filters,
+- create/edit validation where quantity applies only to pooled equipment; vehicles require
+  separate brand/model/license-plate fields and drivers require full name plus at least one
+  license class,
+- loading, error, empty, and filtered-empty states,
+- service and filtering tests that protect existing Meeting and Visit behavior.
+
+Does not include:
+
+- Meeting resource assignment or participant-level resource fields,
+- vehicle-driver assignment or permanent/default driver relationships,
+- reservation, availability, conflict, override, release, or alternatives,
+- notification, audit history, backend, API, database, or persistence.
+
+Acceptance:
+
+- Managers can list, create, and edit all four valid resource types,
+- rooms, vehicles, and drivers have no quantity and equipment pools require a positive
+  whole-number quantity,
+- vehicle brand/model/license plate remain separate fields and drivers retain license
+  classes, optional textual documents, and explicit commercial-vehicle capability,
+- company/facility mismatches are rejected at the service boundary,
+- resources can be deactivated and reactivated without deletion,
+- filters work together and the page reflows without page-level horizontal overflow,
+- catalog operations do not change Meetings, Visits, invitations, or cancellations.
+
+Stop after the catalog and request review. Do not continue to assignment, availability,
+conflicts, Meeting lifecycle, or resource notifications.
+
+---
+
 # Track A — UI / UX First
 
 ## Phase 0 — Frontend Foundation

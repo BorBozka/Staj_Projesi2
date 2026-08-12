@@ -136,6 +136,24 @@ Decision needed:
 
 1. Are drivers always employees, or can external/contract drivers be recorded?
 2. Are vehicle and driver reservations allowed independently?
+3. Will supported driving-license classes use a fixed list?
+4. Which documents determine whether a driver may operate commercial vehicles?
+5. Should document numbers and validity start/end dates be stored?
+6. Are expiry warnings or automatic deactivation required for expired documents?
+
+Approved catalog-only extension:
+
+- Vehicles and drivers are independent resource-catalog records scoped to a company and
+  facility.
+- Each vehicle is stored separately with brand, model, and license plate.
+- Each driver is stored separately with full name, one or more license classes, optional
+  textual document/qualification names, and explicitly recorded commercial-vehicle
+  capability.
+- No vehicle-driver or Meeting-resource assignment, availability, reservation, conflict,
+  notification, or audit behavior is included in this catalog extension.
+- The employee does not select resources. The existing additional-requirement note is not
+  a resource assignment, and resource availability does not block Meeting or Visit
+  creation.
 
 ## 6. Meeting End Lifecycle
 
