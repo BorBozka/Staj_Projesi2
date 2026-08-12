@@ -618,15 +618,27 @@ Supported catalog records:
   quantity field.
 - `POOLED_EQUIPMENT`: a named facility equipment pool belonging to one company and one
   facility; it stores a positive total quantity rather than serialized devices.
+- `VEHICLE`: one individual company vehicle belonging to one company and one facility;
+  brand, model, and license plate are stored separately and it has no quantity field.
+- `DRIVER`: one individual driver resource belonging to one company and one facility;
+  full name, one or more license classes, textual document/qualification names, and an
+  explicitly recorded commercial-vehicle capability are stored independently from any
+  vehicle.
+
+Vehicles and drivers are separate catalog resources. A vehicle has no permanent/default
+driver, and the catalog does not pair vehicles with drivers. Employees do not select
+resources while creating visits. The existing additional-requirement note remains free
+text and is not a structured resource request or assignment.
 
 Every resource has an active/inactive lifecycle. Resources are not deleted in this
 phase. The selected facility must belong to the selected company.
 
 The catalog phase includes listing, filtering, creating, editing, and activating or
-deactivating resources. It does not include Meeting assignment, reservation,
-availability, conflict detection, override, audit history, or employee notification.
-Resource availability does not block Meeting or Visit creation, and an additional-
-requirement note is not a resource request.
+deactivating all four resource types. It does not include Meeting assignment,
+vehicle-driver assignment, reservation, availability, conflict detection, override,
+audit history, or employee notification. Manager assignment is a later phase. Resource
+availability does not block Meeting or Visit creation, and an additional-requirement note
+is not a resource request.
 
 ---
 

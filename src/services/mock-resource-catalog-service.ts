@@ -1,4 +1,4 @@
-import type { FacilityResource, ResourceInput } from "@/domain/resources"
+import { getResourceDisplayName, type FacilityResource, type ResourceInput } from "@/domain/resources"
 import { initialMockResources } from "@/services/mock-resource-data"
 import { mockVisitReferenceData } from "@/services/mock-visit-data"
 import type { ResourceCatalogService } from "@/services/resource-catalog-service"
@@ -12,7 +12,7 @@ export class MockResourceCatalogService implements ResourceCatalogService {
     return clone(this.resources).sort((a, b) =>
       a.companyName.localeCompare(b.companyName, "tr")
       || a.facilityName.localeCompare(b.facilityName, "tr")
-      || a.name.localeCompare(b.name, "tr"),
+      || getResourceDisplayName(a).localeCompare(getResourceDisplayName(b), "tr"),
     )
   }
 
@@ -25,6 +25,7 @@ export class MockResourceCatalogService implements ResourceCatalogService {
 
   async updateResource(id: string, input: ResourceInput): Promise<FacilityResource> {
     const current = this.findResource(id)
+    if (current.type !== input.type) throw new Error("Kaynak türü düzenleme sırasında değiştirilemez.")
     const updated = this.fromInput(id, input, current.isActive, current.createdAt, new Date().toISOString())
     this.resources = this.resources.map((resource) => resource.id === id ? updated : resource)
     return clone(updated)
@@ -54,29 +55,62 @@ export class MockResourceCatalogService implements ResourceCatalogService {
     const facility = mockVisitReferenceData.facilities.find(
       (item) => item.id === input.facilityId && item.companyId === input.companyId,
     )
-    const name = input.name.trim()
-
-    if (input.type !== "ROOM" && input.type !== "POOLED_EQUIPMENT") {
-      throw new Error("Geçersiz kaynak türü.")
-    }
-    if (!name) throw new Error("Kaynak adı zorunludur.")
     if (!company || !facility) throw new Error("Şirket ve tesis eşleşmesi geçersiz.")
-    if (input.type === "POOLED_EQUIPMENT" && (!Number.isInteger(input.totalQuantity) || input.totalQuantity! <= 0)) {
-      throw new Error("Ekipman havuzu miktarı pozitif bir tam sayı olmalıdır.")
-    }
 
-    return {
+    const common = {
       id,
-      type: input.type,
-      name,
       companyId: company.id,
       companyName: company.name,
       facilityId: facility.id,
       facilityName: facility.name,
-      totalQuantity: input.type === "POOLED_EQUIPMENT" ? input.totalQuantity : undefined,
       isActive,
       createdAt,
       updatedAt,
     }
+
+    switch (input.type) {
+      case "ROOM":
+      case "POOLED_EQUIPMENT": {
+        const name = input.name.trim()
+        if (!name) throw new Error("Kaynak adı zorunludur.")
+        if (input.type === "POOLED_EQUIPMENT" && (!Number.isInteger(input.totalQuantity) || input.totalQuantity <= 0)) {
+          throw new Error("Ekipman havuzu miktarı pozitif bir tam sayı olmalıdır.")
+        }
+        return input.type === "ROOM"
+          ? { ...common, type: "ROOM", name }
+          : { ...common, type: "POOLED_EQUIPMENT", name, totalQuantity: input.totalQuantity }
+      }
+      case "VEHICLE": {
+        const brand = input.brand.trim()
+        const model = input.model.trim()
+        const licensePlate = input.licensePlate.trim()
+        if (!brand) throw new Error("Araç markası zorunludur.")
+        if (!model) throw new Error("Araç modeli zorunludur.")
+        if (!licensePlate) throw new Error("Araç plakası zorunludur.")
+        return { ...common, type: "VEHICLE", brand, model, licensePlate }
+      }
+      case "DRIVER": {
+        const fullName = input.fullName.trim()
+        const licenseClasses = normalizeList(input.licenseClasses)
+        const documents = normalizeList(input.documents)
+        if (!fullName) throw new Error("Şoför adı soyadı zorunludur.")
+        if (licenseClasses.length === 0) throw new Error("En az bir ehliyet sınıfı zorunludur.")
+        if (typeof input.canDriveCommercialVehicles !== "boolean") {
+          throw new Error("Ticari araç kullanım bilgisi zorunludur.")
+        }
+        return {
+          ...common,
+          type: "DRIVER",
+          fullName,
+          licenseClasses,
+          documents,
+          canDriveCommercialVehicles: input.canDriveCommercialVehicles,
+        }
+      }
+    }
   }
+}
+
+function normalizeList(values: string[]) {
+  return values.map((value) => value.trim()).filter(Boolean)
 }

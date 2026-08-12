@@ -1,5 +1,7 @@
 import type { FacilityResource, ResourceType } from "@/domain/resources"
 
+export const RESOURCE_PAGE_SIZE = 9
+
 export interface ResourceFilters {
   companyId: string
   facilityId: string
@@ -27,4 +29,18 @@ export function filterResources(resources: FacilityResource[], filters: Resource
 
 export function hasActiveResourceFilters(filters: ResourceFilters) {
   return Object.values(filters).some((value) => value !== "all")
+}
+
+export function paginateResources(resources: FacilityResource[], page: number, pageSize = RESOURCE_PAGE_SIZE) {
+  const start = (page - 1) * pageSize
+  return resources.slice(start, start + pageSize)
+}
+
+export function getResourcePageCount(total: number, pageSize = RESOURCE_PAGE_SIZE) {
+  return Math.max(1, Math.ceil(total / pageSize))
+}
+
+export function getVisibleResourcePageNumbers(page: number, pageCount: number) {
+  const start = Math.max(1, Math.min(page - 1, pageCount - 2))
+  return Array.from({ length: Math.min(3, pageCount) }, (_, index) => start + index)
 }

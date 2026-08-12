@@ -479,17 +479,31 @@ Limit charts to useful summaries.
 
 ### Manager Resource Catalog
 
-- Uses the existing compact management pattern with a contextual title, Add action,
-  company/facility/type/active filters, and a dense resource list.
-- Shows resource name, user-facing type label, company/facility, quantity, and status.
-- Displays `—` for room quantity and a numeric total only for pooled equipment.
-- Uses one compact create/edit dialog with required type, name, company, and facility.
-- Shows and validates quantity only for pooled equipment.
+- Matches the headerless Manager All Visits hierarchy: a compact filter card first,
+  followed directly by the dense resource list and its pagination footer.
+- Keeps an accessible non-visual page heading and places the Add action in the filter
+  card instead of creating a separate visible title/action row.
+- Uses company/facility/type/active filters and nine records per page.
+- Lists rooms, pooled equipment, individual vehicles, and individual drivers together.
+- Shows resource identity/details, user-facing type label, company/facility, quantity,
+  and status without adding vehicle/driver-specific table columns.
+- Shows vehicle brand, model, and license plate; shows driver full name, license classes,
+  commercial-vehicle capability, and a compact document/qualification summary.
+- Displays `—` for room, vehicle, and driver quantity and a numeric total only for pooled
+  equipment.
+- Uses one compact create/edit dialog with type-specific fields. Type can be selected only
+  during creation and is read-only while editing.
+- Requires name for rooms/equipment, positive whole-number quantity for pooled equipment,
+  brand/model/license plate for vehicles, and full name plus at least one license class for
+  drivers. Driver documents remain optional textual names; commercial-vehicle capability
+  uses a user-facing Yes/No control.
 - Clears an invalid facility selection when company changes.
 - Uses active/inactive actions instead of deletion.
 - Provides loading, error, unfiltered-empty, and filtered-empty states.
 - Reflows without page-level horizontal overflow at tablet and narrow widths.
-- Does not expose assignment, reservation, availability, or conflict controls.
+- Does not expose vehicle-driver or Meeting-resource assignment, reservation,
+  availability, conflict, notification, or audit controls. Employees continue to use the
+  additional-requirement note rather than selecting resources.
 
 ---
 

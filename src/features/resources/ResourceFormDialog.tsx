@@ -6,25 +6,26 @@ import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
-import type { FacilityResource, ResourceInput } from "@/domain/resources"
+import { Textarea } from "@/components/ui/textarea"
+import { resourceTypeLabels, resourceTypes, type FacilityResource, type ResourceInput } from "@/domain/resources"
+import type { VisitReferenceData } from "@/domain/visits"
 import {
   resourceFormSchema,
   type ResourceFormValues,
   toResourceInput,
 } from "@/features/resources/resource-form-schema"
-import type { VisitReferenceData } from "@/domain/visits"
 
 interface ResourceFormDialogProps {
   open: boolean
   resource: FacilityResource | null
   referenceData: VisitReferenceData
+  returnFocusRef: React.RefObject<HTMLElement | null>
   onOpenChange(open: boolean): void
   onSave(input: ResourceInput): Promise<void>
 }
@@ -32,12 +33,31 @@ interface ResourceFormDialogProps {
 const blankValues: ResourceFormValues = {
   type: "ROOM",
   name: "",
+  brand: "",
+  model: "",
+  licensePlate: "",
+  fullName: "",
+  licenseClasses: "",
+  documents: "",
+  canDriveCommercialVehicles: "no",
   companyId: "",
   facilityId: "",
   totalQuantity: "",
 }
 
-export function ResourceFormDialog({ open, resource, referenceData, onOpenChange, onSave }: ResourceFormDialogProps) {
+const typeSpecificFields: (keyof ResourceFormValues)[] = [
+  "name",
+  "totalQuantity",
+  "brand",
+  "model",
+  "licensePlate",
+  "fullName",
+  "licenseClasses",
+  "documents",
+  "canDriveCommercialVehicles",
+]
+
+export function ResourceFormDialog({ open, resource, referenceData, returnFocusRef, onOpenChange, onSave }: ResourceFormDialogProps) {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const form = useForm<ResourceFormValues>({
     resolver: zodResolver(resourceFormSchema),
@@ -53,13 +73,7 @@ export function ResourceFormDialog({ open, resource, referenceData, onOpenChange
 
   useEffect(() => {
     if (!open) return
-    form.reset(resource ? {
-      type: resource.type,
-      name: resource.name,
-      companyId: resource.companyId,
-      facilityId: resource.facilityId,
-      totalQuantity: resource.totalQuantity ? String(resource.totalQuantity) : "",
-    } : blankValues)
+    form.reset(resource ? getResourceFormValues(resource) : blankValues)
     setSubmitError(null)
   }, [form, open, resource])
 
@@ -77,7 +91,7 @@ export function ResourceFormDialog({ open, resource, referenceData, onOpenChange
       }
     },
     (errors) => {
-      const fieldOrder: (keyof ResourceFormValues)[] = ["type", "name", "companyId", "facilityId", "totalQuantity"]
+      const fieldOrder = getFieldOrder(resourceType)
       const firstInvalidField = fieldOrder.find((field) => errors[field])
       if (firstInvalidField) form.setFocus(firstInvalidField)
     },
@@ -85,30 +99,81 @@ export function ResourceFormDialog({ open, resource, referenceData, onOpenChange
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
+      <DialogContent
+        className="max-w-xl"
+        aria-describedby={undefined}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault()
+          returnFocusRef.current?.focus()
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{resource ? "Kaynağı düzenle" : "Yeni kaynak"}</DialogTitle>
-          <DialogDescription>Kaynağın şirket, tesis ve katalog bilgilerini tanımlayın.</DialogDescription>
         </DialogHeader>
 
         <form id="resource-form" className="grid gap-3 sm:grid-cols-2" onSubmit={submit} noValidate>
           <FormField label="Kaynak türü" required error={form.formState.errors.type?.message}>
-            <Select
-              {...typeRegistration}
-              aria-invalid={Boolean(form.formState.errors.type)}
-              onChange={(event) => {
-                void typeRegistration.onChange(event)
-                if (event.target.value === "ROOM") form.setValue("totalQuantity", "", { shouldValidate: true })
-              }}
-            >
-              <option value="ROOM">Toplantı odası</option>
-              <option value="POOLED_EQUIPMENT">Ekipman havuzu</option>
-            </Select>
+            {resource ? (
+              <>
+                <input type="hidden" {...typeRegistration} />
+                <div className="flex h-9 items-center rounded-md border bg-slate-50 px-3 text-sm text-slate-700" aria-label={`Kaynak türü: ${resourceTypeLabels[resource.type]}`}>
+                  {resourceTypeLabels[resource.type]}
+                </div>
+              </>
+            ) : (
+              <Select
+                {...typeRegistration}
+                aria-invalid={Boolean(form.formState.errors.type)}
+                onChange={(event) => {
+                  void typeRegistration.onChange(event)
+                  clearTypeSpecificValues(form.setValue)
+                  form.clearErrors(typeSpecificFields)
+                }}
+              >
+                {resourceTypes.map((type) => <option key={type} value={type}>{resourceTypeLabels[type]}</option>)}
+              </Select>
+            )}
           </FormField>
 
-          <FormField label="Kaynak adı" required error={form.formState.errors.name?.message}>
-            <Input {...form.register("name")} aria-invalid={Boolean(form.formState.errors.name)} autoComplete="off" />
-          </FormField>
+          {(resourceType === "ROOM" || resourceType === "POOLED_EQUIPMENT") && (
+            <FormField label="Kaynak adı" required error={form.formState.errors.name?.message}>
+              <Input {...form.register("name")} aria-invalid={Boolean(form.formState.errors.name)} autoComplete="off" />
+            </FormField>
+          )}
+
+          {resourceType === "VEHICLE" && (
+            <>
+              <FormField label="Marka" required error={form.formState.errors.brand?.message}>
+                <Input {...form.register("brand")} aria-invalid={Boolean(form.formState.errors.brand)} autoComplete="off" />
+              </FormField>
+              <FormField label="Model" required error={form.formState.errors.model?.message}>
+                <Input {...form.register("model")} aria-invalid={Boolean(form.formState.errors.model)} autoComplete="off" />
+              </FormField>
+              <FormField label="Plaka" required error={form.formState.errors.licensePlate?.message}>
+                <Input {...form.register("licensePlate")} aria-invalid={Boolean(form.formState.errors.licensePlate)} autoComplete="off" />
+              </FormField>
+            </>
+          )}
+
+          {resourceType === "DRIVER" && (
+            <>
+              <FormField label="Ad soyad" required error={form.formState.errors.fullName?.message}>
+                <Input {...form.register("fullName")} aria-invalid={Boolean(form.formState.errors.fullName)} autoComplete="name" />
+              </FormField>
+              <FormField label="Ehliyet sınıfları" required error={form.formState.errors.licenseClasses?.message}>
+                <Input {...form.register("licenseClasses")} aria-invalid={Boolean(form.formState.errors.licenseClasses)} placeholder="B, C" autoComplete="off" />
+              </FormField>
+              <FormField label="Belgeler" className="sm:col-span-2">
+                <Textarea {...form.register("documents")} rows={2} placeholder="SRC2, Psikoteknik (isteğe bağlı)" />
+              </FormField>
+              <FormField label="Ticari araç kullanabilir" required className="sm:col-span-2">
+                <Select {...form.register("canDriveCommercialVehicles")}>
+                  <option value="no">Hayır</option>
+                  <option value="yes">Evet</option>
+                </Select>
+              </FormField>
+            </>
+          )}
 
           <FormField label="Şirket" required error={form.formState.errors.companyId?.message}>
             <Select
@@ -120,7 +185,7 @@ export function ResourceFormDialog({ open, resource, referenceData, onOpenChange
                 form.clearErrors("facilityId")
               }}
             >
-              <option value="">Şirket seçin</option>
+              <option value="" disabled hidden>Şirket seçin</option>
               {referenceData.companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
             </Select>
           </FormField>
@@ -131,7 +196,7 @@ export function ResourceFormDialog({ open, resource, referenceData, onOpenChange
               aria-invalid={Boolean(form.formState.errors.facilityId)}
               disabled={!companyId}
             >
-              <option value="">{companyId ? "Tesis seçin" : "Önce şirket seçin"}</option>
+              <option value="" disabled hidden>{companyId ? "Tesis seçin" : "Önce şirket seçin"}</option>
               {facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}
             </Select>
           </FormField>
@@ -153,7 +218,6 @@ export function ResourceFormDialog({ open, resource, referenceData, onOpenChange
         </form>
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Vazgeç</Button>
           <Button type="submit" form="resource-form" disabled={form.formState.isSubmitting}>
             {form.formState.isSubmitting ? "Kaydediliyor…" : "Kaydet"}
           </Button>
@@ -161,6 +225,48 @@ export function ResourceFormDialog({ open, resource, referenceData, onOpenChange
       </DialogContent>
     </Dialog>
   )
+}
+
+function getResourceFormValues(resource: FacilityResource): ResourceFormValues {
+  const common = { ...blankValues, type: resource.type, companyId: resource.companyId, facilityId: resource.facilityId }
+  switch (resource.type) {
+    case "ROOM":
+      return { ...common, name: resource.name }
+    case "POOLED_EQUIPMENT":
+      return { ...common, name: resource.name, totalQuantity: String(resource.totalQuantity) }
+    case "VEHICLE":
+      return { ...common, brand: resource.brand, model: resource.model, licensePlate: resource.licensePlate }
+    case "DRIVER":
+      return {
+        ...common,
+        fullName: resource.fullName,
+        licenseClasses: resource.licenseClasses.join(", "),
+        documents: resource.documents.join(", "),
+        canDriveCommercialVehicles: resource.canDriveCommercialVehicles ? "yes" : "no",
+      }
+  }
+}
+
+function getFieldOrder(type: ResourceFormValues["type"]): (keyof ResourceFormValues)[] {
+  const typeFields: Record<ResourceFormValues["type"], (keyof ResourceFormValues)[]> = {
+    ROOM: ["name"],
+    POOLED_EQUIPMENT: ["name", "totalQuantity"],
+    VEHICLE: ["brand", "model", "licensePlate"],
+    DRIVER: ["fullName", "licenseClasses"],
+  }
+  return ["type", ...typeFields[type], "companyId", "facilityId"]
+}
+
+function clearTypeSpecificValues(setValue: ReturnType<typeof useForm<ResourceFormValues>>["setValue"]) {
+  setValue("name", "")
+  setValue("totalQuantity", "")
+  setValue("brand", "")
+  setValue("model", "")
+  setValue("licensePlate", "")
+  setValue("fullName", "")
+  setValue("licenseClasses", "")
+  setValue("documents", "")
+  setValue("canDriveCommercialVehicles", "no")
 }
 
 function FormField({ label, required, error, className, children }: {
