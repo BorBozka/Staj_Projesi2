@@ -120,6 +120,51 @@ conflicts, Meeting lifecycle, or resource notifications.
 
 ---
 
+## Approved Phase — Manager Resource Assignment Frontend / Mock Service
+
+Goal:
+
+Enable Manager users to assign, update, and remove facility meeting rooms (`ROOM`) and pooled equipment (`POOLED_EQUIPMENT`) for Meetings via a replaceable service abstraction and a tabbed visit detail drawer.
+
+Includes:
+
+- Domain models and assignment abstractions in `src/domain/resources.ts`:
+  - `RoomAssignment`, `EquipmentAssignment`, `ResourceAssignment`, `ResourceAssignmentView` (projected view enriched with catalog metadata).
+  - `DesiredResourceState` (`{ roomResourceId: string | null, equipment: { resourceId: string, requestedQuantity: number }[] }`).
+  - `RoomAvailabilityInfo`, `EquipmentAvailabilityInfo`.
+- Service interface `ResourceAssignmentService` in `src/services/resource-assignment-service.ts` and mock implementation `MockResourceAssignmentService` in `src/services/mock-resource-assignment-service.ts`:
+  - `listAssignmentsForMeeting(meetingId)`
+  - `assignRoom(meetingId, input)`
+  - `assignEquipment(meetingId, input)`
+  - `updateEquipmentAssignment(assignmentId, requestedQuantity)`
+  - `removeAssignment(assignmentId)`
+  - `getEligibleRooms(meetingId)`
+  - `getEligibleEquipment(meetingId)`
+  - `saveMeetingAssignments(meetingId, desired)`: Atomic save operation validating Meeting status, facility matching, active status, room conflict, equipment capacity limits, positive quantities, and unique equipment IDs before committing state.
+- `isMeetingCompleted` helper function identifying terminal meetings (where all visits are `CHECKED_OUT`, `CANCELLED`, or `NO_SHOW`).
+- UI Components:
+  - `MeetingResourcePanel` (`src/features/resources/MeetingResourcePanel.tsx`): Renders room and pooled equipment sections, inline room picker with conflict reasons, inline equipment picker with availability counters and stepper controls, local working draft state (`persistedDraft` vs `draft`), sticky unsaved changes footer bar ("Kaydedilmemiş değişiklikler", "Kaydet", "Vazgeç"), error banner handling, and read-only mode for completed meetings.
+  - `ManagerVisitDetailsSheet` (`src/features/manager/ManagerVisitDetailsSheet.tsx`): Integrates restrained text tabs ("Ziyaret Bilgileri" / "Kaynaklar"), assigned count badge, amber dirty dot indicator, CSS `hidden` tab toggling to preserve draft state across tab switches, and `handleBeforeClose` guard with modal `Dialog` confirmation ("Kaydedilmemiş değişiklikler" with "Değişiklikleri sil" / "Geri dön").
+- Comprehensive unit test coverage in `src/services/mock-resource-assignment-service.test.ts`.
+
+Does not include:
+
+- Fleet vehicle (`VEHICLE`) or driver (`DRIVER`) meeting assignment,
+- Conflict override mechanisms or automated employee notifications,
+- Backend API, database persistence, or real server integrations.
+
+Acceptance:
+
+- Managers can view, assign, edit, and remove rooms and equipment for any Meeting that is not completed.
+- At most 1 room can be assigned per meeting (atomic replacement).
+- Equipment assignments enforce positive integer quantities and total pool capacity limits across overlapping non-cancelled meetings.
+- All resource modifications for a meeting are validated and persisted atomically via `saveMeetingAssignments`.
+- Local draft editing supports Kaydet/Vazgeç and blocks drawer close via confirmation dialog when unsaved changes exist.
+- Completed meetings (`CHECKED_OUT`, `CANCELLED`, `NO_SHOW`) render in read-only mode and reject modifications at the service layer.
+- Unit tests (`mock-resource-assignment-service.test.ts`) pass cleanly.
+
+---
+
 # Track A — UI / UX First
 
 ## Phase 0 — Frontend Foundation
@@ -314,7 +359,7 @@ Includes:
 - at most a small number of useful charts.
 - read-only `All Visits` operations list with URL-persisted date-range and manager filters,
 - compact pagination and a right-side visit detail drawer,
-- invitation and additional-requirement visibility without meeting or resource-assignment actions.
+- invitation and additional-requirement visibility, with right-side visit detail drawer tabbed for visit details and Meeting resource assignment.
 
 Recharts may be added only if actual stakeholder-reviewed charts are needed.
 
