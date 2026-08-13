@@ -219,8 +219,9 @@ Cancellation and security overdue behavior also remain Visit-based. Shared Meeti
 must not be maintained as a second editable data source on Visit; screens that need both
 sets of data use a combined projection.
 
-Resource reservation, source/integration tracking, Meeting end/close behavior, and a
-separate Meeting status lifecycle are later phases.
+Manager resource assignment (rooms and pooled equipment) is implemented at the Meeting
+level. Source/integration tracking, Meeting end/close behavior, and a separate Meeting
+status lifecycle remain later phases.
 
 ---
 
@@ -602,8 +603,7 @@ The manager `All Visits` view is read-only and provides:
 - invitation and additional-requirement visibility,
 - a right-side read-only visit detail panel.
 
-Meeting grouping and resource assignment are not part of this view in the current phase.
-It continues to show one row per visitor/Visit and is not redesigned for Meeting grouping.
+The table continues to display one row per visitor/Visit and is not redesigned for Meeting grouping. However, opening the right-side visit detail drawer allows Managers to view and manage Meeting-level room and pooled equipment resource assignments.
 
 ---
 
@@ -633,12 +633,34 @@ text and is not a structured resource request or assignment.
 Every resource has an active/inactive lifecycle. Resources are not deleted in this
 phase. The selected facility must belong to the selected company.
 
-The catalog phase includes listing, filtering, creating, editing, and activating or
-deactivating all four resource types. It does not include Meeting assignment,
-vehicle-driver assignment, reservation, availability, conflict detection, override,
-audit history, or employee notification. Manager assignment is a later phase. Resource
-availability does not block Meeting or Visit creation, and an additional-requirement note
+The catalog supports listing, filtering, creating, editing, and activating or deactivating
+all four resource types. Meeting resource assignment for `ROOM` and `POOLED_EQUIPMENT` is fully
+supported for Managers with real-time availability and capacity validation. Fleet vehicle and driver
+assignment remain a separate future phase. Conflict overrides and automated notifications are not supported.
+Resource availability does not block Meeting or Visit creation, and an additional-requirement note
 is not a resource request.
+
+---
+
+## 22B. Manager Resource Assignment
+
+Users with the Manager role can assign, edit, and remove facility meeting rooms and pooled equipment for meetings.
+
+### Business Rules
+
+- **Meeting Scope:** Resource assignments belong to the `Meeting` record, not to individual `Visit` records or participants.
+- **Resource Types Supported:**
+  - `ROOM`: At most one room may be assigned to a meeting. Assigning a new room atomically replaces any previous room assignment.
+  - `POOLED_EQUIPMENT`: Multiple distinct pooled equipment items may be assigned to a meeting, each with a required positive integer quantity.
+  - `VEHICLE` & `DRIVER`: Vehicle and driver resources remain catalog-only entities in this phase and are not assigned to meetings.
+- **Scope & Active Rule:** Assigned resources must belong to the meeting's host facility and must be active.
+- **Overlap Definition:** Two meetings overlap when their planned time ranges intersect (defined as half-open time intervals where meeting A planned start is before meeting B planned end, and meeting A planned end is after meeting B planned start). Cancelled meetings (meetings where all visits are `CANCELLED`) are ignored and create no conflicts.
+- **ROOM Conflict Rule:** A room cannot be assigned if it is already assigned to another overlapping, non-cancelled meeting.
+- **POOLED_EQUIPMENT Capacity Rule:** An equipment pool cannot be assigned if the total requested quantity across all overlapping non-cancelled meetings plus the newly requested quantity exceeds the total pool capacity.
+- **Atomic Save Semantics:** All resource changes for a meeting are validated and saved atomically. If any requested room or equipment assignment violates availability or capacity, the persisted state remains completely unchanged.
+- **Completed Meeting Rule:** Resource assignments cannot be created, edited, or removed for meetings whose visits are all in terminal states (`CHECKED_OUT`, `CANCELLED`, or `NO_SHOW`).
+- **Permissions:** Any user with the Manager role can create, modify, or remove resource assignments.
+- **No Conflict Override:** Conflict overrides are not supported. Availability conflicts must be resolved operationally by selecting available resources or rescheduling the meeting.
 
 ---
 

@@ -49,11 +49,14 @@ Approved direction (moved to `PRODUCT_SPEC.md` and `UI_SPEC.md`):
 - An unavailable resource does not block Meeting or Visit creation. Users with Manager
   permission see availability or shortage information and resolve it operationally.
 
-Decision needed:
+Status: **Approved and implemented in current frontend/mock-service scope.** (Meeting room and pooled equipment assignment, real-time availability/capacity checking, atomic saving, local draft UX, unsaved-change guard, and Manager visit detail tabs).
 
-1. Who may edit or cancel an existing resource assignment?
-2. Who may override an availability conflict, and what justification or audit details
-   are required?
+Resolved decisions:
+
+1. **Who may edit or cancel an existing resource assignment?**
+   - Any user with the Manager role can create, edit, or remove meeting resource assignments.
+2. **Who may override an availability conflict?**
+   - Conflict overrides do not exist / are not supported. Conflicts must be resolved operationally by selecting available resources or rescheduling the planned meeting.
 
 ## 3. Save and Send Workflow
 
@@ -218,7 +221,7 @@ Decision needed later:
 2. **Approved UI phase:** grouped meetings, validation-on-Save, post-save Send,
    notification-center reminders, and a separate additional-requirement note.
 3. **Resource MVP:** facility meeting rooms, pooled equipment, manager assignment,
-   availability, and conflict handling.
+   availability, and conflict handling (**Approved and implemented**).
 4. **Meeting lifecycle:** actual end, extend/end prompt, resource release, and variance
    reporting.
 5. **Fleet module:** vehicle/driver inventory, assignments, odometer tracking, and

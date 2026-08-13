@@ -472,10 +472,9 @@ Limit charts to useful summaries.
 - Remains a read-only operational list.
 - Uses compact date-range, company, facility, status, visit-type, host, invitation, and additional-requirement filters.
 - Persists filters in the URL and paginates the filtered result.
-- Opens visit details in a right-side drawer without leaving the page.
+- Opens visit details in a right-side drawer which provides tabs for visit details and Meeting resource assignment.
 - Shows invitation delivery and additional-requirement indicators separately from the operational visit status.
 - Continues to show one row per visitor/Visit; do not redesign or group the table by Meeting.
-- Does not expose meeting grouping or resource-assignment actions in this phase.
 
 ### Manager Resource Catalog
 
@@ -501,9 +500,27 @@ Limit charts to useful summaries.
 - Uses active/inactive actions instead of deletion.
 - Provides loading, error, unfiltered-empty, and filtered-empty states.
 - Reflows without page-level horizontal overflow at tablet and narrow widths.
-- Does not expose vehicle-driver or Meeting-resource assignment, reservation,
-  availability, conflict, notification, or audit controls. Employees continue to use the
-  additional-requirement note rather than selecting resources.
+- Does not expose vehicle-driver fleet assignment, reservation override, notification, or audit controls. Employees continue to use the additional-requirement note rather than selecting resources.
+
+### Manager Meeting Resource Assignment UI
+
+- **Tabbed Drawer Shell:** The right-side visit detail drawer in Manager `All Visits` includes two restrained text tabs: `Ziyaret Bilgileri` and `Kaynaklar`.
+- **Tab Indicators:**
+  - The `Kaynaklar` tab header displays a compact numeric count badge (e.g. `1`, `2`) when the meeting has active resource assignments.
+  - The `Kaynaklar` tab header displays a small amber dot indicator when the local resource draft has unsaved changes.
+- **Inline Editing & Pickers:**
+  - Selecting a room displays an inline picker with real-time availability status (`Seç` button for available rooms; conflict reason text for unavailable rooms).
+  - Selecting equipment displays an inline picker showing remaining available capacity (`X / Y kullanılabilir`).
+  - Equipment quantity controls use explicit increment/decrement stepper buttons and numeric input validation capped at available capacity.
+- **Local Draft & Unsaved Footer:**
+  - All resource additions, replacements, quantity updates, and removals update a local working draft immediately without calling backend/service APIs.
+  - When unsaved draft changes exist, a sticky bottom footer bar appears displaying `Kaydedilmemiş değişiklikler` with `Kaydet` and `Vazgeç` actions.
+  - `Kaydet` triggers atomic save; `Vazgeç` restores the working draft back to the last persisted state.
+- **Unsaved-Change Confirmation Guard:**
+  - Attempting to close the drawer (via `✕` button, Escape key, or overlay click) while draft changes are unsaved is intercepted by a guard.
+  - A modal confirmation dialog (`Kaydedilmemiş değişiklikler`) is presented with actions `Değişiklikleri sil` (discards draft and closes drawer) and `Geri dön` (cancels close and returns to editing).
+- **Read-Only UI State:**
+  - For completed meetings (all visits `CHECKED_OUT`, `CANCELLED`, or `NO_SHOW`), the `Kaynaklar` panel is rendered in read-only mode, hiding all add, change, edit, remove, and save controls.
 
 ---
 
