@@ -24,7 +24,7 @@ import { useVisits } from "@/features/visits/visit-context"
 import { cn } from "@/lib/utils"
 
 export function ResourceCatalogPage() {
-  const { resources, isLoading, error, reload, createResource, updateResource, setResourceActive } = useResources()
+  const { resources, isLoading, error, reload, createResource, updateResource, setResourceActive, deleteResource } = useResources()
   const { referenceData, isLoading: visitsLoading, error: visitsError, reload: reloadVisits } = useVisits()
   const [filters, setFilters] = useState<ResourceFilters>(defaultResourceFilters)
   const [sorts, setSorts] = useState<ResourceSort[]>([])
@@ -32,6 +32,7 @@ export function ResourceCatalogPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [selectedResource, setSelectedResource] = useState<FacilityResource | null>(null)
   const [transitioningResourceId, setTransitioningResourceId] = useState<string | null>(null)
+  const [deletingResourceId, setDeletingResourceId] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null)
   const tableSectionRef = useRef<HTMLElement>(null)
   const dialogReturnFocusRef = useRef<HTMLElement | null>(null)
@@ -121,6 +122,17 @@ export function ResourceCatalogPage() {
       })
     } finally {
       setTransitioningResourceId(null)
+    }
+  }
+
+  const hardDeleteResource = async (resource: FacilityResource) => {
+    setDeletingResourceId(resource.id)
+    try {
+      await deleteResource(resource.id)
+      setFeedback({ tone: "success", message: `${getResourceDisplayName(resource)} silindi.` })
+      setSelectedResource(null)
+    } finally {
+      setDeletingResourceId(null)
     }
   }
 
@@ -423,7 +435,9 @@ export function ResourceCatalogPage() {
         onOpenChange={setDialogOpen}
         onSave={saveResource}
         onToggleActive={toggleResource}
+        onDelete={hardDeleteResource}
         isTogglingActive={transitioningResourceId === selectedResource?.id}
+        isDeleting={deletingResourceId === selectedResource?.id}
       />
     </div>
   )

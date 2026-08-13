@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Power, PowerOff } from "lucide-react"
+import { Power, PowerOff, Trash2 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useForm } from "react-hook-form"
 
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -14,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { resourceTypeLabels, resourceTypes, type FacilityResource, type ResourceInput } from "@/domain/resources"
+import { getResourceDisplayName, resourceTypeLabels, resourceTypes, type FacilityResource, type ResourceInput } from "@/domain/resources"
 import type { VisitReferenceData } from "@/domain/visits"
 import {
   resourceFormSchema,
@@ -30,7 +31,9 @@ interface ResourceFormDialogProps {
   onOpenChange(open: boolean): void
   onSave(input: ResourceInput): Promise<void>
   onToggleActive(resource: FacilityResource): Promise<void>
+  onDelete(resource: FacilityResource): Promise<void>
   isTogglingActive: boolean
+  isDeleting: boolean
 }
 
 const blankValues: ResourceFormValues = {
@@ -60,9 +63,11 @@ const typeSpecificFields: (keyof ResourceFormValues)[] = [
   "canDriveCommercialVehicles",
 ]
 
-export function ResourceFormDialog({ open, resource, referenceData, returnFocusRef, onOpenChange, onSave, onToggleActive, isTogglingActive }: ResourceFormDialogProps) {
+export function ResourceFormDialog({ open, resource, referenceData, returnFocusRef, onOpenChange, onSave, onToggleActive, onDelete, isTogglingActive, isDeleting }: ResourceFormDialogProps) {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [statusNotice, setStatusNotice] = useState<string | null>(null)
+  const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const form = useForm<ResourceFormValues>({
     resolver: zodResolver(resourceFormSchema),
     defaultValues: blankValues,
@@ -82,6 +87,8 @@ export function ResourceFormDialog({ open, resource, referenceData, returnFocusR
     form.reset(resource ? getResourceFormValues(resource) : blankValues)
     setSubmitError(null)
     setStatusNotice(null)
+    setDeleteConfirmationOpen(false)
+    setDeleteError(null)
   }, [form, open, resource])
 
   useEffect(() => {
@@ -123,9 +130,22 @@ export function ResourceFormDialog({ open, resource, referenceData, returnFocusR
     }
   }
 
+  const confirmDelete = async () => {
+    if (!resource) return
+    setDeleteError(null)
+    try {
+      await onDelete(resource)
+      setDeleteConfirmationOpen(false)
+      onOpenChange(false)
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "Kaynak silinemedi.")
+    }
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent
         className="max-w-xl"
         aria-describedby={undefined}
         onOpenAutoFocus={(event) => {
@@ -135,7 +155,7 @@ export function ResourceFormDialog({ open, resource, referenceData, returnFocusR
           event.preventDefault()
           returnFocusRef.current?.focus()
         }}
-      >
+        >
         <DialogHeader>
           <DialogTitle>{resource ? "Kaynağı düzenle" : "Yeni kaynak"}</DialogTitle>
         </DialogHeader>
@@ -257,27 +277,68 @@ export function ResourceFormDialog({ open, resource, referenceData, returnFocusR
           {submitError && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800 sm:col-span-2" role="alert">{submitError}</p>}
         </form>
 
-        <DialogFooter>
-          {resource && (
+        <DialogFooter className="border-t pt-4 sm:justify-between">
+          {resource ? (
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={isDeleting || isTogglingActive || form.formState.isSubmitting}
+              onClick={() => setDeleteConfirmationOpen(true)}
+            >
+              <Trash2 />
+              Sil
+            </Button>
+          ) : <span />}
+          <div className="flex flex-col-reverse gap-2 sm:flex-row">
             <Button
               type="button"
               variant="outline"
-              disabled={isTogglingActive || form.formState.isSubmitting || form.formState.isDirty}
-              onClick={() => void toggleActive()}
-              title={form.formState.isDirty ? "Durumu değiştirmek için form değişikliklerini önce kaydedin." : undefined}
+              disabled={isDeleting || isTogglingActive || form.formState.isSubmitting}
+              onClick={() => onOpenChange(false)}
             >
-              {resource.isActive ? <PowerOff /> : <Power />}
-              {resource.isActive ? "Pasife al" : "Aktife al"}
+              Vazgeç
             </Button>
-          )}
-          <Button type="submit" form="resource-form" disabled={form.formState.isSubmitting}>
-            {form.formState.isSubmitting ? "Kaydediliyor…" : "Kaydet"}
-          </Button>
+            {resource && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isTogglingActive || isDeleting || form.formState.isSubmitting || form.formState.isDirty}
+                onClick={() => void toggleActive()}
+                title={form.formState.isDirty ? "Durumu değiştirmek için form değişikliklerini önce kaydedin." : undefined}
+              >
+                {resource.isActive ? <PowerOff /> : <Power />}
+                {resource.isActive ? "Pasife al" : "Aktife al"}
+              </Button>
+            )}
+            <Button type="submit" form="resource-form" disabled={form.formState.isSubmitting || isDeleting}>
+              {form.formState.isSubmitting ? "Kaydediliyor…" : "Kaydet"}
+            </Button>
+          </div>
         </DialogFooter>
         {resource && form.formState.isDirty && <p className="text-right text-[11px] text-slate-500">Durumu değiştirmek için form değişikliklerini önce kaydedin.</p>}
         {statusNotice && <p className="text-right text-xs text-emerald-700" role="status">{statusNotice}</p>}
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteConfirmationOpen} onOpenChange={(nextOpen) => !isDeleting && setDeleteConfirmationOpen(nextOpen)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Kaynağı sil</DialogTitle>
+            <DialogDescription>
+              {resource ? `${getResourceDisplayName(resource)} katalogdan kalıcı olarak silinecek. Geçmiş toplantı atamaları korunur.` : "Bu kaynak katalogdan kalıcı olarak silinecek."}
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800" role="alert">{deleteError}</p>}
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={isDeleting} onClick={() => setDeleteConfirmationOpen(false)}>Vazgeç</Button>
+            <Button type="button" variant="destructive" disabled={isDeleting} onClick={() => void confirmDelete()}>
+              <Trash2 />
+              {isDeleting ? "Siliniyor…" : "Kalıcı olarak sil"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 

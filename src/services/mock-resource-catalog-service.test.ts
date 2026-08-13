@@ -164,6 +164,21 @@ describe("MockResourceCatalogService", () => {
     expect((await service.setResourceActive(id, true)).isActive).toBe(true)
   })
 
+  it.each([
+    ["ROOM", "resource-room-arge-pusula"],
+    ["POOLED_EQUIPMENT", "resource-projector-arge"],
+    ["VEHICLE", "resource-vehicle-transit-merkez"],
+    ["DRIVER", "resource-driver-ayse-demir"],
+  ] as const)("hard-deletes a %s catalog record", async (_type, id) => {
+    const service = new MockResourceCatalogService()
+
+    await service.deleteResource(id)
+
+    expect((await service.listResources()).some((resource) => resource.id === id)).toBe(false)
+    await expect(service.setResourceActive(id, false)).rejects.toThrow("Kaynak bulunamadı")
+    await expect(service.deleteResource(id)).rejects.toThrow("Kaynak bulunamadı")
+  })
+
   it("keeps resource types independent from visit types", async () => {
     const created = await new MockResourceCatalogService().createResource(vehicleInput)
 
@@ -179,6 +194,7 @@ describe("MockResourceCatalogService", () => {
 
     await resourceService.createResource(driverInput)
     await resourceService.setResourceActive("resource-vehicle-transit-merkez", false)
+    await resourceService.deleteResource("resource-driver-mehmet-kaya")
 
     expect(await visitService.listMeetings()).toEqual(meetingsBefore)
     expect(await visitService.listVisits()).toEqual(visitsBefore)

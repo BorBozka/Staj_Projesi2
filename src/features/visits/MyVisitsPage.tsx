@@ -5,11 +5,13 @@ import { useLocation } from "react-router-dom"
 import type { Visit } from "@/domain/visits"
 import { CancelVisitDialog } from "@/features/visits/CancelVisitDialog"
 import { RescheduleVisitDialog } from "@/features/visits/RescheduleVisitDialog"
+import { HostedMeetingEndNotifications } from "@/features/visits/HostedMeetingEndNotifications"
 import { UpcomingVisits } from "@/features/visits/UpcomingVisits"
 import { VisitFormDialog } from "@/features/visits/VisitFormDialog"
 import { VisitDetailsDialog } from "@/features/visits/VisitDetailsDialog"
 import { VisitTimeline, type TimelineView } from "@/features/visits/VisitTimeline"
 import { useVisits } from "@/features/visits/visit-context"
+import { getOwnVisits } from "@/features/visits/visit-visibility"
 
 export function MyVisitsPage() {
   const { visits, referenceData, isLoading, error } = useVisits()
@@ -41,9 +43,7 @@ export function MyVisitsPage() {
 
   if (isLoading) return <PageSkeleton />
 
-  const ownVisits = referenceData
-    ? visits.filter((visit) => visit.creatorEmployeeId === referenceData.currentEmployee.employeeId)
-    : visits
+  const ownVisits = getOwnVisits(visits, referenceData?.currentEmployee.employeeId)
   const isManagerView = location.pathname.startsWith("/manager/")
 
   return (
@@ -97,6 +97,7 @@ export function MyVisitsPage() {
         onOpenChange={(open) => !open && setCancellingVisit(null)}
         onSaved={setNotice}
       />
+      <HostedMeetingEndNotifications />
     </div>
   )
 }

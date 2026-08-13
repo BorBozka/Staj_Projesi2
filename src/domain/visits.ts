@@ -6,6 +6,15 @@ export const invitationStatuses = ["NOT_SENT", "SENDING", "SENT", "FAILED"] as c
 
 export type InvitationStatus = (typeof invitationStatuses)[number]
 
+// ---------------------------------------------------------------------------
+// Meeting end source
+// MANUAL          — host/organizer explicitly closed the meeting
+// VISITOR_CHECK_OUT — meeting was auto-closed when the last checked-in
+//                    visitor checked out
+// ---------------------------------------------------------------------------
+export const meetingEndSources = ["MANUAL", "VISITOR_CHECK_OUT"] as const
+export type MeetingEndSource = (typeof meetingEndSources)[number]
+
 export interface Visitor {
   id: string
   firstName: string
@@ -29,6 +38,10 @@ export interface MeetingDetails {
   note?: string
   hasAdditionalRequirements: boolean
   additionalRequirementNote?: string
+  // Lifecycle fields — projected from Meeting so UI components can read them
+  // from the flat Visit read-model without a second Meeting fetch.
+  actualMeetingEnd?: string
+  meetingEndSource?: MeetingEndSource
 }
 
 export interface Meeting extends MeetingDetails {
@@ -36,6 +49,26 @@ export interface Meeting extends MeetingDetails {
   createdAt: string
   updatedAt: string
 }
+
+// ---------------------------------------------------------------------------
+// Input types for lifecycle operations
+// ---------------------------------------------------------------------------
+
+export interface ExtendMeetingInput {
+  /** Positive whole number of minutes to add. */
+  extensionMinutes: number
+  /** Employee identity performing the manual lifecycle action. */
+  actorEmployeeId: string
+  /**
+   * The current client-side time used to compute the new end.
+   * Formula: max(current plannedEnd, currentTime) + extensionMinutes
+   */
+  currentTime: string
+}
+
+export type CloseMeetingInput =
+  | { source: "MANUAL"; actorEmployeeId: string }
+  | { source: "VISITOR_CHECK_OUT" }
 
 export interface VisitRecord {
   id: string

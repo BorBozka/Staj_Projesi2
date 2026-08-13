@@ -97,10 +97,16 @@ export function getResourceDisplayName(resource: FacilityResource | ResourceInpu
 
 // ---------------------------------------------------------------------------
 // Resource Assignments
-// Normalized stored records — resource identity is resolved from the catalog.
+// Stored records retain immutable identity details for historical projection.
 // ---------------------------------------------------------------------------
 
-export interface RoomAssignment {
+interface ResourceAssignmentSnapshot {
+  resourceName: string
+  companyId: string
+  facilityId: string
+}
+
+export interface RoomAssignment extends ResourceAssignmentSnapshot {
   id: string
   meetingId: string
   resourceId: string
@@ -108,11 +114,12 @@ export interface RoomAssignment {
   createdAt: string
 }
 
-export interface EquipmentAssignment {
+export interface EquipmentAssignment extends ResourceAssignmentSnapshot {
   id: string
   meetingId: string
   resourceId: string
   resourceType: "POOLED_EQUIPMENT"
+  totalQuantity: number
   requestedQuantity: number
   createdAt: string
 }
@@ -129,19 +136,10 @@ export interface AssignEquipmentInput {
   requestedQuantity: number
 }
 
-// Projected views enriched with catalog data — used only by the UI layer
-export interface RoomAssignmentView extends RoomAssignment {
-  resourceName: string
-  companyId: string
-  facilityId: string
-}
+// Projected views are served from the immutable assignment snapshot.
+export type RoomAssignmentView = RoomAssignment
 
-export interface EquipmentAssignmentView extends EquipmentAssignment {
-  resourceName: string
-  totalQuantity: number
-  companyId: string
-  facilityId: string
-}
+export type EquipmentAssignmentView = EquipmentAssignment
 
 export type ResourceAssignmentView = RoomAssignmentView | EquipmentAssignmentView
 
