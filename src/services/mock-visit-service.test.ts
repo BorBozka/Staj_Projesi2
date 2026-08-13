@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 
 import type { MeetingInput, VisitRecord } from "@/domain/visits"
 import { getInvitationActionLabel, getPendingInvitationVisits } from "@/features/visits/invitation-status"
-import { getVisibleAdditionalRequirementNote } from "@/features/visits/visit-visibility"
+import { getOwnVisits, getVisibleAdditionalRequirementNote } from "@/features/visits/visit-visibility"
 import { MockVisitService } from "@/services/mock-visit-service"
 
 const meetingInput: MeetingInput = {
@@ -70,6 +70,48 @@ describe("MockVisitService Meeting–Visit behavior", () => {
     expect((await service.listMeetings()).find((meeting) => meeting.id === created.meeting.id)?.note).toBe("Ortak güncel bilgi")
     const storedRecords = (service as unknown as { visits: VisitRecord[] }).visits
     expect(storedRecords.find((visit) => visit.id === created.visits[0].id)).not.toHaveProperty("note")
+  })
+
+  it("keeps MANUAL and VISITOR_CHECK_OUT closure audit state immutable across shared-plan edits", async () => {
+    const service = new MockVisitService()
+    const meetings = await service.listMeetings()
+    const visits = await service.listVisits()
+
+    for (const source of ["MANUAL", "VISITOR_CHECK_OUT"] as const) {
+      const closedMeeting = meetings.find((meeting) => meeting.meetingEndSource === source)!
+      const linkedVisits = visits.filter((visit) => visit.meetingId === closedMeeting.id)
+      const changedPlannedEnd = new Date(new Date(closedMeeting.plannedEnd).getTime() + 60 * 60_000).toISOString()
+
+      await expect(service.updateMeeting(closedMeeting.id, {
+        visitors: linkedVisits.map((visit) => ({
+          visitId: visit.id,
+          firstName: visit.visitor.firstName,
+          lastName: visit.visitor.lastName,
+          email: visit.visitor.email,
+          phone: visit.visitor.phone,
+        })),
+        visitTypeId: closedMeeting.visitTypeId,
+        hostEmployeeName: closedMeeting.hostEmployeeName,
+        hostCompanyId: closedMeeting.hostCompanyId,
+        facilityId: closedMeeting.facilityId,
+        plannedStart: closedMeeting.plannedStart,
+        plannedEnd: changedPlannedEnd,
+        note: "Kapanıştan sonra değiştirilmemeli",
+      })).rejects.toThrow("Kapatılmış bir toplantının ortak bilgileri değiştirilemez")
+
+      await expect(service.rescheduleVisit(linkedVisits[0].id, {
+        plannedStart: closedMeeting.plannedStart,
+        plannedEnd: changedPlannedEnd,
+      })).rejects.toThrow("Kapatılmış bir toplantının ortak bilgileri değiştirilemez")
+
+      const persisted = (await service.listMeetings()).find((meeting) => meeting.id === closedMeeting.id)
+      expect(persisted).toMatchObject({
+        plannedStart: closedMeeting.plannedStart,
+        plannedEnd: closedMeeting.plannedEnd,
+        actualMeetingEnd: closedMeeting.actualMeetingEnd,
+        meetingEndSource: source,
+      })
+    }
   })
 
   it("cancels one Visit without changing the other participants", async () => {
@@ -170,5 +212,33 @@ describe("MockVisitService Meeting–Visit behavior", () => {
     expect(getVisibleAdditionalRequirementNote(visit, "MANAGER")).toBe("Erişilebilir giriş hazırlanmalı.")
     expect(getVisibleAdditionalRequirementNote(visit, "EMPLOYEE")).toBe("Erişilebilir giriş hazırlanmalı.")
     expect(getVisibleAdditionalRequirementNote(visit, "SECURITY")).toBeUndefined()
+  })
+
+  it("filters personal visits strictly by creatorEmployeeId matching currentEmployee.employeeId without manager bypass", async () => {
+    const service = new MockVisitService()
+    const referenceData = await service.getReferenceData()
+    const allVisits = await service.listVisits()
+    const currentEmployeeId = referenceData.currentEmployee.employeeId
+
+    // Personal visit filter authoritative rule: creatorEmployeeId === currentEmployee.employeeId
+    const ownVisits = getOwnVisits(allVisits, currentEmployeeId)
+
+    // 1. All filtered visits must strictly belong to current employee
+    expect(ownVisits.every((visit) => visit.creatorEmployeeId === currentEmployeeId)).toBe(true)
+
+    // 2. Personal visits must be a meaningful subset of total visits (not all 58 visits)
+    expect(ownVisits.length).toBeGreaterThan(0)
+    expect(ownVisits.length).toBeLessThan(allVisits.length)
+
+    // 3. Current employee has a realistic, representative set of created visits (e.g. 8 visits)
+    expect(ownVisits.length).toBe(8)
+
+    // 4. Other visits belong to other creators in the organization
+    const otherVisits = allVisits.filter((visit) => visit.creatorEmployeeId !== currentEmployeeId)
+    const otherCreators = new Set(otherVisits.map((visit) => visit.creatorEmployeeId))
+    expect(otherCreators.size).toBeGreaterThanOrEqual(3)
+
+    // Missing employee context must never fall back to exposing all visits.
+    expect(getOwnVisits(allVisits)).toEqual([])
   })
 })

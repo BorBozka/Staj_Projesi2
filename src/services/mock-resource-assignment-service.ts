@@ -5,7 +5,6 @@ import type {
   EquipmentAssignment,
   EquipmentAssignmentView,
   EquipmentAvailabilityInfo,
-  FacilityResource,
   PooledEquipmentResource,
   ResourceAssignment,
   ResourceAssignmentView,
@@ -15,6 +14,7 @@ import type {
   RoomResource,
 } from "@/domain/resources"
 import type { Meeting, VisitRecord } from "@/domain/visits"
+import { areAllLinkedVisitsTerminal, isMeetingExplicitlyClosed, isMeetingResourceReadOnly } from "@/lib/meeting-lifecycle"
 import { initialMockAssignments } from "@/services/mock-resource-assignment-data"
 import type { ResourceCatalogService } from "@/services/resource-catalog-service"
 import type { ResourceAssignmentService } from "@/services/resource-assignment-service"
@@ -43,18 +43,38 @@ function isMeetingCancelled(meetingId: string, visits: VisitRecord[]): boolean {
 /**
  * A meeting is considered completed (read-only for resources) when all its Visit records
  * are in terminal states (CHECKED_OUT, CANCELLED, NO_SHOW).
+ * This helper is intentionally independent from explicit Meeting closure.
  */
 export function isMeetingCompleted(meetingId: string, visits: VisitRecord[]): boolean {
-  const meetingVisits = visits.filter((v) => v.meetingId === meetingId)
-  if (meetingVisits.length === 0) return false
-  const terminalStatuses = ["CHECKED_OUT", "CANCELLED", "NO_SHOW"]
-  return meetingVisits.every((v) => terminalStatuses.includes(v.status))
+  return areAllLinkedVisitsTerminal(meetingId, visits)
 }
 
-function assertMeetingNotCompleted(meetingId: string, visits: VisitRecord[]): void {
-  if (isMeetingCompleted(meetingId, visits)) {
-    throw new Error("Tamamlanan ziyaretlerde kaynak atamaları değiştirilemez.")
+/**
+ * Resource assignments become read-only when EITHER:
+ *   a) the meeting has been explicitly closed (actualMeetingEnd is set), OR
+ *   b) all visits are in terminal states (isMeetingCompleted).
+ * Both conditions are checked independently so that explicit closure takes
+ * effect immediately even while visitors are still checked in.
+ */
+function assertMeetingResourcesMutable(meeting: Meeting, visits: VisitRecord[]): void {
+  if (!isMeetingResourceReadOnly(meeting, visits)) return
+  if (isMeetingExplicitlyClosed(meeting)) {
+    throw new Error("Kapatılmış toplantılarda kaynak atamaları değiştirilemez.")
   }
+  throw new Error("Tamamlanan ziyaretlerde kaynak atamaları değiştirilemez.")
+}
+
+/**
+ * Returns true when a meeting should be excluded from availability / conflict
+ * calculations.  A closed meeting (actualMeetingEnd set) no longer consumes
+ * room or equipment capacity.
+ */
+function isMeetingClosedOrCancelled(
+  meeting: Meeting,
+  meetingId: string,
+  visits: VisitRecord[],
+): boolean {
+  return isMeetingExplicitlyClosed(meeting) || isMeetingCancelled(meetingId, visits)
 }
 
 // ---------------------------------------------------------------------------
@@ -69,20 +89,62 @@ export class MockResourceAssignmentService implements ResourceAssignmentService 
     private readonly catalogService: ResourceCatalogService,
   ) {}
 
+  // ── validateExtension ────────────────────────────────────────────────────
+
+  async validateExtension(meetingId: string, newPlannedEnd: string): Promise<void> {
+    const { meeting, visits, resources } = await this.loadContext(meetingId)
+    const meetings = await this.loadMeetings()
+    // Build a temporary snapshot of the target meeting with the extended end.
+    const extendedMeeting: Meeting = { ...meeting, plannedEnd: newPlannedEnd }
+
+    // Assignments from OTHER meetings (used for conflict checks).
+    const otherAssignments = this.assignments.filter((a) => a.meetingId !== meetingId)
+
+    // Check ROOM assignment.
+    const roomAssignment = this.assignments.find(
+      (a) => a.meetingId === meetingId && a.resourceType === "ROOM",
+    )
+    if (roomAssignment && resources.some((resource) => resource.id === roomAssignment.resourceId)) {
+      this.checkRoomConflict(roomAssignment.resourceId, extendedMeeting, meetings, visits, otherAssignments)
+    }
+
+    // Check POOLED_EQUIPMENT assignments.
+    const equipAssignments = this.assignments.filter(
+      (a): a is EquipmentAssignment =>
+        a.meetingId === meetingId && a.resourceType === "POOLED_EQUIPMENT",
+    )
+    for (const ea of equipAssignments) {
+      const equip = resources.find((r) => r.id === ea.resourceId) as PooledEquipmentResource | undefined
+      if (!equip) continue
+      const usedQty = this.computeUsedEquipmentQuantity(
+        ea.resourceId,
+        extendedMeeting,
+        meetings,
+        visits,
+        otherAssignments,
+      )
+      if (usedQty + ea.requestedQuantity > equip.totalQuantity) {
+        const remaining = equip.totalQuantity - usedQty
+        throw new Error(
+          `Uzatma sonrası "${equip.name}" ekipman kapasitesi yetersiz. Kullanılabilir: ${remaining}/${equip.totalQuantity} adet.`,
+        )
+      }
+    }
+  }
+
   // ── list ─────────────────────────────────────────────────────────────────
 
   async listAssignmentsForMeeting(meetingId: string): Promise<ResourceAssignmentView[]> {
-    const resources = await this.catalogService.listResources()
     return this.assignments
       .filter((a) => a.meetingId === meetingId)
-      .map((a) => this.projectAssignment(a, resources))
+      .map((a) => this.projectAssignment(a))
   }
 
   // ── assign room ──────────────────────────────────────────────────────────
 
   async assignRoom(meetingId: string, input: AssignRoomInput): Promise<RoomAssignmentView> {
     const { meeting, visits, resources } = await this.loadContext(meetingId)
-    assertMeetingNotCompleted(meetingId, visits)
+    assertMeetingResourcesMutable(meeting, visits)
     const meetings = await this.loadMeetings()
 
     const room = resources.find((r) => r.id === input.resourceId && r.type === "ROOM") as RoomResource | undefined
@@ -106,10 +168,13 @@ export class MockResourceAssignmentService implements ResourceAssignmentService 
       meetingId,
       resourceId: input.resourceId,
       resourceType: "ROOM",
+      resourceName: room.name,
+      companyId: room.companyId,
+      facilityId: room.facilityId,
       createdAt: new Date().toISOString(),
     }
     this.assignments = [...this.assignments, assignment]
-    return this.projectRoomAssignment(assignment, room)
+    return this.projectRoomAssignment(assignment)
   }
 
   // ── assign equipment ─────────────────────────────────────────────────────
@@ -120,7 +185,7 @@ export class MockResourceAssignmentService implements ResourceAssignmentService 
     }
 
     const { meeting, visits, resources } = await this.loadContext(meetingId)
-    assertMeetingNotCompleted(meetingId, visits)
+    assertMeetingResourcesMutable(meeting, visits)
 
     const alreadyAssigned = this.assignments.some(
       (a) => a.meetingId === meetingId && a.resourceId === input.resourceId && a.resourceType === "POOLED_EQUIPMENT",
@@ -156,11 +221,15 @@ export class MockResourceAssignmentService implements ResourceAssignmentService 
       meetingId,
       resourceId: input.resourceId,
       resourceType: "POOLED_EQUIPMENT",
+      resourceName: equip.name,
+      companyId: equip.companyId,
+      facilityId: equip.facilityId,
+      totalQuantity: equip.totalQuantity,
       requestedQuantity: input.requestedQuantity,
       createdAt: new Date().toISOString(),
     }
     this.assignments = [...this.assignments, assignment]
-    return this.projectEquipmentAssignment(assignment, equip)
+    return this.projectEquipmentAssignment(assignment)
   }
 
   // ── update equipment quantity ─────────────────────────────────────────────
@@ -176,7 +245,7 @@ export class MockResourceAssignmentService implements ResourceAssignmentService 
     }
 
     const { meeting, visits, resources } = await this.loadContext(current.meetingId)
-    assertMeetingNotCompleted(current.meetingId, visits)
+    assertMeetingResourcesMutable(meeting, visits)
     const meetings = await this.loadMeetings()
 
     const equip = resources.find((r) => r.id === current.resourceId) as PooledEquipmentResource | undefined
@@ -200,15 +269,15 @@ export class MockResourceAssignmentService implements ResourceAssignmentService 
 
     const updated: EquipmentAssignment = { ...current, requestedQuantity }
     this.assignments = this.assignments.map((a) => (a.id === assignmentId ? updated : a))
-    return this.projectEquipmentAssignment(updated, equip)
+    return this.projectEquipmentAssignment(updated)
   }
 
   // ── remove ───────────────────────────────────────────────────────────────
 
   async removeAssignment(assignmentId: string): Promise<void> {
     const current = this.findAssignment(assignmentId) // throws if not found
-    const { visits } = await this.loadContext(current.meetingId)
-    assertMeetingNotCompleted(current.meetingId, visits)
+    const { meeting, visits } = await this.loadContext(current.meetingId)
+    assertMeetingResourcesMutable(meeting, visits)
     this.assignments = this.assignments.filter((a) => a.id !== assignmentId)
   }
 
@@ -219,7 +288,7 @@ export class MockResourceAssignmentService implements ResourceAssignmentService 
     desired: DesiredResourceState,
   ): Promise<ResourceAssignmentView[]> {
     const { meeting, visits, resources } = await this.loadContext(meetingId)
-    assertMeetingNotCompleted(meetingId, visits)
+    assertMeetingResourcesMutable(meeting, visits)
     const meetings = await this.loadMeetings()
 
     // Assignments that belong to OTHER meetings — used for conflict checking.
@@ -290,6 +359,9 @@ export class MockResourceAssignmentService implements ResourceAssignmentService 
         meetingId,
         resourceId: roomResource.id,
         resourceType: "ROOM",
+        resourceName: roomResource.name,
+        companyId: roomResource.companyId,
+        facilityId: roomResource.facilityId,
         createdAt: now,
       } satisfies RoomAssignment)
     }
@@ -300,6 +372,10 @@ export class MockResourceAssignmentService implements ResourceAssignmentService 
         meetingId,
         resourceId: resource.id,
         resourceType: "POOLED_EQUIPMENT",
+        resourceName: resource.name,
+        companyId: resource.companyId,
+        facilityId: resource.facilityId,
+        totalQuantity: resource.totalQuantity,
         requestedQuantity,
         createdAt: now,
       } satisfies EquipmentAssignment)
@@ -309,7 +385,7 @@ export class MockResourceAssignmentService implements ResourceAssignmentService 
     this.assignments = [...otherAssignments, ...newAssignments]
 
     // Return projected views.
-    return newAssignments.map((a) => this.projectAssignment(a, resources))
+    return newAssignments.map((a) => this.projectAssignment(a))
   }
 
   // ── eligibility queries ──────────────────────────────────────────────────
@@ -407,7 +483,7 @@ export class MockResourceAssignmentService implements ResourceAssignmentService 
     const conflictingMeeting = allMeetings.find(
       (m) =>
         m.id !== targetMeeting.id &&
-        !isMeetingCancelled(m.id, allVisits as VisitRecord[]) &&
+        !isMeetingClosedOrCancelled(m, m.id, allVisits as VisitRecord[]) &&
         meetingsOverlap(m, targetMeeting) &&
         assignments.some((a) => a.meetingId === m.id && a.resourceId === roomId && a.resourceType === "ROOM"),
     )
@@ -435,7 +511,7 @@ export class MockResourceAssignmentService implements ResourceAssignmentService 
       .filter(
         (m) =>
           m.id !== targetMeeting.id &&
-          !isMeetingCancelled(m.id, allVisits as VisitRecord[]) &&
+          !isMeetingClosedOrCancelled(m, m.id, allVisits as VisitRecord[]) &&
           meetingsOverlap(m, targetMeeting),
       )
       .reduce((sum, m) => {
@@ -453,40 +529,19 @@ export class MockResourceAssignmentService implements ResourceAssignmentService 
 
   // ── projections ────────────────────────────────────────────────────────
 
-  private projectAssignment(
-    assignment: ResourceAssignment,
-    resources: FacilityResource[],
-  ): ResourceAssignmentView {
+  private projectAssignment(assignment: ResourceAssignment): ResourceAssignmentView {
     if (assignment.resourceType === "ROOM") {
-      const room = resources.find((r) => r.id === assignment.resourceId) as RoomResource | undefined
-      if (!room) throw new Error(`Oda kaynağı bulunamadı: ${assignment.resourceId}`)
-      return this.projectRoomAssignment(assignment as RoomAssignment, room)
+      return this.projectRoomAssignment(assignment as RoomAssignment)
     }
-    const equip = resources.find((r) => r.id === assignment.resourceId) as PooledEquipmentResource | undefined
-    if (!equip) throw new Error(`Ekipman kaynağı bulunamadı: ${assignment.resourceId}`)
-    return this.projectEquipmentAssignment(assignment as EquipmentAssignment, equip)
+    return this.projectEquipmentAssignment(assignment as EquipmentAssignment)
   }
 
-  private projectRoomAssignment(assignment: RoomAssignment, room: RoomResource): RoomAssignmentView {
-    return {
-      ...assignment,
-      resourceName: room.name,
-      companyId: room.companyId,
-      facilityId: room.facilityId,
-    }
+  private projectRoomAssignment(assignment: RoomAssignment): RoomAssignmentView {
+    return clone(assignment)
   }
 
-  private projectEquipmentAssignment(
-    assignment: EquipmentAssignment,
-    equip: PooledEquipmentResource,
-  ): EquipmentAssignmentView {
-    return {
-      ...assignment,
-      resourceName: equip.name,
-      totalQuantity: equip.totalQuantity,
-      companyId: equip.companyId,
-      facilityId: equip.facilityId,
-    }
+  private projectEquipmentAssignment(assignment: EquipmentAssignment): EquipmentAssignmentView {
+    return clone(assignment)
   }
 }
 

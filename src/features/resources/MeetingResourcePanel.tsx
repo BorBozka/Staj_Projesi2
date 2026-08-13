@@ -20,7 +20,7 @@ import type {
   RoomAvailabilityInfo,
 } from "@/domain/resources"
 import type { ResourceAssignmentService } from "@/services/resource-assignment-service"
-import { isMeetingCompleted } from "@/services/mock-resource-assignment-service"
+import { isMeetingResourceReadOnly } from "@/lib/meeting-lifecycle"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -102,11 +102,12 @@ export function MeetingResourcePanel({
   onAssignmentsCountChange,
   onDirtyChange,
 }: MeetingResourcePanelProps) {
-  const { visits } = useVisits()
+  const { meetings, visits } = useVisits()
   const computedReadOnly = useMemo(() => {
     if (isReadOnlyProp !== undefined) return isReadOnlyProp
-    return isMeetingCompleted(meetingId, visits)
-  }, [isReadOnlyProp, visits, meetingId])
+    const meeting = meetings.find((item) => item.id === meetingId)
+    return meeting ? isMeetingResourceReadOnly(meeting, visits) : true
+  }, [isReadOnlyProp, meetingId, meetings, visits])
 
   // Persisted draft — what was last successfully saved.
   const [persistedDraft, setPersistedDraft] = useState<ResourceDraft>({ room: null, equipment: [] })
@@ -195,12 +196,12 @@ export function MeetingResourcePanel({
     void load()
   }, [load])
 
-  // Report draft count to parent whenever draft changes (includes unsaved changes).
+  // Report only persisted assignments; unsaved draft changes use the dirty indicator.
   const onAssignmentsCountChangeRef = useRef(onAssignmentsCountChange)
   onAssignmentsCountChangeRef.current = onAssignmentsCountChange
   useEffect(() => {
-    onAssignmentsCountChangeRef.current?.((draft.room ? 1 : 0) + draft.equipment.length)
-  }, [draft])
+    onAssignmentsCountChangeRef.current?.((persistedDraft.room ? 1 : 0) + persistedDraft.equipment.length)
+  }, [persistedDraft])
 
   // ---------------------------------------------------------------------------
   // Draft mutations (no service calls)
@@ -508,7 +509,7 @@ export function MeetingResourcePanel({
             )}
           </div>
         ) : (
-          <div className="flex items-center justify-between rounded-lg border border-dashed bg-slate-50/40 p-3">
+          <div className="flex items-center justify-between border-t border-slate-100 py-2.5">
             <span className="text-xs text-slate-500">Oda atanmamış.</span>
             {!computedReadOnly && (
               <Button
@@ -713,7 +714,7 @@ export function MeetingResourcePanel({
         {/* Draft equipment list */}
         {draft.equipment.length === 0 ? (
           !isEquipPickerOpen && (
-            <div className="flex items-center justify-between rounded-lg border border-dashed bg-slate-50/40 p-3">
+            <div className="flex items-center justify-between border-t border-slate-100 py-2.5">
               <span className="text-xs text-slate-500">Ekipman atanmamış.</span>
               {!computedReadOnly && (
                 <Button

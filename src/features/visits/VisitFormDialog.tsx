@@ -466,6 +466,14 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
             <p id={invitationHelpId} className="text-xs text-slate-500" aria-live="polite">{invitationDisabledReason}</p>
             <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
               <Button
+                type="button"
+                variant="outline"
+                disabled={form.formState.isSubmitting || isSendingInvitation}
+                onClick={() => onOpenChange(false)}
+              >
+                Vazgeç
+              </Button>
+              <Button
                 type="submit"
                 variant="outline"
                 disabled={form.formState.isSubmitting || isSendingInvitation || (Boolean(savedMeetingId) && !form.formState.isDirty)}
@@ -474,6 +482,7 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
               </Button>
               <Button
                 type="button"
+                className="col-span-2 sm:col-span-1"
                 onClick={() => void sendInvitation()}
                 disabled={!canSendInvitation || form.formState.isSubmitting}
                 aria-describedby={invitationHelpId}

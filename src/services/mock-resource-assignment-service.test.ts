@@ -13,6 +13,7 @@ function makeServices() {
   const visitService = new MockVisitService()
   const catalogService = new MockResourceCatalogService()
   const assignmentService = new MockResourceAssignmentService(visitService, catalogService)
+  visitService.setResourceAssignmentService(assignmentService)
   return { visitService, catalogService, assignmentService }
 }
 
@@ -94,6 +95,61 @@ describe("MockResourceAssignmentService — list", () => {
     const meeting = await createMeeting(visitService, { startHour: 6 })
     const assignments = await assignmentService.listAssignmentsForMeeting(meeting.id)
     expect(assignments).toHaveLength(0)
+  })
+
+  it("keeps historical room and equipment projections after catalog hard delete", async () => {
+    const { visitService, catalogService, assignmentService } = makeServices()
+
+    await catalogService.deleteResource(MERKEZ_ROOM_ID)
+    await catalogService.deleteResource(NOTEBOOK_ID)
+
+    await expect(assignmentService.listAssignmentsForMeeting(SEEDED_MEETING_WITH_ROOM)).resolves.toEqual([
+      expect.objectContaining({
+        resourceId: MERKEZ_ROOM_ID,
+        resourceType: "ROOM",
+        resourceName: "Atlas Toplantı Odası",
+        companyId: "bplas",
+        facilityId: "bplas-merkez",
+      }),
+    ])
+    await expect(assignmentService.listAssignmentsForMeeting(SEEDED_MEETING_WITH_EQUIP)).resolves.toEqual([
+      expect.objectContaining({
+        resourceId: NOTEBOOK_ID,
+        resourceType: "POOLED_EQUIPMENT",
+        resourceName: "Notebook Havuzu",
+        totalQuantity: 12,
+        requestedQuantity: 2,
+      }),
+    ])
+
+    const meetings = await visitService.listMeetings()
+    const roomMeeting = meetings.find((meeting) => meeting.id === SEEDED_MEETING_WITH_ROOM)
+    const equipmentMeeting = meetings.find((meeting) => meeting.id === SEEDED_MEETING_WITH_EQUIP)
+    expect(roomMeeting).toBeDefined()
+    expect(equipmentMeeting).toBeDefined()
+    await expect(assignmentService.validateExtension(
+      SEEDED_MEETING_WITH_ROOM,
+      new Date(new Date(roomMeeting!.plannedEnd).getTime() + 15 * 60_000).toISOString(),
+    )).resolves.toBeUndefined()
+    await expect(assignmentService.validateExtension(
+      SEEDED_MEETING_WITH_EQUIP,
+      new Date(new Date(equipmentMeeting!.plannedEnd).getTime() + 15 * 60_000).toISOString(),
+    )).resolves.toBeUndefined()
+  })
+
+  it("excludes deleted resources from eligibility and rejects new assignment without deleting history", async () => {
+    const { visitService, catalogService, assignmentService } = makeServices()
+    const meeting = await createMeeting(visitService, { startHour: 6 })
+
+    await catalogService.deleteResource(MERKEZ_ROOM_ID)
+    await catalogService.deleteResource(NOTEBOOK_ID)
+
+    expect((await assignmentService.getEligibleRooms(meeting.id)).some((item) => item.resource.id === MERKEZ_ROOM_ID)).toBe(false)
+    expect((await assignmentService.getEligibleEquipment(meeting.id)).some((item) => item.resource.id === NOTEBOOK_ID)).toBe(false)
+    await expect(assignmentService.assignRoom(meeting.id, { resourceId: MERKEZ_ROOM_ID })).rejects.toThrow("Oda kaynağı bulunamadı")
+    await expect(assignmentService.assignEquipment(meeting.id, { resourceId: NOTEBOOK_ID, requestedQuantity: 1 })).rejects.toThrow("Ekipman havuzu bulunamadı")
+    await expect(assignmentService.listAssignmentsForMeeting(SEEDED_MEETING_WITH_ROOM)).resolves.toHaveLength(1)
+    await expect(assignmentService.listAssignmentsForMeeting(SEEDED_MEETING_WITH_EQUIP)).resolves.toHaveLength(1)
   })
 })
 
@@ -629,8 +685,8 @@ describe("MockResourceAssignmentService — completed meeting read-only protecti
       hostEmployeeName: "Maya Kara",
       hostCompanyId: "bplas",
       facilityId: "bplas-merkez",
-      plannedStart: new Date().toISOString(),
-      plannedEnd: new Date(Date.now() + 3600000).toISOString(),
+      plannedStart: new Date("2026-08-13T06:00:00.000Z").toISOString(),
+      plannedEnd: new Date("2026-08-13T07:00:00.000Z").toISOString(),
     })
 
     // Cancel only the first visit

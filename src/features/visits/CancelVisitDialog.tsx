@@ -61,7 +61,7 @@ export function CancelVisitDialog({ visit, open, onOpenChange, onSaved }: Props)
         </div>
         {error && <p className="text-xs text-destructive">{error}</p>}
         <DialogFooter className="sm:flex-col sm:items-stretch">
-          <Button variant="outline" className="w-full" onClick={() => onOpenChange(false)}>Ziyareti Koru</Button>
+          <Button variant="outline" className="w-full" onClick={() => onOpenChange(false)}>Vazgeç</Button>
           {showScopeSelection && (
             <Button variant="outline" className="w-full border-red-200 text-destructive hover:bg-red-50 hover:text-destructive" onClick={() => void cancel("VISIT")} disabled={isSubmitting}>
               {visitorName} · 1 Ziyareti İptal Et

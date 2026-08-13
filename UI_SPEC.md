@@ -247,6 +247,21 @@ Visit blocks should show:
 
 Cancelled visits remain visible with muted/cancelled treatment.
 
+The timeline and Upcoming Visits remain limited to Visits created by the current employee.
+On desktop, use one persistent compact action panel fixed to the lower-right for every
+manually actionable Meeting hosted by the current employee whose planned end has arrived or
+passed. A Meeting is manually actionable only after `plannedStart`, while it is explicitly
+open, and while at least one linked Visit is non-terminal. Fully `CHECKED_OUT`, `CANCELLED`,
+or `NO_SHOW` Meetings do not appear even if legacy/mock data lacks `actualMeetingEnd`. The
+panel must not push the timeline down. Each Meeting row must be distinguishable by
+visitor/meeting context and expose +15, +30, an anchored custom-minute popover, and an
+immediate `Toplantıyı Bitir` action. Multiple records scroll inside the panel and its header
+shows the total count. The user can minimize it to a lower-right
+`N toplantı için işlem gerekiyor` control, but cannot dismiss notifications. Extending
+removes the row until the new end time; closing removes it permanently. Do not add these
+host-only notification Meetings to the personal timeline/list, and do not use recurring
+popups or escalation.
+
 ---
 
 ## 13. New Visit
@@ -472,7 +487,7 @@ Limit charts to useful summaries.
 - Remains a read-only operational list.
 - Uses compact date-range, company, facility, status, visit-type, host, invitation, and additional-requirement filters.
 - Persists filters in the URL and paginates the filtered result.
-- Opens visit details in a right-side drawer which provides tabs for visit details and Meeting resource assignment.
+- Opens visit details in a centered, compact dialog which provides tabs for visit details and Meeting resource assignment.
 - Shows invitation delivery and additional-requirement indicators separately from the operational visit status.
 - Continues to show one row per visitor/Visit; do not redesign or group the table by Meeting.
 
@@ -497,14 +512,18 @@ Limit charts to useful summaries.
   drivers. Driver documents remain optional textual names; commercial-vehicle capability
   uses a user-facing Yes/No control.
 - Clears an invalid facility selection when company changes.
-- Uses active/inactive actions instead of deletion.
+- Keeps reversible active/inactive actions separate from permanent deletion.
+- Places a visually distinct destructive `Sil` action in the edit dialog and requires a
+  confirmation dialog before deleting the catalog record.
+- Removes a successfully deleted resource from the catalog and all new-assignment pickers;
+  historical Meeting assignment details remain readable from their stored snapshot.
 - Provides loading, error, unfiltered-empty, and filtered-empty states.
 - Reflows without page-level horizontal overflow at tablet and narrow widths.
 - Does not expose vehicle-driver fleet assignment, reservation override, notification, or audit controls. Employees continue to use the additional-requirement note rather than selecting resources.
 
 ### Manager Meeting Resource Assignment UI
 
-- **Tabbed Drawer Shell:** The right-side visit detail drawer in Manager `All Visits` includes two restrained text tabs: `Ziyaret Bilgileri` and `Kaynaklar`.
+- **Tabbed Detail Dialog:** The centered Manager visit detail dialog, shared by `All Visits` and Dashboard `Sıradaki Ziyaretler`, includes two restrained text tabs: `Ziyaret Bilgileri` and `Kaynaklar`.
 - **Tab Indicators:**
   - The `Kaynaklar` tab header displays a compact numeric count badge (e.g. `1`, `2`) when the meeting has active resource assignments.
   - The `Kaynaklar` tab header displays a small amber dot indicator when the local resource draft has unsaved changes.
@@ -517,10 +536,29 @@ Limit charts to useful summaries.
   - When unsaved draft changes exist, a sticky bottom footer bar appears displaying `Kaydedilmemiş değişiklikler` with `Kaydet` and `Vazgeç` actions.
   - `Kaydet` triggers atomic save; `Vazgeç` restores the working draft back to the last persisted state.
 - **Unsaved-Change Confirmation Guard:**
-  - Attempting to close the drawer (via `✕` button, Escape key, or overlay click) while draft changes are unsaved is intercepted by a guard.
-  - A modal confirmation dialog (`Kaydedilmemiş değişiklikler`) is presented with actions `Değişiklikleri sil` (discards draft and closes drawer) and `Geri dön` (cancels close and returns to editing).
+  - Attempting to close the centered dialog (via `✕` button, Escape key, or overlay click) while draft changes are unsaved is intercepted by a guard.
+  - A modal confirmation dialog (`Kaydedilmemiş değişiklikler`) is presented with actions `Değişiklikleri sil` (discards draft and closes the Manager Visit Detail dialog) and `Vazgeç` (cancels close and returns to editing).
 - **Read-Only UI State:**
   - For completed meetings (all visits `CHECKED_OUT`, `CANCELLED`, or `NO_SHOW`), the `Kaynaklar` panel is rendered in read-only mode, hiding all add, change, edit, remove, and save controls.
+  - A Meeting with `actualMeetingEnd` is immediately rendered read-only even while one or more linked Visits remain non-terminal.
+
+### Meeting Lifecycle UI
+
+- The centered Manager Visit Detail dialog does not show Meeting lifecycle information or
+  actions. Do not duplicate lifecycle UI there when the Manager is also the Meeting host.
+- Manager role and Meeting creator identity do not grant lifecycle permission.
+- Host-only lifecycle controls are available exclusively from the My Visits floating
+  notification for overdue, manually actionable Meetings.
+- `+15 dk`, `+30 dk`, `Özel`, and `Toplantıyı Bitir` remain in a stable action row. `Özel`
+  opens a small anchored popover and does not reflow or reposition the action row.
+- `Toplantıyı Bitir` applies the manual close immediately without a confirmation dialog.
+- Dashboard `Sıradaki Ziyaretler` rows open the centered Manager Visit Detail dialog;
+  `Tümünü gör` keeps its existing navigation behavior.
+- Create, edit, reschedule, cancel, delete, and confirmation dialogs use `Vazgeç` for the
+  applicable secondary action. Read-only information dialogs and operational drawers do not gain an
+  unnecessary cancel action.
+- The resource edit dialog keeps destructive `Sil` separately on the left; its right action
+  group remains `Vazgeç`, `Aktife al`/`Pasife al`, and `Kaydet`.
 
 ---
 
@@ -586,6 +624,10 @@ Use restrained motion only:
 Avoid playful or decorative animation.
 
 ---
+
+### Manager Visit Detail Dialog Update
+
+Manager visit details use one centered, compact dialog for both Dashboard `Sıradaki Ziyaretler` and `All Visits`. The dialog body scrolls independently, retains the resource-assignment tabs and unsaved-draft close guard, and does not display Meeting lifecycle information or actions. Lifecycle management remains in the host-scoped My Visits floating notification panel.
 
 ## 25. Mock-to-Real Transition
 

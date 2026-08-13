@@ -40,7 +40,7 @@ import {
   type VisitSort,
   type VisitSortField,
 } from "@/features/manager/all-visits-utils"
-import { ManagerVisitDetailsSheet } from "@/features/manager/ManagerVisitDetailsSheet"
+import { ManagerVisitDetailsDialog } from "@/features/manager/ManagerVisitDetailsDialog"
 import { VisitStatusBadge } from "@/features/visits/VisitStatusBadge"
 import { useVisits } from "@/features/visits/visit-context"
 import { formatTr } from "@/lib/date"
@@ -441,7 +441,7 @@ export function AllVisitsPage() {
         </div>
       </section>
 
-      <ManagerVisitDetailsSheet
+      <ManagerVisitDetailsDialog
         visit={selectedVisit}
         open={Boolean(selectedVisit)}
         onOpenChange={(open) => !open && setSelectedVisitId(null)}

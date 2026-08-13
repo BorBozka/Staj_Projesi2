@@ -5,4 +5,5 @@ export interface ResourceCatalogService {
   createResource(input: ResourceInput): Promise<FacilityResource>
   updateResource(id: string, input: ResourceInput): Promise<FacilityResource>
   setResourceActive(id: string, isActive: boolean): Promise<FacilityResource>
+  deleteResource(id: string): Promise<void>
 }

@@ -1,4 +1,6 @@
 import type {
+  CloseMeetingInput,
+  ExtendMeetingInput,
   Meeting,
   MeetingInput,
   MeetingWithVisits,
@@ -8,8 +10,10 @@ import type {
   VisitRecord,
   VisitReferenceData,
 } from "@/domain/visits"
+import { computeExtendedPlannedEnd, getManualMeetingLifecycleBlockReason, isMeetingExplicitlyClosed } from "@/lib/meeting-lifecycle"
 import { initialMockMeetings, initialMockVisitRecords, mockVisitReferenceData } from "@/services/mock-visit-data"
 import type { VisitService } from "@/services/visit-service"
+
 
 const clone = <T,>(value: T): T => structuredClone(value)
 
@@ -44,6 +48,7 @@ export class MockVisitService implements VisitService {
   async updateMeeting(id: string, input: MeetingInput): Promise<MeetingWithVisits> {
     this.validateVisitors(input.visitors)
     const currentMeeting = this.findMeeting(id)
+    this.assertMeetingEditable(currentMeeting)
     const now = new Date().toISOString()
     const updatedMeeting = this.fromMeetingInput(id, input, currentMeeting)
     const submittedVisitIds = new Set(input.visitors.flatMap((visitor) => visitor.visitId ? [visitor.visitId] : []))
@@ -101,6 +106,7 @@ export class MockVisitService implements VisitService {
   async rescheduleVisit(id: string, input: RescheduleVisitInput): Promise<Visit> {
     const current = this.findVisitRecord(id)
     const meeting = this.findMeeting(current.meetingId)
+    this.assertMeetingEditable(meeting)
     const now = new Date().toISOString()
     const updatedMeeting: Meeting = {
       ...meeting,
@@ -141,7 +147,95 @@ export class MockVisitService implements VisitService {
     return clone(this.visits.filter((visit) => visit.meetingId === id).map((visit) => this.projectVisit(visit)))
   }
 
+  // ---- Meeting lifecycle --------------------------------------------------
+
+  /**
+   * Allows the ResourceAssignmentService to be injected after construction to
+   * break the circular dependency:
+   * MockVisitService ← MockResourceAssignmentService ← MockVisitService
+   */
+  private resourceAssignmentService?: {
+    validateExtension(meetingId: string, newPlannedEnd: string): Promise<void>
+  }
+
+  setResourceAssignmentService(svc: { validateExtension(meetingId: string, newPlannedEnd: string): Promise<void> }) {
+    this.resourceAssignmentService = svc
+  }
+
+  async extendMeeting(meetingId: string, input: ExtendMeetingInput): Promise<Meeting> {
+    if (!Number.isInteger(input.extensionMinutes) || input.extensionMinutes <= 0) {
+      throw new Error("Uzatma süresi pozitif bir tam sayı dakika olmalıdır.")
+    }
+    const meeting = this.findMeeting(meetingId)
+    const currentTime = new Date(input.currentTime)
+    this.assertManualLifecycleEligible(meeting, input.actorEmployeeId, new Date(), "EXTEND")
+
+    const newEnd = computeExtendedPlannedEnd(
+      meeting.plannedEnd,
+      currentTime,
+      input.extensionMinutes,
+    )
+    const newPlannedEnd = newEnd.toISOString()
+
+    // Re-validate existing resource assignments for the new time range.
+    if (this.resourceAssignmentService) {
+      await this.resourceAssignmentService.validateExtension(meetingId, newPlannedEnd)
+    }
+
+    const now = new Date().toISOString()
+    const updated: Meeting = { ...meeting, plannedEnd: newPlannedEnd, updatedAt: now }
+    this.meetings = this.meetings.map((m) => (m.id === meetingId ? updated : m))
+    return clone(updated)
+  }
+
+  async closeMeeting(meetingId: string, input: CloseMeetingInput): Promise<Meeting> {
+    const meeting = this.findMeeting(meetingId)
+    const now = new Date()
+    if (input.source === "MANUAL") {
+      this.assertManualLifecycleEligible(meeting, input.actorEmployeeId, now, "CLOSE")
+    }
+    if (meeting.actualMeetingEnd) {
+      throw new Error("Toplantı zaten kapatılmış.")
+    }
+    const closedAt = now.toISOString()
+    const updated: Meeting = {
+      ...meeting,
+      actualMeetingEnd: closedAt,
+      meetingEndSource: input.source,
+      updatedAt: closedAt,
+    }
+    this.meetings = this.meetings.map((m) => (m.id === meetingId ? updated : m))
+    return clone(updated)
+  }
+
+  async checkoutVisit(visitId: string): Promise<{ visit: Visit; closedMeeting: Meeting | null }> {
+    const current = this.findVisitRecord(visitId)
+    if (current.status !== "CHECKED_IN") {
+      throw new Error("Yalnızca içerideki ziyaretçiler çıkış yapabilir.")
+    }
+    const now = new Date().toISOString()
+    const checkedOut: VisitRecord = { ...current, status: "CHECKED_OUT", actualCheckOut: now, updatedAt: now }
+    this.visits = this.visits.map((v) => (v.id === visitId ? checkedOut : v))
+
+    const meetingId = current.meetingId
+    const meeting = this.findMeeting(meetingId)
+
+    // Auto-close only if the meeting has not already been explicitly closed.
+    let closedMeeting: Meeting | null = null
+    if (!meeting.actualMeetingEnd) {
+      const stillCheckedIn = this.visits.filter(
+        (v) => v.meetingId === meetingId && v.status === "CHECKED_IN",
+      )
+      if (stillCheckedIn.length === 0) {
+        closedMeeting = await this.closeMeeting(meetingId, { source: "VISITOR_CHECK_OUT" })
+      }
+    }
+
+    return { visit: clone(this.projectVisit(checkedOut)), closedMeeting }
+  }
+
   private async deliverInvitation(id: string): Promise<Visit> {
+
     const current = this.findVisitRecord(id)
     const sending: VisitRecord = {
       ...current,
@@ -165,6 +259,35 @@ export class MockVisitService implements VisitService {
     const meeting = this.meetings.find((item) => item.id === id)
     if (!meeting) throw new Error("Ziyaret grubu bulunamadı.")
     return meeting
+  }
+
+  private assertManualLifecycleEligible(
+    meeting: Meeting,
+    actorEmployeeId: string,
+    currentTime: Date,
+    action: "EXTEND" | "CLOSE",
+  ) {
+    const reason = getManualMeetingLifecycleBlockReason(meeting, this.visits, actorEmployeeId, currentTime)
+    switch (reason) {
+      case null:
+        return
+      case "NOT_HOST":
+        throw new Error("Bu toplantının yaşam döngüsü aksiyonlarını yalnızca ev sahibi kullanabilir.")
+      case "NOT_STARTED":
+        throw new Error("Toplantı başlamadan manuel yaşam döngüsü aksiyonu uygulanamaz.")
+      case "CLOSED":
+        throw new Error(action === "EXTEND" ? "Kapatılmış bir toplantı uzatılamaz." : "Toplantı zaten kapatılmış.")
+      case "NO_LINKED_VISITS":
+        throw new Error("Ziyaretçisi bulunmayan bir toplantıda manuel yaşam döngüsü aksiyonu uygulanamaz.")
+      case "TERMINAL":
+        throw new Error("Tüm ziyaretleri tamamlanmış bir toplantıda manuel yaşam döngüsü aksiyonu uygulanamaz.")
+    }
+  }
+
+  private assertMeetingEditable(meeting: Meeting) {
+    if (isMeetingExplicitlyClosed(meeting)) {
+      throw new Error("Kapatılmış bir toplantının ortak bilgileri değiştirilemez.")
+    }
   }
 
   private findVisitRecord(id: string) {
@@ -191,6 +314,8 @@ export class MockVisitService implements VisitService {
       note: meeting.note,
       hasAdditionalRequirements: meeting.hasAdditionalRequirements,
       additionalRequirementNote: meeting.additionalRequirementNote,
+      actualMeetingEnd: meeting.actualMeetingEnd,
+      meetingEndSource: meeting.meetingEndSource,
     }
   }
 
@@ -228,6 +353,8 @@ export class MockVisitService implements VisitService {
       note: input.note?.trim() || undefined,
       hasAdditionalRequirements: input.hasAdditionalRequirements ?? false,
       additionalRequirementNote: input.hasAdditionalRequirements ? input.additionalRequirementNote?.trim() || undefined : undefined,
+      actualMeetingEnd: existing?.actualMeetingEnd,
+      meetingEndSource: existing?.meetingEndSource,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     }

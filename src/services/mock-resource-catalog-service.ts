@@ -38,6 +38,11 @@ export class MockResourceCatalogService implements ResourceCatalogService {
     return clone(updated)
   }
 
+  async deleteResource(id: string): Promise<void> {
+    this.findResource(id)
+    this.resources = this.resources.filter((resource) => resource.id !== id)
+  }
+
   private findResource(id: string) {
     const resource = this.resources.find((item) => item.id === id)
     if (!resource) throw new Error("Kaynak bulunamadı.")

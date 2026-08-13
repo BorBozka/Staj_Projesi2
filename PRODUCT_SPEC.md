@@ -219,9 +219,9 @@ Cancellation and security overdue behavior also remain Visit-based. Shared Meeti
 must not be maintained as a second editable data source on Visit; screens that need both
 sets of data use a combined projection.
 
-Manager resource assignment (rooms and pooled equipment) is implemented at the Meeting
-level. Source/integration tracking, Meeting end/close behavior, and a separate Meeting
-status lifecycle remain later phases.
+Manager resource assignment (rooms and pooled equipment) and host-only Meeting lifecycle
+behavior are implemented at the Meeting level. Source/integration tracking remains a later
+phase.
 
 ---
 
@@ -525,6 +525,12 @@ Core:
 - reschedule,
 - cancel.
 
+The personal timeline and Upcoming Visits list remain creator-scoped: they show only
+Visits whose `creatorEmployeeId` matches the current employee. Independently, My Visits
+shows a persistent Meeting-end notification when the current employee is the host of an
+open Meeting whose `plannedEnd` has arrived or passed. Host notifications do not add the
+Meeting's Visits to the personal timeline or Upcoming Visits list.
+
 Timeline statuses include:
 
 - Planned
@@ -601,9 +607,12 @@ The manager `All Visits` view is read-only and provides:
 - URL-persisted date-range and operational filters,
 - compact paginated visit records,
 - invitation and additional-requirement visibility,
-- a right-side read-only visit detail panel.
+- a centered, compact Manager Visit Detail dialog.
 
-The table continues to display one row per visitor/Visit and is not redesigned for Meeting grouping. However, opening the right-side visit detail drawer allows Managers to view and manage Meeting-level room and pooled equipment resource assignments.
+The table continues to display one row per visitor/Visit and is not redesigned for Meeting
+grouping. The centered Manager Visit Detail dialog provides visit details and Meeting-level
+room and pooled equipment resource assignments. It does not show Meeting lifecycle data or
+actions; host lifecycle management is available only from the My Visits floating notification.
 
 ---
 
@@ -630,15 +639,23 @@ driver, and the catalog does not pair vehicles with drivers. Employees do not se
 resources while creating visits. The existing additional-requirement note remains free
 text and is not a structured resource request or assignment.
 
-Every resource has an active/inactive lifecycle. Resources are not deleted in this
-phase. The selected facility must belong to the selected company.
+Every resource has an active/inactive lifecycle and can also be permanently deleted from
+the catalog. Deactivation is temporary and reversible; deletion removes the catalog
+record. The selected facility must belong to the selected company.
 
 The catalog supports listing, filtering, creating, editing, and activating or deactivating
-all four resource types. Meeting resource assignment for `ROOM` and `POOLED_EQUIPMENT` is fully
+or permanently deleting all four resource types. Meeting resource assignment for `ROOM` and `POOLED_EQUIPMENT` is fully
 supported for Managers with real-time availability and capacity validation. Fleet vehicle and driver
 assignment remain a separate future phase. Conflict overrides and automated notifications are not supported.
 Resource availability does not block Meeting or Visit creation, and an additional-requirement note
 is not a resource request.
+
+Deleting a `ROOM` or `POOLED_EQUIPMENT` catalog record does not cascade-delete historical
+Meeting assignments. Each assignment retains an immutable snapshot of the resource name,
+type, company, facility, and equipment capacity where applicable. Historical assignment
+details continue to render from that snapshot after deletion. A deleted resource is absent
+from catalog lists, cannot be assigned again, and is excluded from availability and conflict
+calculations for new use.
 
 ---
 
@@ -654,13 +671,104 @@ Users with the Manager role can assign, edit, and remove facility meeting rooms 
   - `POOLED_EQUIPMENT`: Multiple distinct pooled equipment items may be assigned to a meeting, each with a required positive integer quantity.
   - `VEHICLE` & `DRIVER`: Vehicle and driver resources remain catalog-only entities in this phase and are not assigned to meetings.
 - **Scope & Active Rule:** Assigned resources must belong to the meeting's host facility and must be active.
-- **Overlap Definition:** Two meetings overlap when their planned time ranges intersect (defined as half-open time intervals where meeting A planned start is before meeting B planned end, and meeting A planned end is after meeting B planned start). Cancelled meetings (meetings where all visits are `CANCELLED`) are ignored and create no conflicts.
-- **ROOM Conflict Rule:** A room cannot be assigned if it is already assigned to another overlapping, non-cancelled meeting.
-- **POOLED_EQUIPMENT Capacity Rule:** An equipment pool cannot be assigned if the total requested quantity across all overlapping non-cancelled meetings plus the newly requested quantity exceeds the total pool capacity.
+- **Overlap Definition:** Two meetings overlap when their planned time ranges intersect (defined as half-open time intervals where meeting A planned start is before meeting B planned end, and meeting A planned end is after meeting B planned start). Cancelled meetings (meetings where all visits are `CANCELLED`) and closed meetings (meetings where `actualMeetingEnd` is set) are excluded and create no conflicts.
+- **ROOM Conflict Rule:** A room cannot be assigned if it is already assigned to another overlapping, non-cancelled, non-closed meeting.
+- **POOLED_EQUIPMENT Capacity Rule:** An equipment pool cannot be assigned if the total requested quantity across all overlapping non-cancelled, non-closed meetings plus the newly requested quantity exceeds the total pool capacity.
 - **Atomic Save Semantics:** All resource changes for a meeting are validated and saved atomically. If any requested room or equipment assignment violates availability or capacity, the persisted state remains completely unchanged.
-- **Completed Meeting Rule:** Resource assignments cannot be created, edited, or removed for meetings whose visits are all in terminal states (`CHECKED_OUT`, `CANCELLED`, or `NO_SHOW`).
+- **Completed Meeting Rule:** Resource assignments cannot be created, edited, or removed for meetings whose visits are all in terminal states (`CHECKED_OUT`, `CANCELLED`, or `NO_SHOW`). This rule is independent of the explicit-closure rule below.
+- **Closed Meeting Rule:** Resource assignments cannot be created, edited, or removed for meetings where `actualMeetingEnd` is set, regardless of visitor visit statuses. Explicit Meeting closure takes effect immediately.
 - **Permissions:** Any user with the Manager role can create, modify, or remove resource assignments.
 - **No Conflict Override:** Conflict overrides are not supported. Availability conflicts must be resolved operationally by selecting available resources or rescheduling the meeting.
+
+---
+
+## 22C. Meeting Lifecycle
+
+A Meeting does not change status automatically when its planned end time passes.
+
+### Extension
+
+Only the Meeting host employee can extend the planned end time of an open Meeting at any
+point after it starts. Manager role or Meeting creator identity alone grants no lifecycle
+mutation permission.
+
+- Available actions: +15 minutes, +30 minutes, or a custom positive integer number of minutes.
+- The new planned end is computed as: `max(current plannedEnd, current time) + extensionMinutes`.
+- Before the extension is applied, all existing ROOM and POOLED_EQUIPMENT assignments are re-validated against the extended time range.
+- If any conflict or capacity violation is detected, the entire extension is rejected. No partial change is persisted and no automatic alternative is suggested.
+- Extensions are not available after the Meeting has been explicitly closed.
+- Extensions are not available when every linked Visit is terminal (`CHECKED_OUT`,
+  `CANCELLED`, or `NO_SHOW`).
+
+### Manual Close
+
+Only the Meeting host employee can explicitly close a Meeting at any time after it starts.
+
+- Closing records `actualMeetingEnd` (ISO timestamp of the close action) and `meetingEndSource = MANUAL`.
+- The host's close action applies immediately without a separate confirmation step.
+- A Meeting can only be closed once.
+- `extendMeeting` and `MANUAL` `closeMeeting` validate the actor employee identity against
+  `meeting.hostEmployeeId`, verify that the Meeting has started, and reject Meetings whose
+  linked Visits are all terminal at the service boundary.
+
+### Automatic Close (Visitor Checkout)
+
+When the last checked-in visitor in a Meeting is checked out, the Meeting is automatically closed.
+
+- Automatically records `actualMeetingEnd` and `meetingEndSource = VISITOR_CHECK_OUT`.
+- Auto-close fires only when: (a) there are no remaining `CHECKED_IN` visitors in the Meeting, and (b) the Meeting has not already been manually closed.
+- If the Meeting was manually closed before the last checkout, no change is made to `actualMeetingEnd` or `meetingEndSource`.
+
+### End-Time Variance
+
+A signed variance in whole minutes is derived as: `actualMeetingEnd − plannedEnd`.
+
+- Positive → meeting ran over planned time.
+- Negative → meeting ended early.
+- Zero → meeting ended exactly on time.
+- Variance is derived and displayed; it is not stored as a separate field.
+
+### Closed Meeting Behavior
+
+Once a Meeting is closed (`actualMeetingEnd` is set):
+
+- Resource assignment modifications are rejected immediately (service-layer guard).
+- The Manager resource-assignment UI immediately becomes read-only even if linked Visits
+  are not yet terminal.
+- The Meeting no longer consumes room or equipment capacity in conflict / capacity calculations. Existing assignment records are preserved for audit purposes but do not affect availability of resources for other meetings.
+- The close time, close source, and signed variance remain available in the Meeting domain
+  projection; the Manager Visit Detail dialog intentionally does not display lifecycle UI.
+
+### Lifecycle Action Visibility
+
+- Manual lifecycle eligibility requires all of the following: the current employee is the
+  Meeting host, current time is at or after `plannedStart`, `actualMeetingEnd` is absent,
+  and at least one linked Visit is non-terminal.
+- Manager role and Meeting creator identity do not grant lifecycle permission.
+- The centered Manager Visit Detail dialog does not show lifecycle information or actions,
+  including when the Manager is also the Meeting host.
+- Host lifecycle actions are exposed only by the My Visits floating notification after
+  `plannedEnd` arrives or passes.
+- Lifecycle actions are never shown in Security UI screens (Security UI scope is a separate phase).
+
+### Host Meeting-End Notification in My Visits
+
+- When a manually actionable Meeting hosted by the current employee reaches or passes
+  `plannedEnd`, My Visits shows a persistent, actionable notification panel regardless of
+  who created the Meeting. Meetings whose linked Visits are all terminal do not produce a
+  notification even when legacy/mock data has no `actualMeetingEnd`. On desktop, the panel
+  is fixed at the lower-right and does not take space from the personal timeline or Upcoming
+  Visits layout.
+- The notification offers +15 minutes, +30 minutes, a custom positive whole-number
+  extension in a small anchored popover, and an immediate `Toplantıyı Bitir` action.
+- A successful extension hides that Meeting's notification until its new `plannedEnd` is
+  reached. Closing the Meeting removes its notification.
+- Multiple qualifying Meetings are shown as distinct compact rows in one notification
+  surface with an internal scroll area and total count. The panel can be minimized to a
+  lower-right count control but notifications cannot be dismissed. No recurring popup or
+  escalation is generated.
+- Notification selection is host-scoped and independent from the creator-scoped personal
+  calendar and Upcoming Visits data.
 
 ---
 

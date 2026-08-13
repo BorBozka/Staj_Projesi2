@@ -11,6 +11,7 @@ interface ResourceContextValue {
   createResource(input: ResourceInput): Promise<FacilityResource>
   updateResource(id: string, input: ResourceInput): Promise<FacilityResource>
   setResourceActive(id: string, isActive: boolean): Promise<FacilityResource>
+  deleteResource(id: string): Promise<void>
 }
 
 const ResourceContext = createContext<ResourceContextValue | null>(null)
@@ -58,6 +59,11 @@ export function ResourceProvider({ service, children }: { service: ResourceCatal
     return updated
   }, [refreshResources, service])
 
+  const deleteResource = useCallback(async (id: string) => {
+    await service.deleteResource(id)
+    await refreshResources()
+  }, [refreshResources, service])
+
   const value = useMemo(() => ({
     resources,
     isLoading,
@@ -66,7 +72,8 @@ export function ResourceProvider({ service, children }: { service: ResourceCatal
     createResource,
     updateResource,
     setResourceActive,
-  }), [resources, isLoading, error, load, createResource, updateResource, setResourceActive])
+    deleteResource,
+  }), [resources, isLoading, error, load, createResource, updateResource, setResourceActive, deleteResource])
 
   return <ResourceContext.Provider value={value}>{children}</ResourceContext.Provider>
 }

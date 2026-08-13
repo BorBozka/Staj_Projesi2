@@ -85,7 +85,7 @@ Includes:
 - central discriminated-union `ROOM`, `POOLED_EQUIPMENT`, `VEHICLE`, and `DRIVER`
   resource catalog domain types,
 - company/facility validation against existing organization reference data,
-- replaceable mock-service list, create, update, and active/inactive operations,
+- replaceable mock-service list, create, update, active/inactive, and hard-delete operations,
 - deterministic room, equipment-pool, vehicle, and driver seed data across multiple
   facilities,
 - Manager navigation and a compact responsive catalog page,
@@ -111,7 +111,10 @@ Acceptance:
 - vehicle brand/model/license plate remain separate fields and drivers retain license
   classes, optional textual documents, and explicit commercial-vehicle capability,
 - company/facility mismatches are rejected at the service boundary,
-- resources can be deactivated and reactivated without deletion,
+- resources can be deactivated/reactivated or permanently deleted as separate operations,
+- deletion is confirmed in the edit dialog and applies to all four catalog resource types,
+- deleted rooms/equipment cannot be assigned again, while immutable assignment snapshots
+  preserve historical Meeting assignment details without cascade deletion,
 - filters work together and the page reflows without page-level horizontal overflow,
 - catalog operations do not change Meetings, Visits, invitations, or cancellations.
 
@@ -124,7 +127,7 @@ conflicts, Meeting lifecycle, or resource notifications.
 
 Goal:
 
-Enable Manager users to assign, update, and remove facility meeting rooms (`ROOM`) and pooled equipment (`POOLED_EQUIPMENT`) for Meetings via a replaceable service abstraction and a tabbed visit detail drawer.
+Enable Manager users to assign, update, and remove facility meeting rooms (`ROOM`) and pooled equipment (`POOLED_EQUIPMENT`) for Meetings via a replaceable service abstraction and a centered, tabbed Manager Visit Detail dialog.
 
 Includes:
 
@@ -144,7 +147,7 @@ Includes:
 - `isMeetingCompleted` helper function identifying terminal meetings (where all visits are `CHECKED_OUT`, `CANCELLED`, or `NO_SHOW`).
 - UI Components:
   - `MeetingResourcePanel` (`src/features/resources/MeetingResourcePanel.tsx`): Renders room and pooled equipment sections, inline room picker with conflict reasons, inline equipment picker with availability counters and stepper controls, local working draft state (`persistedDraft` vs `draft`), sticky unsaved changes footer bar ("Kaydedilmemiş değişiklikler", "Kaydet", "Vazgeç"), error banner handling, and read-only mode for completed meetings.
-  - `ManagerVisitDetailsSheet` (`src/features/manager/ManagerVisitDetailsSheet.tsx`): Integrates restrained text tabs ("Ziyaret Bilgileri" / "Kaynaklar"), assigned count badge, amber dirty dot indicator, CSS `hidden` tab toggling to preserve draft state across tab switches, and `handleBeforeClose` guard with modal `Dialog` confirmation ("Kaydedilmemiş değişiklikler" with "Değişiklikleri sil" / "Geri dön").
+  - `ManagerVisitDetailsDialog` (`src/features/manager/ManagerVisitDetailsDialog.tsx`): A centered compact dialog shared by Dashboard and All Visits. It keeps restrained tabs, assigned count, dirty indicator, CSS `hidden` tab toggling, and the unsaved-resource close guard.
 - Comprehensive unit test coverage in `src/services/mock-resource-assignment-service.test.ts`.
 
 Does not include:
@@ -159,9 +162,130 @@ Acceptance:
 - At most 1 room can be assigned per meeting (atomic replacement).
 - Equipment assignments enforce positive integer quantities and total pool capacity limits across overlapping non-cancelled meetings.
 - All resource modifications for a meeting are validated and persisted atomically via `saveMeetingAssignments`.
-- Local draft editing supports Kaydet/Vazgeç and blocks drawer close via confirmation dialog when unsaved changes exist.
-- Completed meetings (`CHECKED_OUT`, `CANCELLED`, `NO_SHOW`) render in read-only mode and reject modifications at the service layer.
+- Local draft editing supports Kaydet/Vazgeç and blocks the centered dialog close via confirmation when unsaved changes exist.
+- Completed meetings (`CHECKED_OUT`, `CANCELLED`, `NO_SHOW`) and explicitly closed Meetings (`actualMeetingEnd` set) render in read-only mode and reject modifications at the service layer.
 - Unit tests (`mock-resource-assignment-service.test.ts`) pass cleanly.
+
+---
+
+## Approved Phase — Meeting Lifecycle Frontend / Mock Service
+
+Goal:
+
+Allow a Meeting's host employee to extend or manually close it while it is in progress,
+track the actual close time and its source, derive a signed end-time variance for
+display, and automatically close the Meeting when the last checked-in visitor
+checks out.  Resource availability (room conflict, equipment capacity) is
+re-validated on every extension; a conflict causes the extension to be rejected
+entirely.
+
+Approved business rules:
+
+- Meeting does not auto-close when `plannedEnd` passes.
+- Manual lifecycle permission is identity-based:
+  `currentEmployee.employeeId === meeting.hostEmployeeId`; Manager role and creator
+  identity alone do not grant permission.
+- Manual lifecycle eligibility requires host identity, current time at or after
+  `plannedStart`, no `actualMeetingEnd`, and at least one non-terminal linked Visit.
+- Lifecycle action buttons (+15 dk, +30 dk, custom, close) are exposed only in the My
+  Visits floating notification after `plannedEnd` arrives or passes.
+- Extension formula: `newPlannedEnd = max(current plannedEnd, current time) + extensionMinutes`
+- Extension input is a positive whole-number minute count.
+- Extension is validated against all existing ROOM and POOLED_EQUIPMENT assignments
+  for the new time range; any conflict or capacity violation rejects the entire
+  extension (no partial persistence, no override, no alternative suggestion).
+- `actualMeetingEnd` is written when the Meeting is closed.
+- `meetingEndSource` is `MANUAL` (host) or `VISITOR_CHECK_OUT` (auto-close).
+- End-time variance is `actualMeetingEnd − plannedEnd` in whole minutes (signed,
+  derived — not stored).
+- Auto-close fires only when a checkout leaves zero CHECKED_IN visitors remaining
+  AND the Meeting has not already been explicitly closed.
+- A closed Meeting (`actualMeetingEnd` set) is immediately read-only for resource
+  assignments, independent of whether all visits are in terminal states.
+- The existing `isMeetingCompleted` helper (all-visits-terminal) is kept separate
+  and continues to gate resource mutations as before.
+- A closed Meeting is excluded from room-conflict and equipment-capacity
+  calculations; its assignment records are preserved for auditing.
+- Security UI is out of scope for this phase; `checkoutVisit` domain/service logic
+  is prepared but not surfaced in Security screens.
+- My Visits timeline and Upcoming Visits remain creator-scoped. A separate persistent
+  host-scoped notification lists manually actionable hosted Meetings whose `plannedEnd`
+  has arrived or passed without adding their Visits to either personal surface. Fully
+  terminal Meetings are excluded even when legacy/mock data lacks `actualMeetingEnd`.
+
+Includes:
+
+- Domain (`src/domain/visits.ts`): `meetingEndSources`, `MeetingEndSource`,
+  `actualMeetingEnd?` and `meetingEndSource?` on `MeetingDetails` (projected into
+  `Visit`), `ExtendMeetingInput`, `CloseMeetingInput`.
+- Utility (`src/lib/meeting-lifecycle.ts`): `isMeetingExplicitlyClosed`,
+  `isMeetingOvertime`, `computeMeetingEndVarianceMinutes`, `computeExtendedPlannedEnd`,
+  shared terminal/resource-read-only predicates, manual lifecycle eligibility, host
+  authorization, and overdue-hosted-Meeting selection.
+- Service interface extensions (`src/services/visit-service.ts`):
+  `extendMeeting`, `closeMeeting`, `checkoutVisit`.
+- Service interface extension (`src/services/resource-assignment-service.ts`):
+  `validateExtension`.
+- Mock visit service (`src/services/mock-visit-service.ts`):
+  implementations of `extendMeeting`, `closeMeeting`, `checkoutVisit`,
+  `setResourceAssignmentService` setter to break circular dependency,
+  `projectVisit` updated to include lifecycle fields.
+- Mock resource assignment service (`src/services/mock-resource-assignment-service.ts`):
+  `assertMeetingResourcesMutable` (replaces `assertMeetingNotCompleted` — now
+  checks both explicit closure and all-visits-terminal conditions),
+  `isMeetingClosedOrCancelled` helper (closed meetings excluded from availability),
+  `validateExtension` implementation.
+- Services wiring (`src/services/index.ts`): circular dependency resolved via
+  `setResourceAssignmentService`.
+- Seed data (`src/services/mock-visit-data.ts`): four lifecycle demo meetings
+  (active/in-progress, overtime, closed-MANUAL, closed-VISITOR_CHECK_OUT).
+- Manager detail UI (`src/features/manager/ManagerVisitDetailsDialog.tsx`): one centered,
+  compact dialog shared by Dashboard and All Visits, with visit details and Meeting resource
+  assignment tabs. It intentionally does not expose Meeting lifecycle information or actions,
+  including when the current Manager is the Meeting host.
+- Employee UI (`src/features/visits/HostedMeetingEndNotifications.tsx`): one compact,
+  lower-right fixed and minimizable notification panel with a total count, internally
+  scrollable distinct rows, and host-only +15/+30/custom/close actions for overdue,
+  manually actionable hosted Meetings.
+- Shared lifecycle actions (`src/features/visits/MeetingLifecycleActions.tsx`): keeps quick
+  actions in one stable row, presents custom minutes in an anchored popover, and performs
+  MANUAL close without a confirmation dialog.
+- Manager dashboard (`src/features/manager/ManagerDashboard.tsx`): makes `Sıradaki
+  Ziyaretler` rows open the existing `ManagerVisitDetailsDialog` while preserving the
+  `Tümünü gör` route.
+- Unit tests: `src/lib/meeting-lifecycle.test.ts`,
+  `src/services/mock-meeting-lifecycle-service.test.ts`,
+  `src/services/mock-resource-assignment-service.test.ts` (updated to wire
+  `setResourceAssignmentService`).
+
+Does not include:
+
+- Security UI check-in / check-out screens,
+- Recurring popup/escalation or overdue email related to Meeting lifecycle,
+- Backend, API, database, or persistence.
+
+Acceptance:
+
+- Lifecycle management remains host-scoped in My Visits notifications; Manager detail UI
+  does not expose lifecycle information or actions.
+- +15 dk and +30 dk extend `plannedEnd`; custom entry accepts a positive integer.
+- Extension with a ROOM or POOLED_EQUIPMENT conflict shows an error banner and
+  makes no change.
+- "Toplantıyı Bitir" immediately closes the Meeting, sets source to `MANUAL`, and removes
+  its floating notification; close time, source, and signed variance remain in the Meeting
+  domain projection.
+- Closed meetings are read-only for resource assignment (both from service-layer
+  error and UI read-only mode).
+- A closed meeting does not consume room or equipment capacity.
+- Existing `isMeetingCompleted` all-visits-terminal guard remains intact.
+- My Visits keeps its existing creator-scoped calendar/upcoming data and independently
+  removes a host notification after extension until the new end, or after Meeting close.
+- Service tests reject non-host Manager and non-host creator actors, future Meetings, and
+  fully terminal Meetings for manual lifecycle mutations while preserving
+  `VISITOR_CHECK_OUT` automatic close.
+- `AllVisitsPage` one-row-per-Visit behavior, filtering, sorting, and pagination
+  are unaffected.
+- TypeScript typecheck, lint, unit tests, and build pass.
 
 ---
 
@@ -358,8 +482,8 @@ Includes:
 - multi-company/facility context using mock data,
 - at most a small number of useful charts.
 - read-only `All Visits` operations list with URL-persisted date-range and manager filters,
-- compact pagination and a right-side visit detail drawer,
-- invitation and additional-requirement visibility, with right-side visit detail drawer tabbed for visit details and Meeting resource assignment.
+- compact pagination and a centered Manager Visit Detail dialog,
+- invitation and additional-requirement visibility, with the centered dialog tabbed for visit details and Meeting resource assignment.
 
 Recharts may be added only if actual stakeholder-reviewed charts are needed.
 

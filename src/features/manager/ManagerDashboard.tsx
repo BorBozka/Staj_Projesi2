@@ -1,6 +1,6 @@
 import { format } from "date-fns"
 import { CircleAlert, PackageCheck, RefreshCw, UserRound } from "lucide-react"
-import { useEffect, useMemo, useState, type ReactElement } from "react"
+import { useEffect, useMemo, useRef, useState, type ReactElement } from "react"
 import { Link } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
@@ -9,6 +9,7 @@ import type { ExpectedAfterHoursDelivery } from "@/domain/manager-dashboard"
 import type { Visit } from "@/domain/visits"
 import { getOperationNowIndicator } from "@/features/manager/manager-clock"
 import { ManagerDashboardFilters } from "@/features/manager/ManagerDashboardFilters"
+import { ManagerVisitDetailsDialog } from "@/features/manager/ManagerVisitDetailsDialog"
 import { useManagerRefresh } from "@/features/manager/manager-refresh-context"
 import { VisitDetailsDialog } from "@/features/visits/VisitDetailsDialog"
 import { VisitStatusBadge } from "@/features/visits/VisitStatusBadge"
@@ -53,6 +54,8 @@ export function ManagerDashboard() {
   const [deliveries, setDeliveries] = useState<ExpectedAfterHoursDelivery[]>([])
   const [selection, setSelection] = useState<SelectionDescriptor | null>(null)
   const [viewingVisit, setViewingVisit] = useState<Visit | null>(null)
+  const [nextVisitId, setNextVisitId] = useState<string | null>(null)
+  const returnFocusRef = useRef<HTMLElement | null>(null)
   const now = lastUpdated
 
   useEffect(() => {
@@ -71,7 +74,13 @@ export function ManagerDashboard() {
   const counts = getStatusCounts(todayVisits, currentTime)
   const futureVisits = getNextPlannedVisits(todayVisits, now, todayVisits.length)
   const nextVisits = futureVisits.slice(0, 5)
+  const nextVisit = visits.find((visit) => visit.id === nextVisitId) ?? null
   const selectionData = selection ? resolveSelection(selection, todayVisits, scopedDeliveries, currentTime) : null
+
+  function openNextVisit(visit: Visit) {
+    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    setNextVisitId(visit.id)
+  }
 
   useEffect(() => {
     if (!selection) return
@@ -105,6 +114,7 @@ export function ManagerDashboard() {
               </Button>
             </div>
           )}
+          onVisitOpen={openNextVisit}
         />
         <Distribution
           counts={counts}
@@ -125,7 +135,7 @@ export function ManagerDashboard() {
         onVisitOpen={setViewingVisit}
       />
 
-      <NextVisits visits={nextVisits} total={futureVisits.length} now={now} />
+      <NextVisits visits={nextVisits} total={futureVisits.length} now={now} onVisitOpen={openNextVisit} />
 
       <VisitDetailsDialog
         visit={viewingVisit}
@@ -137,11 +147,18 @@ export function ManagerDashboard() {
         readOnly
         viewerRole="MANAGER"
       />
+
+      <ManagerVisitDetailsDialog
+        visit={nextVisit}
+        open={Boolean(nextVisit)}
+        onOpenChange={(open) => !open && setNextVisitId(null)}
+        returnFocusRef={returnFocusRef}
+      />
     </div>
   )
 }
 
-function InsideVisits({ visits, now, controls }: { visits: Visit[]; now: Date; controls: ReactElement }) {
+export function InsideVisits({ visits, now, controls, onVisitOpen }: { visits: Visit[]; now: Date; controls: ReactElement; onVisitOpen(visit: Visit): void }) {
   return (
     <section className="flex h-[340px] flex-col overflow-hidden rounded-lg border border-emerald-200 bg-card shadow-panel">
       <div className="flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-2 border-l-[3px] border-emerald-500 bg-emerald-50/35 px-3 py-2 sm:px-4">
@@ -171,7 +188,20 @@ function InsideVisits({ visits, now, controls }: { visits: Visit[]; now: Date; c
               {visits.map((visit) => {
                 const delay = getDelayMinutes(visit, now)
                 return (
-                  <tr key={visit.id}>
+                  <tr
+                    key={visit.id}
+                    role="button"
+                    tabIndex={0}
+                    className="cursor-pointer transition-colors hover:bg-emerald-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600"
+                    onClick={() => onVisitOpen(visit)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault()
+                        onVisitOpen(visit)
+                      }
+                    }}
+                    aria-label={`${visit.visitor.firstName} ${visit.visitor.lastName} ziyaret detaylarını aç`}
+                  >
                     <td className="px-3 py-1.5">
                       <div className="flex items-center gap-2">
                         <UserRound className="size-4 shrink-0 text-emerald-700" />
@@ -458,7 +488,17 @@ function SelectionPopoverContent({ selection, side, onVisitOpen }: { selection: 
   )
 }
 
-function NextVisits({ visits, total, now }: { visits: Visit[]; total: number; now: Date }) {
+export function NextVisits({
+  visits,
+  total,
+  now,
+  onVisitOpen,
+}: {
+  visits: Visit[]
+  total: number
+  now: Date
+  onVisitOpen(visit: Visit): void
+}) {
   const link = `/manager/all-visits?date=${format(now, "yyyy-MM-dd")}&status=PLANNED`
   return (
     <section className="overflow-hidden rounded-lg border bg-card shadow-panel">
@@ -474,7 +514,13 @@ function NextVisits({ visits, total, now }: { visits: Visit[]; total: number; no
       ) : (
         <div className="divide-y">
           {visits.map((visit) => (
-            <div key={visit.id} className="grid grid-cols-[64px_minmax(0,1fr)] items-center gap-3 px-4 py-2.5 md:grid-cols-[72px_minmax(150px,1.3fr)_minmax(115px,1fr)_minmax(120px,1fr)_minmax(120px,1fr)]">
+            <button
+              key={visit.id}
+              type="button"
+              className="grid w-full grid-cols-[64px_minmax(0,1fr)] items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600 md:grid-cols-[72px_minmax(150px,1.3fr)_minmax(115px,1fr)_minmax(120px,1fr)_minmax(120px,1fr)]"
+              onClick={() => onVisitOpen(visit)}
+              aria-label={`${visit.visitor.firstName} ${visit.visitor.lastName} ziyaret detaylarını aç`}
+            >
               <p className="font-semibold tabular-nums">{formatTr(new Date(visit.plannedStart), "HH:mm")}</p>
               <div className="min-w-0">
                 <p className="truncate font-semibold">{visit.visitor.firstName} {visit.visitor.lastName}</p>
@@ -483,7 +529,7 @@ function NextVisits({ visits, total, now }: { visits: Visit[]; total: number; no
               <p className="hidden truncate text-sm text-slate-700 md:block">{visit.visitTypeName}</p>
               <p className="hidden truncate text-sm text-slate-700 md:block">{visit.hostEmployeeName}</p>
               <p className="hidden truncate text-sm text-slate-700 md:block">{visit.facilityName}</p>
-            </div>
+            </button>
           ))}
         </div>
       )}
