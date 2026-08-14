@@ -289,6 +289,54 @@ Acceptance:
 
 ---
 
+## Approved Feature — Planned Vehicle and Driver Assignment Frontend / Mock Service
+
+Goal:
+
+Allow Managers to create, edit, cancel, and view standalone planned vehicle-and-driver assignments using
+the existing Resource Catalog records, without changing Meeting resource assignment.
+
+Includes:
+
+- centralized planned transport assignment domain models with immutable vehicle/driver display snapshots,
+- replaceable mock transport-assignment service with list, availability, create, update, and cancel operations,
+- service-boundary validation for required fields, company/facility scope, active catalog state,
+  optional Meeting-or-Visit link scope, and overlapping active assignments,
+- a compact Manager planning page with an initially blank planning context, instructional
+  availability state, selected-time available vehicles/drivers, upcoming assignments, contextual
+  filtering, and active-assignment edit/cancel controls,
+- Manager navigation/route integration plus compact Dashboard Fleet integration: current tasks in
+  `Şu Anda Aktif` and today's vehicle event markers in the existing operation chart,
+- unit coverage for availability, overlap, scope, active-state, optional-link, self-excluded edit,
+  cancellation release, and isolation behavior,
+- horizontal centering for the existing unsaved-resource confirmation dialog actions.
+
+Does not include:
+
+- Security unplanned assignment UI,
+- odometer input or monthly kilometre reporting,
+- permanent vehicle-driver pairings, overrides, notifications, backend, or persistence,
+- changes to Meeting room/equipment resource assignments.
+
+Acceptance:
+
+- A Manager can create an assignment only with company, facility, date, planned start/end,
+  task/purpose, exactly one available vehicle, and exactly one available driver.
+- A selected Meeting or Visit is optional; when present it must match the assignment scope.
+- Inactive, out-of-scope, or overlapping resources are omitted from availability and rejected by
+  the service even if a caller bypasses the UI.
+- Availability remains instructional until all planning-context fields are present; cancelled
+  assignments do not consume either resource and cannot be edited.
+- The page clearly shows selected-time availability plus upcoming/contextual assignments without
+  adding dashboard KPIs. The existing Dashboard can show active Fleet tasks and today's Fleet
+  event markers without changing visit, delivery, or bar-chart semantics.
+- Existing Meeting resource assignments remain unchanged.
+- TypeScript typecheck, lint, relevant unit tests, and build pass.
+
+Stop after this feature and request review before commit, push, PR, or merge.
+
+---
+
 # Track A — UI / UX First
 
 ## Phase 0 — Frontend Foundation

@@ -16,12 +16,16 @@ const AllVisitsPage = lazy(() =>
 const ResourceCatalogPage = lazy(() =>
   import("@/features/resources/ResourceCatalogPage").then((module) => ({ default: module.ResourceCatalogPage })),
 )
+const TransportPlanningPage = lazy(() =>
+  import("@/features/transport/TransportPlanningPage").then((module) => ({ default: module.TransportPlanningPage })),
+)
 
 export function App() {
   const { pathname } = useLocation()
 
   useEffect(() => {
     const pageTitles: Record<string, string> = {
+      "/manager/transport-planning": "BPLAS - Araç ve Şoför Planı",
       "/manager/dashboard": "BPLAS — Dashboard",
       "/manager/all-visits": "BPLAS — Tüm Ziyaretler",
       "/manager/resources": "BPLAS — Kaynaklar",
@@ -55,6 +59,7 @@ export function App() {
         />
         <Route path="all-visits" element={<Suspense fallback={<RouteSkeleton />}><AllVisitsPage /></Suspense>} />
         <Route path="resources" element={<Suspense fallback={<RouteSkeleton />}><ResourceCatalogPage /></Suspense>} />
+        <Route path="transport-planning" element={<Suspense fallback={<RouteSkeleton />}><TransportPlanningPage /></Suspense>} />
         <Route index element={<Navigate to="dashboard" replace />} />
       </Route>
       <Route path="*" element={<Navigate to="/manager/dashboard" replace />} />

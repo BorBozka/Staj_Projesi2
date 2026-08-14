@@ -1,6 +1,7 @@
 import { differenceInMinutes, isAfter, isBefore, isSameDay } from "date-fns"
 
 import type { ExpectedAfterHoursDelivery } from "@/domain/manager-dashboard"
+import type { PlannedTransportAssignment } from "@/domain/transport-assignments"
 import type { Visit, VisitStatus } from "@/domain/visits"
 
 export type DashboardScope = { companyId: string; facilityId: string }
@@ -15,6 +16,7 @@ export type OperationBin = {
   planned: number
   actual: number
   deliveries: ExpectedAfterHoursDelivery[]
+  transportAssignments: PlannedTransportAssignment[]
 }
 
 export function getScopedVisits(visits: Visit[], scope: DashboardScope) {
@@ -28,7 +30,16 @@ export function getTodayVisits(visits: Visit[], now: Date) {
   return visits.filter((visit) => isSameDay(new Date(visit.plannedStart), now))
 }
 
-export function getOperationBins(visits: Visit[], deliveries: ExpectedAfterHoursDelivery[], startHour = 8, endHour = 23): OperationBin[] {
+export function getTodayScopedTransportAssignments(assignments: PlannedTransportAssignment[], scope: DashboardScope, now: Date) {
+  return assignments.filter((assignment) =>
+    assignment.status === "ACTIVE"
+    && (scope.companyId === "all" || assignment.companyId === scope.companyId)
+    && (scope.facilityId === "all" || assignment.facilityId === scope.facilityId)
+    && isSameDay(new Date(assignment.plannedStart), now),
+  )
+}
+
+export function getOperationBins(visits: Visit[], deliveries: ExpectedAfterHoursDelivery[], transportAssignments: PlannedTransportAssignment[], startHour = 8, endHour = 23): OperationBin[] {
   return Array.from({ length: endHour - startHour + 1 }, (_, index) => {
     const hour = startHour + index
     return {
@@ -36,8 +47,19 @@ export function getOperationBins(visits: Visit[], deliveries: ExpectedAfterHours
       planned: visits.filter((visit) => new Date(visit.plannedStart).getHours() === hour).length,
       actual: visits.filter((visit) => visit.actualCheckIn && new Date(visit.actualCheckIn).getHours() === hour).length,
       deliveries: deliveries.filter((delivery) => new Date(delivery.expectedAt).getHours() === hour),
+      transportAssignments: transportAssignments.filter((assignment) => new Date(assignment.plannedStart).getHours() === hour),
     }
   })
+}
+
+export function getActiveTransportAssignments(assignments: PlannedTransportAssignment[], scope: DashboardScope, now: Date) {
+  return assignments.filter((assignment) =>
+    assignment.status === "ACTIVE"
+    && (scope.companyId === "all" || assignment.companyId === scope.companyId)
+    && (scope.facilityId === "all" || assignment.facilityId === scope.facilityId)
+    && new Date(assignment.plannedStart) <= now
+    && new Date(assignment.plannedEnd) > now,
+  )
 }
 
 export function getDashboardVisitStatus(visit: Visit, now: Date): DashboardVisitStatus | null {

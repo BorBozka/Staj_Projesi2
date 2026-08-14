@@ -645,8 +645,9 @@ record. The selected facility must belong to the selected company.
 
 The catalog supports listing, filtering, creating, editing, and activating or deactivating
 or permanently deleting all four resource types. Meeting resource assignment for `ROOM` and `POOLED_EQUIPMENT` is fully
-supported for Managers with real-time availability and capacity validation. Fleet vehicle and driver
-assignment remain a separate future phase. Conflict overrides and automated notifications are not supported.
+supported for Managers with real-time availability and capacity validation. Vehicle and driver planning
+is a separate Manager workflow defined in section 22D; it does not assign fleet resources to Meetings.
+Conflict overrides and automated notifications are not supported.
 Resource availability does not block Meeting or Visit creation, and an additional-requirement note
 is not a resource request.
 
@@ -769,6 +770,44 @@ Once a Meeting is closed (`actualMeetingEnd` is set):
   escalation is generated.
 - Notification selection is host-scoped and independent from the creator-scoped personal
   calendar and Upcoming Visits data.
+
+---
+
+## 22D. Planned Vehicle and Driver Assignment
+
+Managers can create a standalone planned assignment that always pairs one catalog `VEHICLE`
+with one catalog `DRIVER`. This workflow is separate from Meeting room/equipment assignments
+and does not change existing Meeting resource-assignment behavior.
+
+### Business Rules
+
+- Each assignment requires company, facility, planned start and end, a non-empty task/purpose,
+  one vehicle, and one driver.
+- A related Meeting or Visit may be selected, but is optional. One assignment may link to one
+  Meeting or one Visit, not both; the linked record must be in the selected company and facility.
+- Only active `VEHICLE` and `DRIVER` records in the selected company and facility are eligible.
+- Availability uses half-open planned time intervals. A vehicle or driver already used by an
+  overlapping active assignment is unavailable for a new assignment. Adjacent assignments where
+  one ends exactly when the other starts do not conflict.
+- Availability and all required-field, active-state, scope, link, and conflict rules are verified
+  at the service/domain boundary as well as reflected in the Manager UI. No override is available.
+- Assignment records retain the vehicle and driver display details used at creation so the plan
+  remains readable if a catalog record is later changed or deleted.
+- Managers may edit an active planned assignment. Its replacement vehicle, driver, scope, time,
+  purpose, and optional link are revalidated with the assignment itself excluded from conflict
+  checking.
+- Managers may cancel an active planned assignment. A cancelled assignment remains readable in
+  the plan history, cannot be edited, and no longer reserves its vehicle or driver for availability.
+- The Manager Dashboard shows only assignments whose planned interval contains the current time.
+  It also exposes today's active Fleet assignments as distinct operation-chart event markers; those
+  markers do not alter the visit-bar calculations.
+
+Not included in this feature:
+
+- Security unplanned-assignment UI,
+- odometer input or monthly kilometre reporting,
+- permanent/default vehicle-driver pairing,
+- any change to Meeting room/equipment assignment behavior.
 
 ---
 
