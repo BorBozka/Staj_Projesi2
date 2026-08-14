@@ -197,8 +197,8 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
       form.reset(defaultsFor(saved.visits))
       await form.trigger()
       const message = saved.visits.length === 1
-        ? "Ziyaret kaydedildi ve güvenliğe iletildi. Davet henüz gönderilmedi."
-        : `${saved.visits.length} ziyaret kaydedildi ve güvenliğe iletildi. Davetler henüz gönderilmedi.`
+        ? "Ziyaret kaydedildi. Davet henüz gönderilmedi."
+        : `${saved.visits.length} ziyaret kaydedildi. Davetler henüz gönderilmedi.`
       setSaveNotice(message)
       onSaved(message)
     } catch (error) {
@@ -280,15 +280,15 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl gap-0 overflow-hidden p-0">
-        <DialogHeader className="border-b px-5 py-4 pr-12">
-          <DialogTitle>{visit ? "Ziyareti Düzenle" : "Yeni Ziyaret"}</DialogTitle>
+      <DialogContent className="!max-h-[85vh] !w-[min(820px,calc(100vw-2rem))] !max-w-none flex flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="shrink-0 border-b bg-white px-5 pb-4 pt-4 pr-12">
+          <DialogTitle className="text-lg font-semibold text-slate-900">{visit ? "Ziyareti Düzenle" : "Yeni Ziyaret"}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={onSave} className="flex min-h-0 flex-col" noValidate>
-          <div ref={formContentRef} className="max-h-[calc(90vh-142px)] space-y-4 overflow-y-auto px-5 py-4 scrollbar-thin">
+          <div ref={formContentRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4 scrollbar-thin">
             <section className="space-y-3" aria-labelledby="visitors-heading">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center justify-between gap-3 border-b border-slate-200/70 pb-1.5">
                 <div>
                   <h3 id="visitors-heading" className="text-xs font-semibold text-slate-700">Ziyaretçiler</h3>
                   <p className="mt-0.5 text-[11px] text-slate-500">Her kişi için ayrı bir ziyaret kaydı oluşturulur.</p>
@@ -308,19 +308,26 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
                 const canRemove = visitorFields.fields.length > 1 && !field.visitId
                 const { ref: phoneFieldRef, onChange: onPhoneChange, ...phoneField } = form.register(`visitors.${index}.visitorPhone`)
                 return (
-                  <fieldset key={field.id} className="space-y-3 rounded-md border bg-slate-50/60 p-3">
-                    <legend className="px-1 text-xs font-semibold text-slate-700">Ziyaretçi {index + 1}</legend>
-                    <div className="grid gap-3 sm:grid-cols-2">
+                  <div key={field.id} className="space-y-2.5 rounded-md border border-slate-200/80 bg-slate-50/20 p-2.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <h4 className="text-xs font-semibold text-slate-700">Ziyaretçi {index + 1}</h4>
+                      {canRemove && (
+                        <Button type="button" variant="ghost" size="sm" className="text-destructive hover:bg-red-50 hover:text-destructive" onClick={() => visitorFields.remove(index)} aria-label={`Ziyaretçi ${index + 1} kaydını kaldır`}>
+                          <Trash2 />Ziyaretçiyi Kaldır
+                        </Button>
+                      )}
+                    </div>
+                    <div className="grid gap-x-3 gap-y-2 sm:grid-cols-2">
                       <FormField label="Ad" required error={fieldError(`visitors.${index}.visitorFirstName`)}>
                         <Input autoFocus={index === 0} {...form.register(`visitors.${index}.visitorFirstName`)} />
                       </FormField>
                       <FormField label="Soyad" required error={fieldError(`visitors.${index}.visitorLastName`)}>
                         <Input {...form.register(`visitors.${index}.visitorLastName`)} />
                       </FormField>
-                      <FormField label="E-posta" required error={fieldError(`visitors.${index}.visitorEmail`)} className="sm:col-span-2">
+                      <FormField label="E-posta" required error={fieldError(`visitors.${index}.visitorEmail`)}>
                         <Input type="email" placeholder="ziyaretci@firma.com" {...form.register(`visitors.${index}.visitorEmail`)} />
                       </FormField>
-                      <FormField label="Telefon (opsiyonel)" error={fieldError(`visitors.${index}.visitorPhone`)} className="sm:col-span-2">
+                      <FormField label="Telefon (opsiyonel)" error={fieldError(`visitors.${index}.visitorPhone`)}>
                         <div className={phoneCountryCode === "other" ? "grid gap-2 sm:grid-cols-[150px_96px_minmax(0,1fr)]" : "grid gap-2 sm:grid-cols-[150px_minmax(0,1fr)]"}>
                           <Select {...form.register(`visitors.${index}.phoneCountryCode`)} aria-label={`Ziyaretçi ${index + 1} telefon ülke kodu`}>
                             {phoneCountryCodes.map((country) => <option key={country.value} value={country.value}>{country.label}</option>)}
@@ -355,25 +362,20 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
                         </div>
                       </FormField>
                     </div>
-                    {canRemove && (
-                      <div className="flex justify-end">
-                        <Button type="button" variant="ghost" size="sm" className="text-destructive hover:bg-red-50 hover:text-destructive" onClick={() => visitorFields.remove(index)} aria-label={`Ziyaretçi ${index + 1} kaydını kaldır`}>
-                          <Trash2 />Ziyaretçiyi Kaldır
-                        </Button>
-                      </div>
-                    )}
                     {field.visitId && visitorFields.fields.length > 1 && (
                       <p className="text-[11px] text-slate-500">Kaydedilmiş ziyaretçi silinmez; gerektiğinde ziyaret detayından ayrı olarak iptal edilir.</p>
                     )}
-                  </fieldset>
+                  </div>
                 )
               })}
             </section>
 
-            <fieldset className="space-y-3 rounded-md border bg-slate-50/60 p-3">
-              <legend className="px-1 text-xs font-semibold text-slate-700">Ziyaret Bilgileri</legend>
-              <p className="text-[11px] text-slate-500">Tüm ziyaretçiler için ortak.</p>
-              <div className="grid gap-3 sm:grid-cols-2">
+            <section className="space-y-2.5" aria-labelledby="visit-details-heading">
+              <div className="flex items-baseline gap-2 border-b border-slate-200/70 pb-1.5">
+                <h3 id="visit-details-heading" className="text-sm font-semibold text-slate-900">Ziyaret Bilgileri</h3>
+                <span className="text-[11px] text-slate-500">Tüm ziyaretçiler için ortak</span>
+              </div>
+              <div className="grid gap-x-3 gap-y-2.5 sm:grid-cols-2">
                 <FormField label="Ziyaret Türü" required error={fieldError("visitTypeId")}>
                   <Select {...form.register("visitTypeId", { onChange: scrollToNextFields })}>
                     <option value="" disabled hidden>Ziyaret türü seçin</option>
@@ -414,11 +416,10 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
                   </FormField>
                 </div>
               </div>
-            </fieldset>
+            </section>
 
-            <fieldset className="space-y-2 rounded-md border bg-slate-50/60 p-2.5">
-              <legend className="px-1 text-xs font-semibold text-slate-700">Ek Bilgi</legend>
-              <label className="flex min-h-9 cursor-pointer items-center gap-2 rounded-md border bg-white px-3 text-sm font-medium text-slate-700">
+            <section className="space-y-2.5 border-t border-slate-200/60 pt-3" aria-label="Ek Bilgiler">
+              <label className="flex min-h-9 cursor-pointer items-center gap-2 text-sm font-medium text-slate-700">
                 <input
                   type="checkbox"
                   className="size-4 rounded border-slate-300 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -443,10 +444,10 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
                   placeholder="Güvenlik veya ilgili personel için isteğe bağlı açıklama"
                 />
               </FormField>
-            </fieldset>
+            </section>
 
             {savedVisits.length > 0 && savedMeetingId && (
-              <ul className="grid gap-1.5 rounded-md border bg-white p-2.5 text-xs" aria-label="Ziyaretçi davet durumları">
+              <ul className="grid gap-1.5 border-y border-slate-200 py-2.5 text-xs" aria-label="Ziyaretçi davet durumları">
                 {savedVisits.map((item) => (
                   <li key={item.id} className="flex items-center justify-between gap-3">
                     <span className="truncate font-medium text-slate-700">{item.visitor.firstName} {item.visitor.lastName}</span>
@@ -462,7 +463,7 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
             {saveNotice && <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800" role="status">{saveNotice}</p>}
           </div>
 
-          <DialogFooter className="items-stretch border-t bg-card px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <DialogFooter className="shrink-0 items-stretch border-t bg-card px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
             <p id={invitationHelpId} className="text-xs text-slate-500" aria-live="polite">{invitationDisabledReason}</p>
             <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
               <Button
@@ -475,7 +476,7 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
               </Button>
               <Button
                 type="submit"
-                variant="outline"
+                variant={!savedMeetingId || form.formState.isDirty ? "default" : "outline"}
                 disabled={form.formState.isSubmitting || isSendingInvitation || (Boolean(savedMeetingId) && !form.formState.isDirty)}
               >
                 {form.formState.isSubmitting ? "Kaydediliyor…" : savedMeetingId && form.formState.isDirty ? "Değişiklikleri Kaydet" : savedMeetingId ? "Kaydedildi" : "Ziyareti Kaydet"}
