@@ -561,6 +561,21 @@ Limit charts to useful summaries.
 - The Resource Catalog remains the single source for vehicle and driver records; no catalog fields
   or fleet-pairing controls are duplicated on the planning page.
 
+### Manager Goods Movement
+
+- Sidebar `Mal Giriş / Çıkış` opens a compact Manager operations page aligned with All Visits,
+  Resources, and Fleet pages.
+- A compact top filter row provides search, date range, company, facility, direction, status, and
+  `+ Yeni kayıt`; the dense table shows direction, counterparty, goods/description, scope,
+  planned/actual times, and status.
+- Row click opens a centered detail dialog. Planned rows can be edited or cancelled; completed rows
+  are read-only. The create/edit dialog changes `Gönderen firma` to `Alıcı firma` with direction.
+- Manager forms use the shared internal dialog structure with fixed top alignment, header, scrollable
+  content, and footer. They separate `Planlama` and `Mal bilgisi` with a light divider; planned date is
+  required and planned time is optional. The list shows `Saat belirtilmedi` when no time is supplied.
+- Manager forms do not expose plate or driver fields. Dashboard delivery-style markers list both
+  `Gelen` and `Giden` movements clearly only when a planned time exists, without adding a Dashboard surface.
+
 ### Manager Meeting Resource Assignment UI
 
 - **Tabbed Detail Dialog:** The centered Manager visit detail dialog, shared by `All Visits` and Dashboard `Sıradaki Ziyaretler`, includes two restrained text tabs: `Ziyaret Bilgileri` and `Kaynaklar`.

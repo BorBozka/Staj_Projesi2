@@ -38,7 +38,7 @@ const managementNavigationItems = [
   { label: "Tüm Ziyaretler", icon: CalendarDays, to: "/manager/all-visits" },
   { label: "Kaynaklar", icon: Boxes, to: "/manager/resources" },
   { label: "Araç & Şoför Planı", icon: CarFront, to: "/manager/transport-planning" },
-  { label: "Mal Girişi / Teslimat", icon: PackageCheck },
+  { label: "Mal Giriş / Çıkış", icon: PackageCheck, to: "/manager/goods-movements" },
   { label: "Raporlar", icon: FileBarChart },
 ]
 

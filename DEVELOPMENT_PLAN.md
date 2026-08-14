@@ -337,6 +337,33 @@ Stop after this feature and request review before commit, push, PR, or merge.
 
 ---
 
+## Approved Feature — Manager Goods Movement Frontend / Mock Service
+
+Goal: add a compact Manager-only initial goods inbound/outbound module backed by a replaceable
+in-memory service, while reusing its records for existing Dashboard delivery markers.
+
+Includes:
+
+- one centralized `GoodsMovement` model with direction, required planned date, optional planned time,
+  actual timestamps, and derived late state,
+  optional reference/note, and Security-owned optional plate/driver fields,
+- mock list/create/update/cancel service validation for required fields and company/facility scope,
+- Manager route, sidebar item, filters, compact table, adaptive direction label, detail dialog, and
+  planned-only edit/cancel actions,
+- Dashboard migration from the standalone delivery mock to today's planned goods movements,
+  retaining the marker and visit-bar interaction model,
+- targeted service and Dashboard utility tests.
+
+Does not include Security completion UI, plate/driver entry UI, depot/ERP fields, backend, or persistence.
+
+Acceptance: Managers can create and manage planned inbound/outbound records with a required date and
+optional time; completed records remain read-only; `Gecikti` is derived only when a time is supplied;
+Dashboard markers distinguish only time-scheduled records; visit and Fleet behavior remains unchanged.
+
+Stop after this feature and request review before commit, push, PR, or merge.
+
+---
+
 # Track A — UI / UX First
 
 ## Phase 0 — Frontend Foundation

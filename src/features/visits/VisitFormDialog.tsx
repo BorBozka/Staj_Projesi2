@@ -282,7 +282,7 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
     <Dialog open={open} onOpenChange={onOpenChange}>
       <InternalDialogContent className="!max-h-[85vh] !w-[min(820px,calc(100vw-2rem))] !max-w-none flex flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="shrink-0 border-b bg-white px-5 pb-4 pt-4 pr-12">
-          <DialogTitle className="text-lg font-semibold text-slate-900">{visit ? "Ziyareti Düzenle" : "Yeni Ziyaret"}</DialogTitle>
+          <DialogTitle className="text-lg font-semibold text-slate-900">{visit ? "Ziyareti düzenle" : "Yeni ziyaret"}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={onSave} className="flex min-h-0 flex-col" noValidate>

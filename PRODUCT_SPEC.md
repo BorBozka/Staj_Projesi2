@@ -847,6 +847,26 @@ Track both:
 - actual arrival time,
 - actual departure/completion time.
 
+### Manager Goods Movement
+
+Managers use one goods-movement record for both inbound and outbound operations. A record has
+direction (`INBOUND` or `OUTBOUND`), company, facility, counterparty, required planned date and
+optional planned time,
+goods/description, optional reference number and note, and a stored status of `PLANNED`,
+`COMPLETED`, or `CANCELLED`.
+
+- `INBOUND` is labelled `Gelen`; its counterparty is the `Gönderen firma`, and completion is `Geldi`.
+- `OUTBOUND` is labelled `Giden`; its counterparty is the `Alıcı firma`, and completion is `Çıkış yaptı`.
+- A planned record with a planned time whose scheduled date/time has passed is derived as `Gecikti`;
+  `LATE` is not stored. A record without a planned time remains `PLANNED` until completed or cancelled.
+- Actual timestamp plus optional plate and driver name belong to the Security completion flow.
+  They are retained on the model but are not exposed in Manager create/edit forms in this phase.
+- Managers may create, edit, and cancel only `PLANNED` records. Completed records are read-only;
+  cancelled records remain historical.
+- The Manager Dashboard's existing goods-delivery marker source is the same goods-movement service.
+  It shows markers only for today's planned inbound and outbound records that have a planned time,
+  without changing visit-bar calculations. Records without a planned time remain in daily lists and reports.
+
 If driver only hands goods over at the gate, the driver is not treated as a visitor.
 
 If driver enters the facility, the driver must also go through the visitor workflow.
