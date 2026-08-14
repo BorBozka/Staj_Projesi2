@@ -10,6 +10,7 @@ import {
   DialogDescription,
   DialogFooter,
   DialogHeader,
+  InternalDialogContent,
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -145,22 +146,22 @@ export function ResourceFormDialog({ open, resource, referenceData, returnFocusR
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent
-        className="max-w-xl"
-        aria-describedby={undefined}
-        onOpenAutoFocus={(event) => {
-          event.preventDefault()
-        }}
-        onCloseAutoFocus={(event) => {
-          event.preventDefault()
-          returnFocusRef.current?.focus()
-        }}
+        <InternalDialogContent
+          className="!max-h-[85vh] !w-[min(576px,calc(100vw-2rem))] !max-w-none flex flex-col gap-0 overflow-hidden p-0"
+          aria-describedby={undefined}
+          onOpenAutoFocus={(event) => {
+            event.preventDefault()
+          }}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault()
+            returnFocusRef.current?.focus()
+          }}
         >
-        <DialogHeader>
-          <DialogTitle>{resource ? "Kaynağı düzenle" : "Yeni kaynak"}</DialogTitle>
+        <DialogHeader className="shrink-0 border-b bg-white px-5 pb-4 pt-4 pr-12">
+          <DialogTitle className="text-lg font-semibold text-slate-900">{resource ? "Kaynağı düzenle" : "Yeni kaynak"}</DialogTitle>
         </DialogHeader>
 
-        <form id="resource-form" className="grid gap-3 sm:grid-cols-2" onSubmit={submit} noValidate>
+        <form id="resource-form" className="grid min-h-0 flex-1 gap-3 overflow-y-auto px-5 py-4 sm:grid-cols-2" onSubmit={submit} noValidate>
           <FormField label="Kaynak türü" required error={form.formState.errors.type?.message}>
             {resource ? (
               <>
@@ -275,9 +276,11 @@ export function ResourceFormDialog({ open, resource, referenceData, returnFocusR
           )}
 
           {submitError && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800 sm:col-span-2" role="alert">{submitError}</p>}
+          {resource && form.formState.isDirty && <p className="text-right text-[11px] text-slate-500 sm:col-span-2">Durumu değiştirmek için form değişikliklerini önce kaydedin.</p>}
+          {statusNotice && <p className="text-right text-xs text-emerald-700 sm:col-span-2" role="status">{statusNotice}</p>}
         </form>
 
-        <DialogFooter className="border-t pt-4 sm:justify-between">
+        <DialogFooter className="shrink-0 border-t bg-card px-5 py-3 sm:items-center sm:justify-between">
           {resource ? (
             <Button
               type="button"
@@ -315,15 +318,13 @@ export function ResourceFormDialog({ open, resource, referenceData, returnFocusR
             </Button>
           </div>
         </DialogFooter>
-        {resource && form.formState.isDirty && <p className="text-right text-[11px] text-slate-500">Durumu değiştirmek için form değişikliklerini önce kaydedin.</p>}
-        {statusNotice && <p className="text-right text-xs text-emerald-700" role="status">{statusNotice}</p>}
-        </DialogContent>
+        </InternalDialogContent>
       </Dialog>
 
       <Dialog open={deleteConfirmationOpen} onOpenChange={(nextOpen) => !isDeleting && setDeleteConfirmationOpen(nextOpen)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Kaynağı sil</DialogTitle>
+            <DialogTitle>Kaynağı Sil</DialogTitle>
             <DialogDescription>
               {resource ? `${getResourceDisplayName(resource)} katalogdan kalıcı olarak silinecek. Geçmiş toplantı atamaları korunur.` : "Bu kaynak katalogdan kalıcı olarak silinecek."}
             </DialogDescription>

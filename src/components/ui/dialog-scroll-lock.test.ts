@@ -11,4 +11,9 @@ describe("global dialog scroll-lock", () => {
     expect(globalStyles).not.toMatch(/scrollbar-gutter\s*:/)
     expect(globalStyles).toContain("Radix Dialog scroll-lock")
   })
+
+  it("provides one shared top position for internal main dialogs", () => {
+    expect(dialogSource).toContain('className={cn("top-[5vh] translate-y-0", className)}')
+    expect(dialogSource).toContain('InternalDialogContent.displayName = "InternalDialogContent"')
+  })
 })
