@@ -30,6 +30,7 @@ describe("ManagerVisitDetailsDialog", () => {
     expect(componentSource).not.toContain("!top-6")
     expect(componentSource).toContain('title="Not"')
     expect(componentSource).toContain("compact")
+    expect(componentSource).toContain('className="mt-1 flex w-full justify-center gap-2"')
     expect(componentSource).not.toContain("MeetingLifecycleSection")
     expect(componentSource).not.toContain("Toplantıyı Bitir")
   })

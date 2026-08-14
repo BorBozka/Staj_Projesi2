@@ -455,6 +455,19 @@ Below:
 - operational summaries,
 - limited charts only when useful.
 
+The upper operational surface is titled `Şu Anda Aktif` and uses two compact tabs:
+
+- `Ziyaretçiler` retains the existing inside-visitor table and its filters.
+- `Araç görevleri` lists only currently ongoing Fleet assignments in the selected Manager scope.
+  Each compact, clickable row shows vehicle, plate, driver, purpose, and time interval and opens a
+  read-only assignment detail dialog.
+
+`Bugünün Operasyonu` preserves its visit-bar semantics. Today's Fleet assignments appear as a
+separate vehicle-icon event marker, using the delivery-marker interaction pattern. Multiple Fleet
+assignments show a count; a Fleet marker and delivery marker at the same hour sit side by side.
+Selecting a Fleet marker lists that hour's assignments and lets the Manager open the read-only
+detail dialog.
+
 ---
 
 ## 20. Reports
@@ -519,7 +532,34 @@ Limit charts to useful summaries.
   historical Meeting assignment details remain readable from their stored snapshot.
 - Provides loading, error, unfiltered-empty, and filtered-empty states.
 - Reflows without page-level horizontal overflow at tablet and narrow widths.
-- Does not expose vehicle-driver fleet assignment, reservation override, notification, or audit controls. Employees continue to use the additional-requirement note rather than selecting resources.
+- Does not expose fleet planning controls in the catalog itself, reservation overrides, notifications,
+  or audit controls. Employees continue to use the additional-requirement note rather than selecting resources.
+
+### Manager Planned Vehicle and Driver Assignment
+
+- Uses a dedicated compact Manager page, reachable from Manager navigation, rather than changing
+  the Meeting resource-assignment tab or the Resource Catalog table.
+- Opens with company, facility, date, start time, and end time unset. Native company/facility
+  controls use placeholder text rather than a selectable `Şirket seçin` or `Tesis seçin` option.
+- Keeps the planning form, selected-time availability, and planned assignments visible together.
+  It does not add dashboard KPIs or charts.
+- Requires company, facility, date, start/end time, task/purpose, one vehicle, and one driver.
+  The task/purpose control is a compact single-line field. A Meeting or Visit relationship is
+  optional, expressed as an understandable `Bağlantılı kayıt` type plus optional record selector.
+- Calculates and shows availability only after company, facility, date, start time, and end time
+  are complete. Until then, an instructional state explains how to continue; it does not claim
+  that no resources are available.
+- Shows only active, selected-company/facility resources that are available for the chosen time.
+  Vehicles and drivers use clear, compact selectable rows; a complete context with no matches
+  shows the no-availability state.
+- Initially lists upcoming active assignments. Company/facility selections narrow that list, and a
+  complete company/facility/date context shows that day's assignments, including cancellations.
+  Active rows can be edited or cancelled; a cancellation visibly releases the resource pair from
+  the current availability result.
+- Planned assignments render in a compact table with time, vehicle/plate, driver, purpose, status,
+  and edit/cancel actions.
+- The Resource Catalog remains the single source for vehicle and driver records; no catalog fields
+  or fleet-pairing controls are duplicated on the planning page.
 
 ### Manager Meeting Resource Assignment UI
 
@@ -537,7 +577,9 @@ Limit charts to useful summaries.
   - `Kaydet` triggers atomic save; `Vazgeç` restores the working draft back to the last persisted state.
 - **Unsaved-Change Confirmation Guard:**
   - Attempting to close the centered dialog (via `✕` button, Escape key, or overlay click) while draft changes are unsaved is intercepted by a guard.
-  - A modal confirmation dialog (`Kaydedilmemiş değişiklikler`) is presented with actions `Değişiklikleri sil` (discards draft and closes the Manager Visit Detail dialog) and `Vazgeç` (cancels close and returns to editing).
+  - A modal confirmation dialog (`Kaydedilmemiş değişiklikler`) is presented with horizontally
+    centered `Düzenlemeye dön` and `Kaydetmeden çık` actions. The latter discards the draft and
+    closes the Manager Visit Detail dialog; the former returns to editing.
 - **Read-Only UI State:**
   - For completed meetings (all visits `CHECKED_OUT`, `CANCELLED`, or `NO_SHOW`), the `Kaynaklar` panel is rendered in read-only mode, hiding all add, change, edit, remove, and save controls.
   - A Meeting with `actualMeetingEnd` is immediately rendered read-only even while one or more linked Visits remain non-terminal.

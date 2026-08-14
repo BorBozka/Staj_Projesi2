@@ -1,6 +1,7 @@
 import {
   Bell,
   Boxes,
+  CarFront,
   CalendarDays,
   FileBarChart,
   LayoutDashboard,
@@ -36,6 +37,7 @@ const managementNavigationItems = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/manager/dashboard" },
   { label: "Tüm Ziyaretler", icon: CalendarDays, to: "/manager/all-visits" },
   { label: "Kaynaklar", icon: Boxes, to: "/manager/resources" },
+  { label: "Araç & Şoför Planı", icon: CarFront, to: "/manager/transport-planning" },
   { label: "Mal Girişi / Teslimat", icon: PackageCheck },
   { label: "Raporlar", icon: FileBarChart },
 ]

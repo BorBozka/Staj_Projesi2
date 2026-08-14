@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import type { ExpectedAfterHoursDelivery } from "@/domain/manager-dashboard"
 import type { Visit, VisitStatus } from "@/domain/visits"
-import { getDashboardVisitStatus, getDelayMinutes, getNextPlannedVisits, getOperationBins, getOtherVisits, getScopedVisits, getStatusCounts, getTodayVisits } from "./manager-dashboard-utils"
+import { getActiveTransportAssignments, getDashboardVisitStatus, getDelayMinutes, getNextPlannedVisits, getOperationBins, getOtherVisits, getScopedVisits, getStatusCounts, getTodayScopedTransportAssignments, getTodayVisits } from "./manager-dashboard-utils"
 
 function makeVisit(id: string, status: VisitStatus, plannedStart: string, overrides: Partial<Visit> = {}): Visit {
   return {
@@ -48,11 +48,36 @@ describe("manager dashboard calculations", () => {
       { id: "delivery-1", supplierName: "Tedarikçi", companyId: "bplas", facilityId: "bplas-merkez", expectedAt: "2026-08-10T19:00:00+03:00", status: "EXPECTED" },
       { id: "delivery-2", supplierName: "Gece Tedarikçisi", companyId: "bplas", facilityId: "bplas-merkez", expectedAt: "2026-08-10T23:30:00+03:00", status: "EXPECTED" },
     ]
-    const bins = getOperationBins(getTodayVisits(visits, now), deliveries)
+    const assignments = [{
+      id: "transport-1", companyId: "bplas", companyName: "BPLAS A.Ş.", facilityId: "bplas-merkez", facilityName: "Merkez Tesis", plannedStart: "2026-08-10T19:00:00+03:00", plannedEnd: "2026-08-10T20:00:00+03:00", purpose: "Saha görevi", vehicleResourceId: "vehicle-1", vehicleName: "Transit", vehicleLicensePlate: "16 BPL 101", driverResourceId: "driver-1", driverName: "Ayşe Demir", status: "ACTIVE" as const, createdAt: "2026-08-10T08:00:00+03:00",
+    }]
+    const bins = getOperationBins(getTodayVisits(visits, now), deliveries, assignments)
 
     expect(bins.find((bin) => bin.hour === 10)).toMatchObject({ planned: 2, actual: 1 })
     expect(bins.find((bin) => bin.hour === 19)?.deliveries).toHaveLength(1)
     expect(bins.find((bin) => bin.hour === 23)?.deliveries).toHaveLength(1)
+    expect(bins.find((bin) => bin.hour === 19)?.transportAssignments).toHaveLength(1)
+  })
+
+  it("selects only currently active Fleet assignments in scope", () => {
+    const assignments = [
+      { id: "active", companyId: "bplas", companyName: "BPLAS A.Ş.", facilityId: "bplas-merkez", facilityName: "Merkez Tesis", plannedStart: "2026-08-10T12:00:00+03:00", plannedEnd: "2026-08-10T13:00:00+03:00", purpose: "Aktif", vehicleResourceId: "vehicle", vehicleName: "Transit", vehicleLicensePlate: "16 BPL 101", driverResourceId: "driver", driverName: "Ayşe Demir", status: "ACTIVE" as const, createdAt: "2026-08-10T08:00:00+03:00" },
+      { id: "cancelled", companyId: "bplas", companyName: "BPLAS A.Ş.", facilityId: "bplas-merkez", facilityName: "Merkez Tesis", plannedStart: "2026-08-10T12:00:00+03:00", plannedEnd: "2026-08-10T13:00:00+03:00", purpose: "İptal", vehicleResourceId: "vehicle", vehicleName: "Transit", vehicleLicensePlate: "16 BPL 101", driverResourceId: "driver", driverName: "Ayşe Demir", status: "CANCELLED" as const, createdAt: "2026-08-10T08:00:00+03:00" },
+    ]
+    expect(getActiveTransportAssignments(assignments, { companyId: "bplas", facilityId: "bplas-merkez" }, now).map((assignment) => assignment.id)).toEqual(["active"])
+  })
+
+  it("applies company, facility, active-state and date filters to Fleet chart markers", () => {
+    const assignments = [
+      { id: "in-scope", companyId: "bplas", companyName: "BPLAS A.Ş.", facilityId: "bplas-merkez", facilityName: "Merkez Tesis", plannedStart: "2026-08-10T09:00:00+03:00", plannedEnd: "2026-08-10T10:00:00+03:00", purpose: "Kapsam içi", vehicleResourceId: "vehicle", vehicleName: "Transit", vehicleLicensePlate: "16 BPL 101", driverResourceId: "driver", driverName: "Ayşe Demir", status: "ACTIVE" as const, createdAt: "2026-08-10T08:00:00+03:00" },
+      { id: "other-facility", companyId: "bplas", companyName: "BPLAS A.Ş.", facilityId: "bplas-arge", facilityName: "Ar-Ge Merkezi", plannedStart: "2026-08-10T09:00:00+03:00", plannedEnd: "2026-08-10T10:00:00+03:00", purpose: "Başka tesis", vehicleResourceId: "vehicle-2", vehicleName: "Megane", vehicleLicensePlate: "16 BPL 202", driverResourceId: "driver-2", driverName: "Mehmet Kaya", status: "ACTIVE" as const, createdAt: "2026-08-10T08:00:00+03:00" },
+      { id: "cancelled", companyId: "bplas", companyName: "BPLAS A.Ş.", facilityId: "bplas-merkez", facilityName: "Merkez Tesis", plannedStart: "2026-08-10T09:00:00+03:00", plannedEnd: "2026-08-10T10:00:00+03:00", purpose: "İptal", vehicleResourceId: "vehicle", vehicleName: "Transit", vehicleLicensePlate: "16 BPL 101", driverResourceId: "driver", driverName: "Ayşe Demir", status: "CANCELLED" as const, createdAt: "2026-08-10T08:00:00+03:00" },
+      { id: "other-day", companyId: "bplas", companyName: "BPLAS A.Ş.", facilityId: "bplas-merkez", facilityName: "Merkez Tesis", plannedStart: "2026-08-11T09:00:00+03:00", plannedEnd: "2026-08-11T10:00:00+03:00", purpose: "Başka gün", vehicleResourceId: "vehicle", vehicleName: "Transit", vehicleLicensePlate: "16 BPL 101", driverResourceId: "driver", driverName: "Ayşe Demir", status: "ACTIVE" as const, createdAt: "2026-08-10T08:00:00+03:00" },
+    ]
+
+    const scoped = getTodayScopedTransportAssignments(assignments, { companyId: "bplas", facilityId: "bplas-merkez" }, now)
+    expect(scoped.map((assignment) => assignment.id)).toEqual(["in-scope"])
+    expect(getOperationBins([], [], scoped).find((bin) => bin.hour === 9)?.transportAssignments.map((assignment) => assignment.id)).toEqual(["in-scope"])
   })
 
   it("derives exclusive live dashboard statuses without showing NO_SHOW", () => {

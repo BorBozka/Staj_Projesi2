@@ -139,7 +139,7 @@ export function ManagerVisitDetailsDialog({ visit, open, onOpenChange, returnFoc
               <p className="text-sm font-semibold text-slate-900">Kaydedilmemiş değişiklikler</p>
               <p className="mt-1 text-xs text-slate-600">Kaydetmeden çıkarsanız kaynak atamalarında yaptığınız değişiklikler kaybolacak.</p>
             </div>
-            <div className="mt-1 flex w-full justify-end gap-2">
+            <div className="mt-1 flex w-full justify-center gap-2">
               <button type="button" onClick={() => setShowDiscardDialog(false)} className="rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400">Düzenlemeye dön</button>
               <button type="button" onClick={handleDiscardConfirm} className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600">Kaydetmeden çık</button>
             </div>

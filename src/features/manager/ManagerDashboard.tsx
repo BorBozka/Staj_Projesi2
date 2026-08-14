@@ -1,29 +1,33 @@
 import { format } from "date-fns"
-import { CircleAlert, PackageCheck, RefreshCw, UserRound } from "lucide-react"
+import { CarFront, CircleAlert, PackageCheck, RefreshCw, UserRound } from "lucide-react"
 import { useEffect, useMemo, useRef, useState, type ReactElement } from "react"
 import { Link } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import type { ExpectedAfterHoursDelivery } from "@/domain/manager-dashboard"
+import type { PlannedTransportAssignment } from "@/domain/transport-assignments"
 import type { Visit } from "@/domain/visits"
 import { getOperationNowIndicator } from "@/features/manager/manager-clock"
 import { ManagerDashboardFilters } from "@/features/manager/ManagerDashboardFilters"
 import { ManagerVisitDetailsDialog } from "@/features/manager/ManagerVisitDetailsDialog"
+import { TransportAssignmentDetailsDialog } from "@/features/transport/TransportAssignmentDetailsDialog"
 import { useManagerRefresh } from "@/features/manager/manager-refresh-context"
 import { VisitDetailsDialog } from "@/features/visits/VisitDetailsDialog"
 import { VisitStatusBadge } from "@/features/visits/VisitStatusBadge"
 import { useVisits } from "@/features/visits/visit-context"
 import { formatTr } from "@/lib/date"
 import { cn } from "@/lib/utils"
-import { managerDashboardService } from "@/services"
+import { managerDashboardService, transportAssignmentService } from "@/services"
 import {
   getDashboardVisitStatus,
+  getActiveTransportAssignments,
   getDelayMinutes,
   getNextPlannedVisits,
   getOperationBins,
   getScopedVisits,
   getStatusCounts,
+  getTodayScopedTransportAssignments,
   getTodayVisits,
   type DashboardVisitStatus,
 } from "./manager-dashboard-utils"
@@ -31,12 +35,14 @@ import {
 type SelectionDescriptor =
   | { anchorKey: string; key: string; kind: "hour"; hour: number }
   | { anchorKey: string; key: string; kind: "delivery"; hour: number }
+  | { anchorKey: string; key: string; kind: "fleet"; hour: number }
   | { anchorKey: string; key: string; kind: "status"; status: DashboardVisitStatus }
 
 type SelectionData = {
   title: string
   visits: Visit[]
   deliveries: ExpectedAfterHoursDelivery[]
+  transportAssignments: PlannedTransportAssignment[]
 }
 
 const statusMeta: { status: DashboardVisitStatus; label: string; color: string }[] = [
@@ -52,14 +58,22 @@ export function ManagerDashboard() {
   const { visits, referenceData, isLoading } = useVisits()
   const { companyId, currentTime, facilityId, isRefreshing, refresh, refreshVersion, lastUpdated } = useManagerRefresh()
   const [deliveries, setDeliveries] = useState<ExpectedAfterHoursDelivery[]>([])
+  const [transportAssignments, setTransportAssignments] = useState<PlannedTransportAssignment[]>([])
   const [selection, setSelection] = useState<SelectionDescriptor | null>(null)
   const [viewingVisit, setViewingVisit] = useState<Visit | null>(null)
   const [nextVisitId, setNextVisitId] = useState<string | null>(null)
+  const [viewingTransportAssignment, setViewingTransportAssignment] = useState<PlannedTransportAssignment | null>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
   const now = lastUpdated
 
   useEffect(() => {
-    void managerDashboardService.listExpectedAfterHoursDeliveries().then(setDeliveries)
+    void Promise.all([
+      managerDashboardService.listExpectedAfterHoursDeliveries(),
+      transportAssignmentService.listAssignments(),
+    ]).then(([nextDeliveries, nextTransportAssignments]) => {
+      setDeliveries(nextDeliveries)
+      setTransportAssignments(nextTransportAssignments)
+    })
   }, [refreshVersion])
 
   const scopedVisits = useMemo(() => getScopedVisits(visits, { companyId, facilityId }), [companyId, facilityId, visits])
@@ -71,11 +85,13 @@ export function ManagerDashboard() {
     (companyId === "all" || delivery.companyId === companyId) &&
     (facilityId === "all" || delivery.facilityId === facilityId),
   )
+  const scopedTransportAssignments = getTodayScopedTransportAssignments(transportAssignments, { companyId, facilityId }, currentTime)
+  const activeTransportAssignments = getActiveTransportAssignments(transportAssignments, { companyId, facilityId }, currentTime)
   const counts = getStatusCounts(todayVisits, currentTime)
   const futureVisits = getNextPlannedVisits(todayVisits, now, todayVisits.length)
   const nextVisits = futureVisits.slice(0, 5)
   const nextVisit = visits.find((visit) => visit.id === nextVisitId) ?? null
-  const selectionData = selection ? resolveSelection(selection, todayVisits, scopedDeliveries, currentTime) : null
+  const selectionData = selection ? resolveSelection(selection, todayVisits, scopedDeliveries, scopedTransportAssignments, currentTime) : null
 
   function openNextVisit(visit: Visit) {
     returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
@@ -86,8 +102,9 @@ export function ManagerDashboard() {
     if (!selection) return
     const statusIsGone = selection.kind === "status" && !counts.some((count) => count.status === selection.status)
     const deliveryIsGone = selection.kind === "delivery" && !scopedDeliveries.some((delivery) => new Date(delivery.expectedAt).getHours() === selection.hour)
-    if (statusIsGone || deliveryIsGone) setSelection(null)
-  }, [counts, scopedDeliveries, selection])
+    const fleetIsGone = selection.kind === "fleet" && !scopedTransportAssignments.some((assignment) => new Date(assignment.plannedStart).getHours() === selection.hour)
+    if (statusIsGone || deliveryIsGone || fleetIsGone) setSelection(null)
+  }, [counts, scopedDeliveries, scopedTransportAssignments, selection])
 
   if (isLoading || !referenceData) return <DashboardSkeleton />
 
@@ -96,6 +113,7 @@ export function ManagerDashboard() {
       <section className="grid items-stretch gap-4 xl:grid-cols-[minmax(0,7fr)_minmax(280px,3fr)]">
         <InsideVisits
           visits={insideVisits}
+          transportAssignments={activeTransportAssignments}
           now={now}
           controls={(
             <div className="flex min-w-0 max-w-full items-center gap-1.5">
@@ -115,6 +133,7 @@ export function ManagerDashboard() {
             </div>
           )}
           onVisitOpen={openNextVisit}
+          onTransportAssignmentOpen={setViewingTransportAssignment}
         />
         <Distribution
           counts={counts}
@@ -122,17 +141,20 @@ export function ManagerDashboard() {
           selectionData={selectionData}
           onSelectionChange={setSelection}
           onVisitOpen={setViewingVisit}
+          onTransportAssignmentOpen={setViewingTransportAssignment}
         />
       </section>
 
       <Operations
         visits={todayVisits}
         deliveries={scopedDeliveries}
+        transportAssignments={scopedTransportAssignments}
         now={currentTime}
         selection={selection}
         selectionData={selectionData}
         onSelectionChange={setSelection}
         onVisitOpen={setViewingVisit}
+        onTransportAssignmentOpen={setViewingTransportAssignment}
       />
 
       <NextVisits visits={nextVisits} total={futureVisits.length} now={now} onVisitOpen={openNextVisit} />
@@ -154,21 +176,28 @@ export function ManagerDashboard() {
         onOpenChange={(open) => !open && setNextVisitId(null)}
         returnFocusRef={returnFocusRef}
       />
+
+      <TransportAssignmentDetailsDialog
+        assignment={viewingTransportAssignment}
+        open={Boolean(viewingTransportAssignment)}
+        onOpenChange={(open) => !open && setViewingTransportAssignment(null)}
+      />
     </div>
   )
 }
 
-export function InsideVisits({ visits, now, controls, onVisitOpen }: { visits: Visit[]; now: Date; controls: ReactElement; onVisitOpen(visit: Visit): void }) {
+export function InsideVisits({ visits, transportAssignments = [], now, controls, onVisitOpen, onTransportAssignmentOpen = noopTransportAssignmentAction }: { visits: Visit[]; transportAssignments?: PlannedTransportAssignment[]; now: Date; controls: ReactElement; onVisitOpen(visit: Visit): void; onTransportAssignmentOpen?(assignment: PlannedTransportAssignment): void }) {
+  const [activeTab, setActiveTab] = useState<"visitors" | "fleet">("visitors")
   return (
     <section className="flex h-[340px] flex-col overflow-hidden rounded-lg border border-emerald-200 bg-card shadow-panel">
       <div className="flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-2 border-l-[3px] border-emerald-500 bg-emerald-50/35 px-3 py-2 sm:px-4">
         <div className="flex min-w-0 items-center gap-2">
           <span className="size-3 shrink-0 rounded-full bg-emerald-500" />
-          <h2 className="truncate text-lg font-semibold">Şu Anda İçeride</h2>
+          <div className="min-w-0"><h2 className="truncate text-lg font-semibold">Şu Anda Aktif</h2><div className="mt-1 flex gap-3 text-xs font-medium"><button type="button" onClick={() => setActiveTab("visitors")} className={cn("border-b-2 pb-0.5", activeTab === "visitors" ? "border-emerald-600 text-emerald-800" : "border-transparent text-slate-500")}>Ziyaretçiler {visits.length}</button><button type="button" onClick={() => setActiveTab("fleet")} className={cn("border-b-2 pb-0.5", activeTab === "fleet" ? "border-emerald-600 text-emerald-800" : "border-transparent text-slate-500")}>Araç görevleri {transportAssignments.length}</button></div></div>
         </div>
         {controls}
       </div>
-      {visits.length === 0 ? (
+      {activeTab === "visitors" && (visits.length === 0 ? (
         <p className="px-4 py-7 text-center text-sm text-slate-600">Seçili bağlamda içeride ziyaretçi bulunmuyor.</p>
       ) : (
         <div className="min-h-0 flex-1 overflow-auto">
@@ -229,8 +258,52 @@ export function InsideVisits({ visits, now, controls, onVisitOpen }: { visits: V
             </tbody>
           </table>
         </div>
-      )}
+      ))}
+      {activeTab === "fleet" && <ActiveTransportAssignments assignments={transportAssignments} onOpen={onTransportAssignmentOpen} />}
     </section>
+  )
+}
+
+function ActiveTransportAssignments({ assignments, onOpen }: { assignments: PlannedTransportAssignment[]; onOpen(assignment: PlannedTransportAssignment): void }) {
+  if (assignments.length === 0) return <p className="px-4 py-7 text-center text-sm text-slate-600">Seçili bağlamda şu anda devam eden araç görevi bulunmuyor.</p>
+  return (
+    <div className="min-h-0 flex-1 overflow-auto">
+      <table className="w-full min-w-[680px] table-fixed text-left text-xs">
+        <thead className="sticky top-0 z-[1] border-y border-emerald-100 bg-white text-[11px] font-semibold text-slate-600">
+          <tr>
+            <th className="w-[24%] px-3 py-2">Araç / plaka</th>
+            <th className="w-[18%] px-2 py-2">Şoför</th>
+            <th className="w-[28%] px-2 py-2">Görev / amaç</th>
+            <th className="w-[15%] px-2 py-2">Başlangıç</th>
+            <th className="w-[15%] px-2 py-2">Planlanan dönüş</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {assignments.map((assignment) => (
+            <tr
+              key={assignment.id}
+              role="button"
+              tabIndex={0}
+              className="cursor-pointer transition-colors hover:bg-emerald-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600"
+              onClick={() => onOpen(assignment)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault()
+                  onOpen(assignment)
+                }
+              }}
+              aria-label={`${assignment.vehicleName} ${assignment.vehicleLicensePlate} araç görevi detaylarını aç`}
+            >
+              <td className="px-3 py-1.5"><p className="truncate font-semibold text-slate-900"><CarFront className="mr-1 inline size-3.5 text-emerald-700" />{assignment.vehicleName}</p><p className="truncate text-[11px] text-slate-500">{assignment.vehicleLicensePlate}</p></td>
+              <td className="truncate px-2 py-1.5 font-medium text-slate-900">{assignment.driverName}</td>
+              <td className="truncate px-2 py-1.5 text-slate-700">{assignment.purpose}</td>
+              <td className="px-2 py-1.5 tabular-nums text-slate-700">{formatTr(new Date(assignment.plannedStart), "HH:mm")}</td>
+              <td className="px-2 py-1.5 tabular-nums text-slate-700">{formatTr(new Date(assignment.plannedEnd), "HH:mm")}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
@@ -239,10 +312,11 @@ type InteractiveChartProps = {
   selectionData: SelectionData | null
   onSelectionChange: React.Dispatch<React.SetStateAction<SelectionDescriptor | null>>
   onVisitOpen(visit: Visit): void
+  onTransportAssignmentOpen(assignment: PlannedTransportAssignment): void
 }
 
-function Operations({ visits, deliveries, now, ...interactiveProps }: { visits: Visit[]; deliveries: ExpectedAfterHoursDelivery[]; now: Date } & InteractiveChartProps) {
-  const bins = getOperationBins(visits, deliveries, 8, 23)
+function Operations({ visits, deliveries, transportAssignments, now, ...interactiveProps }: { visits: Visit[]; deliveries: ExpectedAfterHoursDelivery[]; transportAssignments: PlannedTransportAssignment[]; now: Date } & InteractiveChartProps) {
+  const bins = getOperationBins(visits, deliveries, transportAssignments, 8, 23)
   const max = Math.max(1, ...bins.flatMap((bin) => [bin.planned, bin.actual, bin.deliveries.length]))
   const nowIndicator = getOperationNowIndicator(now, 8, 23)
 
@@ -257,6 +331,7 @@ function Operations({ visits, deliveries, now, ...interactiveProps }: { visits: 
           <Legend color="bg-blue-600" label="Planlanan" />
           <Legend color="bg-blue-300" label="Gerçekleşen giriş" />
           <Legend color="bg-violet-600" label="Teslimatlar" />
+          <span className="flex items-center gap-1.5"><CarFront className="size-3.5 text-sky-700" />Araç görevleri</span>
         </div>
       </div>
 
@@ -296,8 +371,10 @@ function OperationHour({ bin, max, visits, ...interactiveProps }: { bin: ReturnT
   const hourLabel = String(bin.hour).padStart(2, "0")
   const hourSelection: SelectionDescriptor = { anchorKey: `hour-trigger-${bin.hour}`, key: `hour-${bin.hour}`, kind: "hour", hour: bin.hour }
   const deliverySelection: SelectionDescriptor = { anchorKey: `delivery-trigger-${bin.hour}`, key: `delivery-${bin.hour}`, kind: "delivery", hour: bin.hour }
+  const fleetSelection: SelectionDescriptor = { anchorKey: `fleet-trigger-${bin.hour}`, key: `fleet-${bin.hour}`, kind: "fleet", hour: bin.hour }
   const hourSelected = interactiveProps.selection?.key === hourSelection.key
   const deliverySelected = interactiveProps.selection?.key === deliverySelection.key
+  const fleetSelected = interactiveProps.selection?.key === fleetSelection.key
   const records = visits.filter((visit) => visitMatchesHour(visit, bin.hour))
 
   return (
@@ -305,7 +382,7 @@ function OperationHour({ bin, max, visits, ...interactiveProps }: { bin: ReturnT
       <SelectionMenu descriptor={hourSelection} {...interactiveProps}>
         <button
           type="button"
-          aria-label={`${hourLabel}.00 saatindeki ${records.length + bin.deliveries.length} kaydı göster`}
+          aria-label={`${hourLabel}.00 saatindeki ${records.length + bin.deliveries.length + bin.transportAssignments.length} kaydı göster`}
           className="flex size-full min-w-0 flex-col justify-end px-1 text-left hover:bg-blue-50/70 focus-visible:outline-none focus-visible:ring-0"
         >
           <span className="flex h-48 items-end justify-center gap-1">
@@ -323,11 +400,28 @@ function OperationHour({ bin, max, visits, ...interactiveProps }: { bin: ReturnT
             aria-label={`${hourLabel}.00 saatindeki ${bin.deliveries.length} teslimatı göster`}
             className={cn(
               "absolute bottom-7 left-1/2 z-30 flex min-h-6 min-w-6 -translate-x-1/2 items-center justify-center gap-0.5 rounded border border-violet-300 bg-violet-100 px-1 text-[11px] font-semibold text-violet-900 shadow-sm hover:bg-violet-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-600",
+              bin.transportAssignments.length > 0 && "-translate-x-[calc(100%+2px)]",
               deliverySelected && "bg-violet-200 ring-2 ring-violet-600",
             )}
           >
             <PackageCheck className="size-3.5" />
             {bin.deliveries.length > 1 && bin.deliveries.length}
+          </button>
+        </SelectionMenu>
+      )}
+      {bin.transportAssignments.length > 0 && (
+        <SelectionMenu descriptor={fleetSelection} {...interactiveProps}>
+          <button
+            type="button"
+            aria-label={`${hourLabel}.00 başlangıç saatindeki ${bin.transportAssignments.length} araç görevini göster`}
+            title="Araç görevi başlangıç saati"
+            className={cn(
+              "absolute bottom-7 left-1/2 z-30 flex min-h-6 min-w-6 translate-x-[2px] items-center justify-center gap-0.5 rounded border border-sky-300 bg-sky-100 px-1 text-[11px] font-semibold text-sky-900 shadow-sm hover:bg-sky-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600",
+              fleetSelected && "bg-sky-200 ring-2 ring-sky-600",
+            )}
+          >
+            <CarFront className="size-3.5" />
+            {bin.transportAssignments.length > 1 && bin.transportAssignments.length}
           </button>
         </SelectionMenu>
       )}
@@ -415,7 +509,7 @@ function Distribution({ counts, ...interactiveProps }: { counts: { status: Dashb
   )
 }
 
-function SelectionMenu({ descriptor, selection, selectionData, onSelectionChange, onVisitOpen, children }: { descriptor: SelectionDescriptor; children: ReactElement } & InteractiveChartProps) {
+function SelectionMenu({ descriptor, selection, selectionData, onSelectionChange, onVisitOpen, onTransportAssignmentOpen, children }: { descriptor: SelectionDescriptor; children: ReactElement } & InteractiveChartProps) {
   const open = selection?.anchorKey === descriptor.anchorKey
   return (
     <DropdownMenu
@@ -428,17 +522,18 @@ function SelectionMenu({ descriptor, selection, selectionData, onSelectionChange
     >
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
       {open && selectionData && (
-        <SelectionPopoverContent selection={selectionData} side={descriptor.kind === "status" ? "bottom" : "right"} onVisitOpen={onVisitOpen} />
+        <SelectionPopoverContent selection={selectionData} side={descriptor.kind === "status" ? "bottom" : "right"} onVisitOpen={onVisitOpen} onTransportAssignmentOpen={onTransportAssignmentOpen} />
       )}
     </DropdownMenu>
   )
 }
 
-function SelectionPopoverContent({ selection, side, onVisitOpen }: { selection: SelectionData; side: "bottom" | "right"; onVisitOpen(visit: Visit): void }) {
+function SelectionPopoverContent({ selection, side, onVisitOpen, onTransportAssignmentOpen }: { selection: SelectionData; side: "bottom" | "right"; onVisitOpen(visit: Visit): void; onTransportAssignmentOpen(assignment: PlannedTransportAssignment): void }) {
   const resolvedSide = side === "right" && typeof window !== "undefined" && window.innerWidth <= 480 ? "bottom" : side
   const rows = [
     ...selection.visits.map((visit) => ({ kind: "visit" as const, id: visit.id, date: new Date(visit.plannedStart), visit })),
     ...selection.deliveries.map((delivery) => ({ kind: "delivery" as const, id: delivery.id, date: new Date(delivery.expectedAt), delivery })),
+    ...selection.transportAssignments.map((assignment) => ({ kind: "fleet" as const, id: assignment.id, date: new Date(assignment.plannedStart), assignment })),
   ].sort((left, right) => left.date.getTime() - right.date.getTime())
 
   return (
@@ -475,12 +570,25 @@ function SelectionPopoverContent({ selection, side, onVisitOpen }: { selection: 
             </span>
             <VisitStatusBadge status={row.visit.status} compact />
           </DropdownMenuItem>
-        ) : (
+        ) : row.kind === "delivery" ? (
           <div key={row.id} className="grid min-h-11 grid-cols-[42px_minmax(0,1fr)_auto] items-center gap-2 rounded-sm px-2 py-1.5 text-xs">
             <span className="tabular-nums text-slate-600">{formatTr(row.date, "HH:mm")}</span>
             <span className="truncate font-semibold text-slate-900">{row.delivery.supplierName}</span>
             <span className="inline-flex items-center gap-1 rounded border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-800"><PackageCheck className="size-3" />Teslimat</span>
           </div>
+        ) : (
+          <DropdownMenuItem
+            key={row.id}
+            className="group grid min-h-11 cursor-pointer grid-cols-[42px_minmax(0,1fr)_auto] items-center gap-2 px-2 py-1.5 text-xs transition-colors hover:bg-sky-50 focus:bg-sky-50 focus-visible:outline-none"
+            onSelect={(event) => {
+              event.preventDefault()
+              onTransportAssignmentOpen(row.assignment)
+            }}
+          >
+            <span className="tabular-nums text-slate-600"><span className="sr-only">Görev başlangıcı: </span>{formatTr(row.date, "HH:mm")}</span>
+            <span className="min-w-0"><span className="block truncate font-semibold text-slate-900">{row.assignment.vehicleName} · {row.assignment.vehicleLicensePlate}</span><span className="block truncate text-[11px] text-slate-600">{row.assignment.driverName} · {row.assignment.purpose}</span></span>
+            <span className="inline-flex items-center gap-1 rounded border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800"><CarFront className="size-3" />Görev</span>
+          </DropdownMenuItem>
         ))}
         {rows.length === 0 && <p className="px-3 py-6 text-center text-sm text-slate-600">Bu seçim için kayıt bulunmuyor.</p>}
       </div>
@@ -537,24 +645,29 @@ export function NextVisits({
   )
 }
 
-function resolveSelection(selection: SelectionDescriptor, visits: Visit[], deliveries: ExpectedAfterHoursDelivery[], now: Date): SelectionData {
+function resolveSelection(selection: SelectionDescriptor, visits: Visit[], deliveries: ExpectedAfterHoursDelivery[], transportAssignments: PlannedTransportAssignment[], now: Date): SelectionData {
   if (selection.kind === "status") {
     const selectedVisits = visits.filter((visit) => getDashboardVisitStatus(visit, now) === selection.status)
     const label = statusMeta.find((item) => item.status === selection.status)?.label ?? selection.status
-    return { title: `${label} · ${selectedVisits.length}`, visits: selectedVisits, deliveries: [] }
+    return { title: `${label} · ${selectedVisits.length}`, visits: selectedVisits, deliveries: [], transportAssignments: [] }
   }
 
   const hourLabel = String(selection.hour).padStart(2, "0")
   const selectedDeliveries = deliveries.filter((delivery) => new Date(delivery.expectedAt).getHours() === selection.hour)
+  const selectedTransportAssignments = transportAssignments.filter((assignment) => new Date(assignment.plannedStart).getHours() === selection.hour)
   if (selection.kind === "delivery") {
-    return { title: `${hourLabel}.00 · ${selectedDeliveries.length} kayıt`, visits: [], deliveries: selectedDeliveries }
+    return { title: `${hourLabel}.00 · ${selectedDeliveries.length} kayıt`, visits: [], deliveries: selectedDeliveries, transportAssignments: [] }
+  }
+  if (selection.kind === "fleet") {
+    return { title: `Başlangıç ${hourLabel}.00 · ${selectedTransportAssignments.length} araç görevi`, visits: [], deliveries: [], transportAssignments: selectedTransportAssignments }
   }
 
   const selectedVisits = visits.filter((visit) => visitMatchesHour(visit, selection.hour))
   return {
-    title: `${hourLabel}.00 · ${selectedVisits.length + selectedDeliveries.length} kayıt`,
+    title: `${hourLabel}.00 · ${selectedVisits.length + selectedDeliveries.length + selectedTransportAssignments.length} kayıt`,
     visits: selectedVisits,
     deliveries: selectedDeliveries,
+    transportAssignments: selectedTransportAssignments,
   }
 }
 
@@ -580,3 +693,4 @@ function DashboardSkeleton() {
 }
 
 function noopVisitAction() {}
+function noopTransportAssignmentAction() {}
