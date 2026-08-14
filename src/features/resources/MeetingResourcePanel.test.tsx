@@ -11,9 +11,16 @@ describe("MeetingResourcePanel empty states", () => {
   it("uses compact inline empty rows instead of dashed empty-state cards", () => {
     expect(componentSource).toContain("Oda atanmamış.")
     expect(componentSource).toContain("Ekipman atanmamış.")
-    expect(componentSource).toContain("Oda Ata")
+    expect(componentSource).toContain("Oda ata")
     expect(componentSource).toContain("Ekipman ekle")
     expect(componentSource).not.toContain("border-dashed bg-slate-50/40 p-3")
+  })
+
+  it("keeps the assignment footer outside the scrollable picker content", () => {
+    expect(componentSource).toContain('className="flex min-h-0 flex-1 flex-col"')
+    expect(componentSource).toContain('className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4"')
+    expect(componentSource).toContain('className="shrink-0 border-t bg-white px-5 py-3"')
+    expect(componentSource).not.toContain("Kullanılabilir: {maxQty} adet")
   })
 
   it("shares the closed-or-terminal read-only predicate and reports only persisted assignments", () => {

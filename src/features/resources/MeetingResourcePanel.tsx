@@ -394,7 +394,8 @@ export function MeetingResourcePanel({
   const { eligibleRooms, eligibleEquipment } = loadState
 
   return (
-    <div className="space-y-5">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
       {/* Error banner */}
       {errorBanner && (
         <div
@@ -423,9 +424,9 @@ export function MeetingResourcePanel({
         </h4>
 
         {isRoomPickerOpen && !computedReadOnly ? (
-          <div className="rounded-lg border bg-slate-50/80 p-3 space-y-2">
+          <div className="space-y-2 rounded-lg border bg-slate-50/80 p-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-800">Toplantı odası seç</span>
+              <span className="text-xs font-semibold text-slate-800">Oda seçin</span>
               <Button
                 type="button"
                 variant="ghost"
@@ -440,7 +441,7 @@ export function MeetingResourcePanel({
             {eligibleRooms.length === 0 ? (
               <p className="py-2 text-center text-xs text-slate-500">Bu tesis için oda bulunamadı.</p>
             ) : (
-              <ul className="divide-y rounded-md border bg-white text-xs">
+              <ul className="max-h-48 divide-y overflow-y-auto rounded-md border bg-white text-xs">
                 {eligibleRooms.map(({ resource, isAvailable, conflictReason }) => {
                   const isDraftSelected = resource.id === draft.room?.resourceId
                   return (
@@ -520,7 +521,7 @@ export function MeetingResourcePanel({
                 disabled={saving}
               >
                 <Plus className="size-3.5" />
-                Oda Ata
+                Oda ata
               </Button>
             )}
           </div>
@@ -551,7 +552,7 @@ export function MeetingResourcePanel({
 
         {/* Equipment picker */}
         {isEquipPickerOpen && !computedReadOnly && (
-          <div className="mb-3 rounded-lg border bg-slate-50/80 p-3 space-y-3">
+          <div className="mb-3 space-y-2 rounded-lg border bg-slate-50/80 p-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-slate-800">Ekipman seçin</span>
               <Button
@@ -568,7 +569,7 @@ export function MeetingResourcePanel({
             {eligibleEquipment.length === 0 ? (
               <p className="py-2 text-center text-xs text-slate-500">Bu tesis için ekipman bulunamadı.</p>
             ) : (
-              <div className="max-h-48 space-y-1.5 overflow-y-auto pr-1">
+              <div className="max-h-48 divide-y overflow-y-auto rounded-md border bg-white">
                 {eligibleEquipment.map(({ resource }) => {
                   const alreadyInDraft = draft.equipment.some((e) => e.resourceId === resource.id)
                   const remaining = maxAssignableQty(resource.id)
@@ -587,13 +588,13 @@ export function MeetingResourcePanel({
                         }
                       }}
                       className={cn(
-                        "group flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-xs transition-all",
+                        "group flex w-full items-center justify-between px-2.5 py-2 text-left text-xs transition-colors",
                         isSelected
-                          ? "border-blue-500 bg-blue-50/90 font-medium text-blue-900 ring-1 ring-blue-300"
+                          ? "bg-blue-50/90 font-medium text-blue-900 ring-1 ring-inset ring-blue-300"
                           : alreadyInDraft
-                            ? "cursor-not-allowed border-slate-200 bg-slate-100/70 text-slate-400"
+                            ? "cursor-not-allowed bg-slate-100/70 text-slate-400"
                             : isAvailable
-                              ? "bg-white text-slate-800 hover:border-blue-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                              ? "text-slate-800 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600"
                               : "cursor-not-allowed bg-slate-100/60 text-slate-400 opacity-60",
                       )}
                     >
@@ -641,12 +642,9 @@ export function MeetingResourcePanel({
                 const maxQty = target.remainingQuantity
 
                 return (
-                  <div className="space-y-2 border-t pt-2.5">
+                  <div className="border-t pt-2">
                     <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <span className="text-xs font-semibold text-slate-800">Miktar seçin</span>
-                        <p className="text-[11px] text-slate-500">Kullanılabilir: {maxQty} adet</p>
-                      </div>
+                      <span className="text-xs font-semibold text-slate-800">Miktar</span>
                       <div className="flex items-center gap-1.5">
                         <Button
                           type="button"
@@ -684,7 +682,7 @@ export function MeetingResourcePanel({
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-end gap-2 pt-1">
+                    <div className="mt-2 flex items-center justify-end gap-1.5">
                       <Button
                         type="button"
                         variant="ghost"
@@ -863,11 +861,13 @@ export function MeetingResourcePanel({
         )}
       </section>
 
+      </div>
+
       {/* ------------------------------------------------------------------ */}
       {/* Unsaved-changes footer                                               */}
       {/* ------------------------------------------------------------------ */}
       {isDirty && !computedReadOnly && (
-        <div className="sticky bottom-0 -mx-5 -mb-4 border-t bg-white px-5 py-3">
+        <div className="shrink-0 border-t bg-white px-5 py-3">
           <div className="flex items-center justify-between gap-3">
             <p className="text-[11px] font-medium text-amber-700">
               Kaydedilmemiş değişiklikler

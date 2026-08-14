@@ -7,9 +7,9 @@ import { type FieldErrors, type FieldPath, useFieldArray, useForm } from "react-
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
-  DialogContent,
   DialogFooter,
   DialogHeader,
+  InternalDialogContent,
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -280,7 +280,7 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="!max-h-[85vh] !w-[min(820px,calc(100vw-2rem))] !max-w-none flex flex-col gap-0 overflow-hidden p-0">
+      <InternalDialogContent className="!max-h-[85vh] !w-[min(820px,calc(100vw-2rem))] !max-w-none flex flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="shrink-0 border-b bg-white px-5 pb-4 pt-4 pr-12">
           <DialogTitle className="text-lg font-semibold text-slate-900">{visit ? "Ziyareti Düzenle" : "Yeni Ziyaret"}</DialogTitle>
         </DialogHeader>
@@ -495,7 +495,7 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
             </div>
           </DialogFooter>
         </form>
-      </DialogContent>
+      </InternalDialogContent>
     </Dialog>
   )
 }

@@ -8,14 +8,17 @@ const componentSource = readFileSync(
 )
 
 describe("ManagerVisitDetailsDialog", () => {
-  it("uses the compact centered dialog layout and omits lifecycle controls", () => {
+  it("uses the shared internal dialog position and omits lifecycle controls", () => {
+    expect(componentSource).toContain("<InternalDialogContent")
     expect(componentSource).toContain('!max-h-[85vh] !w-[min(820px,calc(100vw-2rem))] !max-w-none')
+    expect(componentSource).not.toContain("!h-")
+    expect(componentSource).not.toContain("min-h-[")
     expect(componentSource).toContain("onOpenAutoFocus")
-    expect(componentSource).toContain("content.getBoundingClientRect().top")
-    expect(componentSource).toContain('lockedTop !== null && "!translate-y-0"')
-    expect(componentSource).toContain("style={lockedTop === null ? undefined : { top: lockedTop }}")
-    expect(componentSource).not.toContain('!h-[min(85vh,560px)]')
-    expect(componentSource).toContain("overflow-y-auto")
+    expect(componentSource).toContain("event.preventDefault()")
+    expect(componentSource).not.toContain("lockedTop")
+    expect(componentSource).toContain('className="flex min-h-0 flex-1 flex-col overflow-clip"')
+    expect(componentSource).toContain('"min-h-0 flex-1 overflow-y-auto px-5 py-4"')
+    expect(componentSource).toContain('"min-h-0 flex-1 flex-col", activeTab === "resources" ? "flex" : "hidden"')
     expect(componentSource).toContain("grid-cols-[minmax(0,45fr)_minmax(0,55fr)]")
     expect(componentSource).toContain("md:divide-x")
     expect(componentSource).toContain("Ziyaret Bilgileri")

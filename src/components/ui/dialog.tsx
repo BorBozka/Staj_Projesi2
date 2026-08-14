@@ -46,6 +46,14 @@ const DialogContent = React.forwardRef<
 ))
 DialogContent.displayName = DialogPrimitive.Content.displayName
 
+const InternalDialogContent = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
+>(({ className, ...props }, ref) => (
+  <DialogContent ref={ref} className={cn("top-[5vh] translate-y-0", className)} {...props} />
+))
+InternalDialogContent.displayName = "InternalDialogContent"
+
 function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return <div className={cn("space-y-1", className)} {...props} />
 }
@@ -77,6 +85,7 @@ export {
   DialogDescription,
   DialogFooter,
   DialogHeader,
+  InternalDialogContent,
   DialogTitle,
   DialogTrigger,
 }

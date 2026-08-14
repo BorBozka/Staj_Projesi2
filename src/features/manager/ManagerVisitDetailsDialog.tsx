@@ -2,7 +2,7 @@ import { AlertTriangle } from "lucide-react"
 import type { ReactNode, RefObject } from "react"
 import { useCallback, useEffect, useRef, useState } from "react"
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, InternalDialogContent } from "@/components/ui/dialog"
 import type { InvitationStatus, Visit } from "@/domain/visits"
 import { MeetingResourcePanel } from "@/features/resources/MeetingResourcePanel"
 import { VisitStatusBadge } from "@/features/visits/VisitStatusBadge"
@@ -37,7 +37,6 @@ export function ManagerVisitDetailsDialog({ visit, open, onOpenChange, returnFoc
   const [assignmentsCount, setAssignmentsCount] = useState(0)
   const [isResourcesDirty, setIsResourcesDirty] = useState(false)
   const [showDiscardDialog, setShowDiscardDialog] = useState(false)
-  const [lockedTop, setLockedTop] = useState<number | null>(null)
   const isResourcesDirtyRef = useRef(isResourcesDirty)
   isResourcesDirtyRef.current = isResourcesDirty
 
@@ -47,8 +46,6 @@ export function ManagerVisitDetailsDialog({ visit, open, onOpenChange, returnFoc
       setAssignmentsCount(0)
       setIsResourcesDirty(false)
       setShowDiscardDialog(false)
-    } else {
-      setLockedTop(null)
     }
   }, [open, visit?.id])
 
@@ -76,12 +73,10 @@ export function ManagerVisitDetailsDialog({ visit, open, onOpenChange, returnFoc
   return (
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent
-          className={cn("!max-h-[85vh] !w-[min(820px,calc(100vw-2rem))] !max-w-none flex flex-col gap-0 overflow-hidden p-0", lockedTop !== null && "!translate-y-0")}
-          style={lockedTop === null ? undefined : { top: lockedTop }}
+        <InternalDialogContent
+          className="!max-h-[85vh] !w-[min(820px,calc(100vw-2rem))] !max-w-none flex flex-col gap-0 overflow-hidden p-0"
           onOpenAutoFocus={(event) => {
-            const content = event.currentTarget as HTMLElement | null
-            if (content) setLockedTop(content.getBoundingClientRect().top)
+            event.preventDefault()
           }}
           onCloseAutoFocus={(event) => {
             event.preventDefault()
@@ -106,8 +101,8 @@ export function ManagerVisitDetailsDialog({ visit, open, onOpenChange, returnFoc
             </div>
           </DialogHeader>
 
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            <div className={cn("px-5 py-4", activeTab !== "details" && "hidden")}>
+          <div className="flex min-h-0 flex-1 flex-col overflow-clip">
+            <div className={cn("min-h-0 flex-1 overflow-y-auto px-5 py-4", activeTab !== "details" && "hidden")}>
               <div className="grid gap-0 md:grid-cols-[minmax(0,45fr)_minmax(0,55fr)] md:divide-x md:divide-slate-200">
                 <DetailSection title="Ziyaretçi">
                   <Field label="E-posta" value={visit.visitor.email} />
@@ -129,11 +124,11 @@ export function ManagerVisitDetailsDialog({ visit, open, onOpenChange, returnFoc
                 {hasActualUpdate && <p className="text-[11px] text-slate-500">Son güncelleme: {formatTr(new Date(visit.updatedAt), "d MMM yyyy · HH:mm")}</p>}
               </div>
             </div>
-            <div className={cn("px-5 py-4", activeTab !== "resources" && "hidden")}>
+            <div className={cn("min-h-0 flex-1 flex-col", activeTab === "resources" ? "flex" : "hidden")}>
               <MeetingResourcePanel meetingId={visit.meetingId} service={resourceAssignmentService} onAssignmentsCountChange={setAssignmentsCount} onDirtyChange={setIsResourcesDirty} />
             </div>
           </div>
-        </DialogContent>
+        </InternalDialogContent>
       </Dialog>
 
       <Dialog open={showDiscardDialog} onOpenChange={setShowDiscardDialog}>
@@ -142,11 +137,11 @@ export function ManagerVisitDetailsDialog({ visit, open, onOpenChange, returnFoc
             <span className="flex size-10 items-center justify-center rounded-full bg-amber-100"><AlertTriangle className="size-5 text-amber-600" /></span>
             <div>
               <p className="text-sm font-semibold text-slate-900">Kaydedilmemiş değişiklikler</p>
-              <p className="mt-1 text-xs text-slate-600">Kaynak atamaları taslağında kaydedilmemiş değişiklikler var. Değişiklikleri silmek istiyor musunuz?</p>
+              <p className="mt-1 text-xs text-slate-600">Kaydetmeden çıkarsanız kaynak atamalarında yaptığınız değişiklikler kaybolacak.</p>
             </div>
-            <div className="mt-1 flex w-full flex-col gap-2">
-              <button type="button" onClick={handleDiscardConfirm} className="w-full rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600">Değişiklikleri sil</button>
-              <button type="button" onClick={() => setShowDiscardDialog(false)} className="w-full rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400">Vazgeç</button>
+            <div className="mt-1 flex w-full justify-end gap-2">
+              <button type="button" onClick={() => setShowDiscardDialog(false)} className="rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400">Düzenlemeye dön</button>
+              <button type="button" onClick={handleDiscardConfirm} className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600">Kaydetmeden çık</button>
             </div>
           </div>
         </DialogContent>
