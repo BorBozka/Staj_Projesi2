@@ -50,15 +50,20 @@ export function getTodayScopedGoodsMovements(movements: GoodsMovement[], scope: 
   )
 }
 
+function extractHourFromISO(isoString: string): number | null {
+  const match = isoString.match(/T(\d{2}):/);
+  return match ? parseInt(match[1], 10) : null;
+}
+
 export function getOperationBins(visits: Visit[], deliveries: GoodsMovement[], transportAssignments: PlannedTransportAssignment[], startHour = 8, endHour = 23): OperationBin[] {
   return Array.from({ length: endHour - startHour + 1 }, (_, index) => {
     const hour = startHour + index
     return {
       hour,
-      planned: visits.filter((visit) => new Date(visit.plannedStart).getHours() === hour).length,
-      actual: visits.filter((visit) => visit.actualCheckIn && new Date(visit.actualCheckIn).getHours() === hour).length,
+      planned: visits.filter((visit) => extractHourFromISO(visit.plannedStart) === hour).length,
+      actual: visits.filter((visit) => visit.actualCheckIn && extractHourFromISO(visit.actualCheckIn) === hour).length,
       deliveries: deliveries.filter((delivery) => delivery.plannedTime?.startsWith(String(hour).padStart(2, "0"))),
-      transportAssignments: transportAssignments.filter((assignment) => new Date(assignment.plannedStart).getHours() === hour),
+      transportAssignments: transportAssignments.filter((assignment) => extractHourFromISO(assignment.plannedStart) === hour),
     }
   })
 }
