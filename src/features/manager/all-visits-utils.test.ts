@@ -14,6 +14,7 @@ import {
   updateAllVisitsSearchParams,
   type AllVisitsFilters,
   type VisitSort,
+  type VisitSortField,
 } from "@/features/manager/all-visits-utils"
 import { mockVisitReferenceData } from "@/services/mock-visit-data"
 
@@ -26,7 +27,6 @@ const baseFilters: AllVisitsFilters = {
   status: "all",
   visitTypeId: "all",
   hostEmployeeId: "all",
-  invitationStatus: "all",
   additionalRequirement: "all",
 }
 
@@ -34,6 +34,7 @@ const visits = [
   visit("1", "2026-08-10T08:00:00+03:00", { firstName: "Ayşe", companyId: "bplas", facilityId: "bplas-merkez", employeeId: "maya-kara" }),
   visit("2", "2026-08-11T10:00:00+03:00", { firstName: "Bora", companyId: "bplas", facilityId: "bplas-arge", employeeId: "emre-yilmaz", invitationStatus: "FAILED", hasAdditionalRequirements: true }),
   visit("3", "2026-08-12T12:00:00+03:00", { firstName: "Ceren", companyId: "bplas-otomotiv", facilityId: "otomotiv-uretim", employeeId: "selin-aydin", status: "CHECKED_IN", typeId: "audit", hasAdditionalRequirements: true }),
+  visit("4", "2026-08-13T09:00:00+03:00", { firstName: "Deniz", companyId: "bplas", facilityId: "bplas-merkez", employeeId: "maya-kara", invitationStatus: "NOT_SENT", hasAdditionalRequirements: true }),
 ]
 
 describe("all visits operations", () => {
@@ -55,45 +56,39 @@ describe("all visits operations", () => {
     expect(parseAllVisitsQuery(new URLSearchParams("company=bplas&facility=otomotiv-uretim"), mockVisitReferenceData).filters.facilityId).toBe("all")
   })
 
-  it("filters status, visit type, invitation and additional requirement independently", () => {
+  it("filters status, visit type and additional requirement independently", () => {
     expect(ids(filterAndSortVisits(visits, { ...baseFilters, status: "CHECKED_IN" }))).toEqual(["3"])
     expect(ids(filterAndSortVisits(visits, { ...baseFilters, visitTypeId: "audit" }))).toEqual(["3"])
-    expect(ids(filterAndSortVisits(visits, { ...baseFilters, invitationStatus: "FAILED" }))).toEqual(["2"])
     expect(ids(filterAndSortVisits(visits, { ...baseFilters, additionalRequirement: "with" }))).toEqual(["2", "3"])
   })
 
-  it("toggles visitor header through 1st: visitor asc, 2nd: visitor desc, 3rd: visitType asc, 4th: off", () => {
-    let sorts: VisitSort[] = []
-
-    // 1st click: visitor asc
-    sorts = toggleVisitSort(sorts, "visitor")
-    expect(sorts).toEqual([{ field: "visitor", direction: "asc" }])
-    expect(ids(filterAndSortVisits(visits, baseFilters, sorts))).toEqual(["1", "2", "3"])
-
-    // 2nd click: visitor desc
-    sorts = toggleVisitSort(sorts, "visitor")
-    expect(sorts).toEqual([{ field: "visitor", direction: "desc" }])
-    expect(ids(filterAndSortVisits(visits, baseFilters, sorts))).toEqual(["3", "2", "1"])
-
-    // 3rd click: visitType asc (sort by visit type for same visit type grouping)
-    sorts = toggleVisitSort(sorts, "visitor")
-    expect(sorts).toEqual([{ field: "visitType", direction: "asc" }])
-
-    // 4th click: off (back to original table)
-    sorts = toggleVisitSort(sorts, "visitor")
-    expect(sorts).toEqual([])
+  it("excludes visits whose invitation has not been sent from the operations list", () => {
+    expect(ids(filterAndSortVisits(visits, baseFilters))).toEqual(["1", "2", "3"])
+    expect(filterAndSortVisits(visits, { ...baseFilters, search: "Deniz" })).toEqual([])
   })
 
-  it("toggles TAKİP header through 1st: invitation asc, 2nd: off (back to original table)", () => {
-    let sorts: VisitSort[] = []
+  it.each<VisitSortField>(["visitor", "visitType", "host", "companyFacility", "plannedStart", "status"])("cycles %s through asc, desc and removed without clearing other sorts", (field) => {
+    const existing: VisitSort = field === "plannedStart"
+      ? { field: "visitor", direction: "asc" }
+      : { field: "plannedStart", direction: "asc" }
+    let sorts: VisitSort[] = [existing]
 
-    // 1st click: invitation asc
-    sorts = toggleVisitSort(sorts, "invitation")
-    expect(sorts).toEqual([{ field: "invitation", direction: "asc" }])
+    sorts = toggleVisitSort(sorts, field)
+    expect(sorts).toEqual([existing, { field, direction: "asc" }])
 
-    // 2nd click: off (directly returns to original table)
-    sorts = toggleVisitSort(sorts, "invitation")
-    expect(sorts).toEqual([])
+    sorts = toggleVisitSort(sorts, field)
+    expect(sorts).toEqual([existing, { field, direction: "desc" }])
+
+    sorts = toggleVisitSort(sorts, field)
+    expect(sorts).toEqual([existing])
+  })
+
+  it("sorts visit type, host, company/facility and status within active priorities", () => {
+    expect(ids(filterAndSortVisits(visits, baseFilters, [{ field: "visitType", direction: "asc" }]))).toEqual(["3", "1", "2"])
+    expect(ids(filterAndSortVisits(visits, baseFilters, [{ field: "host", direction: "asc" }]))).toEqual(["2", "1", "3"])
+    expect(ids(filterAndSortVisits(visits, baseFilters, [{ field: "companyFacility", direction: "asc" }]))).toEqual(["2", "1", "3"])
+    expect(ids(filterAndSortVisits(visits, baseFilters, [{ field: "status", direction: "asc" }, { field: "host", direction: "desc" }]))).toEqual(["3", "1", "2"])
+    expect(ids(filterAndSortVisits(visits, baseFilters, [{ field: "visitType", direction: "asc" }, { field: "host", direction: "desc" }]))).toEqual(["3", "1", "2"])
   })
 
   it("calculates scope-aware count for visits with additional requirements", () => {
@@ -111,7 +106,7 @@ describe("all visits operations", () => {
   })
 
   it("resets the page when a filter changes and clears known filters", () => {
-    const changed = updateAllVisitsSearchParams(new URLSearchParams("page=3&status=PLANNED&custom=kept"), "company", "bplas")
+    const changed = updateAllVisitsSearchParams(new URLSearchParams("page=3&status=PLANNED&invitation=FAILED&custom=kept"), "company", "bplas")
     expect(changed.get("page")).toBeNull()
     expect(changed.get("company")).toBe("bplas")
     expect(changed.get("custom")).toBe("kept")
@@ -134,6 +129,9 @@ describe("all visits operations", () => {
     const invalid = parseAllVisitsQuery(new URLSearchParams("date=bad&status=UNKNOWN&company=missing&page=-4"), mockVisitReferenceData)
     expect(invalid.filters).toMatchObject({ startDate: "", endDate: "", status: "all", companyId: "all" })
     expect(invalid.page).toBe(1)
+
+    const staleInvitation = parseAllVisitsQuery(new URLSearchParams("invitation=FAILED"), mockVisitReferenceData)
+    expect(staleInvitation.filters).not.toHaveProperty("invitationStatus")
   })
 })
 

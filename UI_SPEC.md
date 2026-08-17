@@ -138,6 +138,9 @@ May include:
 - notifications,
 - current user/profile.
 
+The Manager notification list may be cleared in bulk. Clearing only dismisses the current
+notification presentation and must not change Visit invitation domain states.
+
 Example:
 
 `Company B / Factory 1 ▼`
@@ -248,16 +251,20 @@ Visit blocks should show:
 Cancelled visits remain visible with muted/cancelled treatment.
 
 The timeline and Upcoming Visits remain limited to Visits created by the current employee.
-On desktop, use one persistent compact action panel fixed to the lower-right for every
-manually actionable Meeting hosted by the current employee whose planned end has arrived or
-passed. A Meeting is manually actionable only after `plannedStart`, while it is explicitly
+On desktop, use one persistent compact `İşlem gerekenler` panel fixed to the lower-right.
+It contains every manually actionable Meeting hosted by the current employee whose planned
+end has arrived or passed. A Meeting is manually actionable only after `plannedStart`, while it is explicitly
 open, and while at least one linked Visit is non-terminal. Fully `CHECKED_OUT`, `CANCELLED`,
 or `NO_SHOW` Meetings do not appear even if legacy/mock data lacks `actualMeetingEnd`. The
-panel must not push the timeline down. Each Meeting row must be distinguishable by
+panel also contains planned Visits created by the current employee whose invitation is
+`NOT_SENT` or `FAILED`; `SENDING` is not an actionable state. Keep invitation rows visibly
+separate from Meeting rows and route their action into the existing single-Visit invitation
+dialog. Do not change the left-navigation invitation notifications in this phase. The panel
+must not push the timeline down. Each Meeting row must be distinguishable by
 visitor/meeting context and expose +15, +30, an anchored custom-minute popover, and an
 immediate `Toplantıyı Bitir` action. Multiple records scroll inside the panel and its header
-shows the total count. The user can minimize it to a lower-right
-`N toplantı için işlem gerekiyor` control, but cannot dismiss notifications. Extending
+shows the total action count. The user can minimize it to a lower-right
+`N işlem gerekiyor` control, but cannot dismiss notifications. Extending
 removes the row until the new end time; closing removes it permanently. Do not add these
 host-only notification Meetings to the personal timeline/list, and do not use recurring
 popups or escalation.
@@ -498,10 +505,11 @@ Limit charts to useful summaries.
 ### Manager All Visits
 
 - Remains a read-only operational list.
-- Uses compact date-range, company, facility, status, visit-type, host, invitation, and additional-requirement filters.
+- Uses compact date-range, company, facility, status, visit-type, host, and additional-requirement filters.
+- Excludes Visits whose invitation state is `NOT_SENT`; the list contains only operationally opened Visits.
 - Persists filters in the URL and paginates the filtered result.
 - Opens visit details in a centered, compact dialog which provides tabs for visit details and Meeting resource assignment.
-- Shows invitation delivery and additional-requirement indicators separately from the operational visit status.
+- Uses separate Visitor and Visit Type columns and does not include a Tracking column; invitation delivery and additional-requirement details remain available in the detail dialog.
 - Continues to show one row per visitor/Visit; do not redesign or group the table by Meeting.
 
 ### Manager Resource Catalog
@@ -543,23 +551,47 @@ Limit charts to useful summaries.
   controls use placeholder text rather than a selectable `Şirket seçin` or `Tesis seçin` option.
 - Keeps the planning form, selected-time availability, and planned assignments visible together.
   It does not add dashboard KPIs or charts.
-- Requires company, facility, date, start/end time, task/purpose, one vehicle, and one driver.
+- Requires company, facility, date, task/purpose, one vehicle, and one driver. Start and end
+  times are optional together; entering only one is invalid. When both are omitted, the vehicle
+  and driver are reserved for the full selected day and the UI shows `Saat belirtilmedi`.
   The task/purpose control is a compact single-line field. A Meeting or Visit relationship is
   optional, expressed as an understandable `Bağlantılı kayıt` type plus optional record selector.
-- Calculates and shows availability only after company, facility, date, start time, and end time
-  are complete. Until then, an instructional state explains how to continue; it does not claim
-  that no resources are available.
+- Calculates and shows availability after company, facility, and date are complete and either
+  both time fields are supplied or both are blank. Until then, an instructional state explains
+  how to continue; it does not claim that no resources are available.
 - Shows only active, selected-company/facility resources that are available for the chosen time.
   Vehicles and drivers use clear, compact selectable rows; a complete context with no matches
   shows the no-availability state.
 - Initially lists upcoming active assignments. Company/facility selections narrow that list, and a
   complete company/facility/date context shows that day's assignments, including cancellations.
-  Active rows can be edited or cancelled; a cancellation visibly releases the resource pair from
-  the current availability result.
-- Planned assignments render in a compact table with time, vehicle/plate, driver, purpose, status,
-  and edit/cancel actions.
+  The compact table shows three records per page at a fixed/minimum list height, with the visible
+  record range at lower-left and content-sized dynamic pagination at lower-right. The table body
+  does not scroll vertically; page-number positions remain stable while unavailable direction
+  arrows disappear.
+- Assignment rows remain clickable and open the existing centered detail dialog. Active assignments
+  expose edit and cancel actions only in that dialog; the table has no inline action column.
+- Editing switches the detail dialog into an edit form that preserves vehicle, driver, company,
+  facility, date, optional paired times, purpose, and optional related record. The upper planning
+  card remains create-only.
 - The Resource Catalog remains the single source for vehicle and driver records; no catalog fields
   or fleet-pairing controls are duplicated on the planning page.
+
+### Manager Goods Movement
+
+- Sidebar `Mal Giriş / Çıkış` opens a compact Manager operations page aligned with All Visits,
+  Resources, and Fleet pages.
+- A compact top filter row provides search, date range, company, facility, direction, status, and
+  `+ Yeni kayıt`; the dense table shows direction, counterparty, goods/description, scope,
+  planned/actual times, and status.
+- Row click opens a centered detail dialog. Planned rows can be edited or cancelled; completed rows
+  are read-only. The create/edit dialog changes `Gönderen firma` to `Alıcı firma` with direction.
+- Manager forms use the shared internal dialog structure with fixed top alignment, header, scrollable
+  content, and footer. They separate `Planlama` and `Mal bilgisi` with a light divider; planned date is
+  required and planned time is optional. The list shows `Saat belirtilmedi` when no time is supplied.
+- Manager forms do not expose plate or driver fields. Dashboard delivery-style markers list both
+  `Gelen` and `Giden` movements clearly only when a planned time exists, without adding a Dashboard surface.
+- The fixed-height movement list does not scroll vertically. Pagination keeps its page-number
+  positions stable while unavailable direction arrows disappear.
 
 ### Manager Meeting Resource Assignment UI
 

@@ -5,7 +5,7 @@ import { Link } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import type { ExpectedAfterHoursDelivery } from "@/domain/manager-dashboard"
+import { getGoodsDirectionLabel, type GoodsMovement } from "@/domain/goods-movements"
 import type { PlannedTransportAssignment } from "@/domain/transport-assignments"
 import type { Visit } from "@/domain/visits"
 import { getOperationNowIndicator } from "@/features/manager/manager-clock"
@@ -18,7 +18,7 @@ import { VisitStatusBadge } from "@/features/visits/VisitStatusBadge"
 import { useVisits } from "@/features/visits/visit-context"
 import { formatTr } from "@/lib/date"
 import { cn } from "@/lib/utils"
-import { managerDashboardService, transportAssignmentService } from "@/services"
+import { goodsMovementService, transportAssignmentService } from "@/services"
 import {
   getDashboardVisitStatus,
   getActiveTransportAssignments,
@@ -28,6 +28,7 @@ import {
   getScopedVisits,
   getStatusCounts,
   getTodayScopedTransportAssignments,
+  getTodayScopedGoodsMovements,
   getTodayVisits,
   type DashboardVisitStatus,
 } from "./manager-dashboard-utils"
@@ -41,7 +42,7 @@ type SelectionDescriptor =
 type SelectionData = {
   title: string
   visits: Visit[]
-  deliveries: ExpectedAfterHoursDelivery[]
+  deliveries: GoodsMovement[]
   transportAssignments: PlannedTransportAssignment[]
 }
 
@@ -57,7 +58,7 @@ const statusMeta: { status: DashboardVisitStatus; label: string; color: string }
 export function ManagerDashboard() {
   const { visits, referenceData, isLoading } = useVisits()
   const { companyId, currentTime, facilityId, isRefreshing, refresh, refreshVersion, lastUpdated } = useManagerRefresh()
-  const [deliveries, setDeliveries] = useState<ExpectedAfterHoursDelivery[]>([])
+  const [deliveries, setDeliveries] = useState<GoodsMovement[]>([])
   const [transportAssignments, setTransportAssignments] = useState<PlannedTransportAssignment[]>([])
   const [selection, setSelection] = useState<SelectionDescriptor | null>(null)
   const [viewingVisit, setViewingVisit] = useState<Visit | null>(null)
@@ -68,7 +69,7 @@ export function ManagerDashboard() {
 
   useEffect(() => {
     void Promise.all([
-      managerDashboardService.listExpectedAfterHoursDeliveries(),
+      goodsMovementService.listGoodsMovements(),
       transportAssignmentService.listAssignments(),
     ]).then(([nextDeliveries, nextTransportAssignments]) => {
       setDeliveries(nextDeliveries)
@@ -81,10 +82,7 @@ export function ManagerDashboard() {
   const insideVisits = scopedVisits
     .filter((visit) => visit.status === "CHECKED_IN")
     .sort((left, right) => getDelayMinutes(right, now) - getDelayMinutes(left, now))
-  const scopedDeliveries = deliveries.filter((delivery) =>
-    (companyId === "all" || delivery.companyId === companyId) &&
-    (facilityId === "all" || delivery.facilityId === facilityId),
-  )
+  const scopedDeliveries = getTodayScopedGoodsMovements(deliveries, { companyId, facilityId }, currentTime)
   const scopedTransportAssignments = getTodayScopedTransportAssignments(transportAssignments, { companyId, facilityId }, currentTime)
   const activeTransportAssignments = getActiveTransportAssignments(transportAssignments, { companyId, facilityId }, currentTime)
   const counts = getStatusCounts(todayVisits, currentTime)
@@ -101,7 +99,7 @@ export function ManagerDashboard() {
   useEffect(() => {
     if (!selection) return
     const statusIsGone = selection.kind === "status" && !counts.some((count) => count.status === selection.status)
-    const deliveryIsGone = selection.kind === "delivery" && !scopedDeliveries.some((delivery) => new Date(delivery.expectedAt).getHours() === selection.hour)
+    const deliveryIsGone = selection.kind === "delivery" && !scopedDeliveries.some((delivery) => delivery.plannedTime?.startsWith(String(selection.hour).padStart(2, "0")))
     const fleetIsGone = selection.kind === "fleet" && !scopedTransportAssignments.some((assignment) => new Date(assignment.plannedStart).getHours() === selection.hour)
     if (statusIsGone || deliveryIsGone || fleetIsGone) setSelection(null)
   }, [counts, scopedDeliveries, scopedTransportAssignments, selection])
@@ -315,7 +313,7 @@ type InteractiveChartProps = {
   onTransportAssignmentOpen(assignment: PlannedTransportAssignment): void
 }
 
-function Operations({ visits, deliveries, transportAssignments, now, ...interactiveProps }: { visits: Visit[]; deliveries: ExpectedAfterHoursDelivery[]; transportAssignments: PlannedTransportAssignment[]; now: Date } & InteractiveChartProps) {
+function Operations({ visits, deliveries, transportAssignments, now, ...interactiveProps }: { visits: Visit[]; deliveries: GoodsMovement[]; transportAssignments: PlannedTransportAssignment[]; now: Date } & InteractiveChartProps) {
   const bins = getOperationBins(visits, deliveries, transportAssignments, 8, 23)
   const max = Math.max(1, ...bins.flatMap((bin) => [bin.planned, bin.actual, bin.deliveries.length]))
   const nowIndicator = getOperationNowIndicator(now, 8, 23)
@@ -397,7 +395,7 @@ function OperationHour({ bin, max, visits, ...interactiveProps }: { bin: ReturnT
         <SelectionMenu descriptor={deliverySelection} {...interactiveProps}>
           <button
             type="button"
-            aria-label={`${hourLabel}.00 saatindeki ${bin.deliveries.length} teslimatı göster`}
+            aria-label={`${hourLabel}.00 saatindeki ${bin.deliveries.length} mal hareketini göster`}
             className={cn(
               "absolute bottom-7 left-1/2 z-30 flex min-h-6 min-w-6 -translate-x-1/2 items-center justify-center gap-0.5 rounded border border-violet-300 bg-violet-100 px-1 text-[11px] font-semibold text-violet-900 shadow-sm hover:bg-violet-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-600",
               bin.transportAssignments.length > 0 && "-translate-x-[calc(100%+2px)]",
@@ -532,7 +530,7 @@ function SelectionPopoverContent({ selection, side, onVisitOpen, onTransportAssi
   const resolvedSide = side === "right" && typeof window !== "undefined" && window.innerWidth <= 480 ? "bottom" : side
   const rows = [
     ...selection.visits.map((visit) => ({ kind: "visit" as const, id: visit.id, date: new Date(visit.plannedStart), visit })),
-    ...selection.deliveries.map((delivery) => ({ kind: "delivery" as const, id: delivery.id, date: new Date(delivery.expectedAt), delivery })),
+    ...selection.deliveries.map((delivery) => ({ kind: "delivery" as const, id: delivery.id, date: new Date(`${delivery.plannedDate}T${delivery.plannedTime}`), delivery })),
     ...selection.transportAssignments.map((assignment) => ({ kind: "fleet" as const, id: assignment.id, date: new Date(assignment.plannedStart), assignment })),
   ].sort((left, right) => left.date.getTime() - right.date.getTime())
 
@@ -573,8 +571,8 @@ function SelectionPopoverContent({ selection, side, onVisitOpen, onTransportAssi
         ) : row.kind === "delivery" ? (
           <div key={row.id} className="grid min-h-11 grid-cols-[42px_minmax(0,1fr)_auto] items-center gap-2 rounded-sm px-2 py-1.5 text-xs">
             <span className="tabular-nums text-slate-600">{formatTr(row.date, "HH:mm")}</span>
-            <span className="truncate font-semibold text-slate-900">{row.delivery.supplierName}</span>
-            <span className="inline-flex items-center gap-1 rounded border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-800"><PackageCheck className="size-3" />Teslimat</span>
+            <span className="truncate font-semibold text-slate-900">{row.delivery.counterpartyName}<span className="block text-[11px] font-normal text-slate-600">{row.delivery.goodsDescription}</span></span>
+            <span className="inline-flex items-center gap-1 rounded border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-800"><PackageCheck className="size-3" />{getGoodsDirectionLabel(row.delivery.direction)}</span>
           </div>
         ) : (
           <DropdownMenuItem
@@ -645,7 +643,7 @@ export function NextVisits({
   )
 }
 
-function resolveSelection(selection: SelectionDescriptor, visits: Visit[], deliveries: ExpectedAfterHoursDelivery[], transportAssignments: PlannedTransportAssignment[], now: Date): SelectionData {
+function resolveSelection(selection: SelectionDescriptor, visits: Visit[], deliveries: GoodsMovement[], transportAssignments: PlannedTransportAssignment[], now: Date): SelectionData {
   if (selection.kind === "status") {
     const selectedVisits = visits.filter((visit) => getDashboardVisitStatus(visit, now) === selection.status)
     const label = statusMeta.find((item) => item.status === selection.status)?.label ?? selection.status
@@ -653,7 +651,7 @@ function resolveSelection(selection: SelectionDescriptor, visits: Visit[], deliv
   }
 
   const hourLabel = String(selection.hour).padStart(2, "0")
-  const selectedDeliveries = deliveries.filter((delivery) => new Date(delivery.expectedAt).getHours() === selection.hour)
+  const selectedDeliveries = deliveries.filter((delivery) => delivery.plannedTime?.startsWith(String(selection.hour).padStart(2, "0")))
   const selectedTransportAssignments = transportAssignments.filter((assignment) => new Date(assignment.plannedStart).getHours() === selection.hour)
   if (selection.kind === "delivery") {
     return { title: `${hourLabel}.00 · ${selectedDeliveries.length} kayıt`, visits: [], deliveries: selectedDeliveries, transportAssignments: [] }

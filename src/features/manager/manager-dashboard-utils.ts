@@ -1,6 +1,6 @@
-import { differenceInMinutes, isAfter, isBefore, isSameDay } from "date-fns"
+import { differenceInMinutes, format, isAfter, isBefore, isSameDay } from "date-fns"
 
-import type { ExpectedAfterHoursDelivery } from "@/domain/manager-dashboard"
+import type { GoodsMovement } from "@/domain/goods-movements"
 import type { PlannedTransportAssignment } from "@/domain/transport-assignments"
 import type { Visit, VisitStatus } from "@/domain/visits"
 
@@ -15,7 +15,7 @@ export type OperationBin = {
   hour: number
   planned: number
   actual: number
-  deliveries: ExpectedAfterHoursDelivery[]
+  deliveries: GoodsMovement[]
   transportAssignments: PlannedTransportAssignment[]
 }
 
@@ -39,14 +39,25 @@ export function getTodayScopedTransportAssignments(assignments: PlannedTransport
   )
 }
 
-export function getOperationBins(visits: Visit[], deliveries: ExpectedAfterHoursDelivery[], transportAssignments: PlannedTransportAssignment[], startHour = 8, endHour = 23): OperationBin[] {
+export function getTodayScopedGoodsMovements(movements: GoodsMovement[], scope: DashboardScope, now: Date) {
+  const today = format(now, "yyyy-MM-dd")
+  return movements.filter((movement) =>
+    movement.status === "PLANNED"
+    && Boolean(movement.plannedTime)
+    && (scope.companyId === "all" || movement.companyId === scope.companyId)
+    && (scope.facilityId === "all" || movement.facilityId === scope.facilityId)
+    && movement.plannedDate === today,
+  )
+}
+
+export function getOperationBins(visits: Visit[], deliveries: GoodsMovement[], transportAssignments: PlannedTransportAssignment[], startHour = 8, endHour = 23): OperationBin[] {
   return Array.from({ length: endHour - startHour + 1 }, (_, index) => {
     const hour = startHour + index
     return {
       hour,
       planned: visits.filter((visit) => new Date(visit.plannedStart).getHours() === hour).length,
       actual: visits.filter((visit) => visit.actualCheckIn && new Date(visit.actualCheckIn).getHours() === hour).length,
-      deliveries: deliveries.filter((delivery) => new Date(delivery.expectedAt).getHours() === hour),
+      deliveries: deliveries.filter((delivery) => delivery.plannedTime?.startsWith(String(hour).padStart(2, "0"))),
       transportAssignments: transportAssignments.filter((assignment) => new Date(assignment.plannedStart).getHours() === hour),
     }
   })

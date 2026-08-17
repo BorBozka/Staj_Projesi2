@@ -2,7 +2,6 @@ import {
   AlertCircle,
   ArrowDown,
   ArrowUp,
-  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -11,9 +10,7 @@ import {
   ChevronUp,
   ClipboardList,
   FilterX,
-  LoaderCircle,
   Search,
-  Send,
   SlidersHorizontal,
 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
@@ -22,7 +19,7 @@ import { useSearchParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
-import type { InvitationStatus, Visit, VisitStatus } from "@/domain/visits"
+import type { Visit, VisitStatus } from "@/domain/visits"
 import {
   ALL_VISITS_PAGE_SIZE,
   clearAllVisitsSearchParams,
@@ -53,14 +50,6 @@ const statusOptions: { value: "all" | VisitStatus; label: string }[] = [
   { value: "CHECKED_OUT", label: "Çıkış yapıldı" },
   { value: "CANCELLED", label: "İptal edildi" },
   { value: "NO_SHOW", label: "Gelmedi" },
-]
-
-const invitationOptions: { value: "all" | InvitationStatus; label: string }[] = [
-  { value: "all", label: "Tüm davet durumları" },
-  { value: "NOT_SENT", label: "Davet gönderilmedi" },
-  { value: "SENDING", label: "Davet gönderiliyor" },
-  { value: "SENT", label: "Davet gönderildi" },
-  { value: "FAILED", label: "Gönderim başarısız" },
 ]
 
 export function AllVisitsPage() {
@@ -233,21 +222,18 @@ export function AllVisitsPage() {
         {dateRangeInvalid && <p className="mt-2 text-xs font-medium text-red-700" role="alert">Başlangıç tarihi bitiş tarihinden sonra olamaz.</p>}
 
         {queryState.showOtherFilters && (
-          <div id="all-visits-other-filters" className="mt-2.5 grid gap-2 rounded-md border bg-slate-50/70 p-2.5 sm:grid-cols-2 lg:grid-cols-3">
+          <div id="all-visits-other-filters" className="mt-2.5 grid gap-2 rounded-md border bg-slate-50/70 p-2.5 sm:grid-cols-2">
             <FilterField label="Ziyaret türü" htmlFor="all-visits-type">
               <FilterSelect id="all-visits-type" value={filters.visitTypeId} emptyLabel="Tüm ziyaret türleri" options={referenceData.visitTypes.map((type) => ({ value: type.id, label: type.name }))} onValueChange={(value) => setFilter("type", value)} />
             </FilterField>
             <FilterField label="Ev sahibi" htmlFor="all-visits-host">
               <FilterSelect id="all-visits-host" value={filters.hostEmployeeId} emptyLabel="Tüm ev sahipleri" options={referenceData.employees.map((employee) => ({ value: employee.id, label: employee.name }))} onValueChange={(value) => setFilter("host", value)} />
             </FilterField>
-            <FilterField label="Davet durumu" htmlFor="all-visits-invitation">
-              <FilterSelect id="all-visits-invitation" value={filters.invitationStatus} emptyLabel="Tüm davet durumları" options={invitationOptions.filter((option) => option.value !== "all")} onValueChange={(value) => setFilter("invitation", value)} />
-            </FilterField>
           </div>
         )}
       </section>
 
-      <section ref={tableSectionRef} className="overflow-hidden rounded-lg border bg-card shadow-panel min-h-[460px] flex flex-col justify-between" aria-label="Ziyaret listesi">
+      <section ref={tableSectionRef} className="scroll-mt-3 flex h-[35.5rem] flex-col justify-between overflow-hidden rounded-lg border bg-card shadow-panel" aria-label="Ziyaret listesi">
         {filteredVisits.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center px-4 py-24 text-center">
             <Search className="mx-auto size-8 text-slate-400" />
@@ -264,18 +250,18 @@ export function AllVisitsPage() {
                     <SortButton label="ZİYARETÇİ" field="visitor" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
                   </th>
                   <th className="w-[14%] px-3 py-2.5">
+                    <SortButton label="ZİYARET TÜRÜ" field="visitType" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
+                  </th>
+                  <th className="w-[14%] px-3 py-2.5">
                     <SortButton label="EV SAHİBİ" field="host" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
                   </th>
-                  <th className="w-[17%] px-3 py-2.5">
+                  <th className="w-[18%] px-3 py-2.5">
                     <SortButton label="ŞİRKET / TESİS" field="companyFacility" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
                   </th>
-                  <th className="w-[18%] px-3 py-2.5">
+                  <th className="w-[24%] px-3 py-2.5">
                     <SortButton label="PLANLANAN ZAMAN" field="plannedStart" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
                   </th>
-                  <th className="w-[23%] px-3 py-2.5">
-                    <SortButton label="TAKİP" field="invitation" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
-                  </th>
-                  <th className="w-[12%] px-3 py-2.5">
+                  <th className="w-[14%] px-3 py-2.5">
                     <SortButton label="DURUM" field="status" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
                   </th>
                 </tr>
@@ -296,15 +282,14 @@ export function AllVisitsPage() {
                   >
                     <td className="px-3 py-2.5 sm:py-3">
                       <p className="truncate font-semibold text-slate-900" title={`${visit.visitor.firstName} ${visit.visitor.lastName}`}>{visit.visitor.firstName} {visit.visitor.lastName}</p>
-                      <p className="mt-0.5 truncate text-[11px] text-slate-500" title={visit.visitTypeName}>{visit.visitTypeName}</p>
                     </td>
+                    <td className="px-3 py-2.5 sm:py-3"><p className="truncate" title={visit.visitTypeName}>{visit.visitTypeName}</p></td>
                     <td className="px-3 py-2.5 sm:py-3"><p className="truncate" title={visit.hostEmployeeName}>{visit.hostEmployeeName}</p></td>
                     <td className="px-3 py-2.5 sm:py-3">
                       <p className="truncate" title={visit.hostCompanyName}>{visit.hostCompanyName}</p>
                       <p className="mt-0.5 truncate text-[11px] text-slate-500" title={visit.facilityName}>{visit.facilityName}</p>
                     </td>
                     <td className="px-3 py-2.5 sm:py-3 tabular-nums">{formatTr(new Date(visit.plannedStart), "d MMM yyyy · HH:mm")}–{formatTr(new Date(visit.plannedEnd), "HH:mm")}</td>
-                    <td className="px-3 py-2.5 sm:py-3"><TrackingBadges visit={visit} /></td>
                     <td className="px-3 py-2.5 sm:py-3"><VisitStatusBadge status={visit.status} compact /></td>
                   </tr>
                 ))}
@@ -312,7 +297,6 @@ export function AllVisitsPage() {
                   <tr key={`filler-${index}`} aria-hidden="true" className={cn("pointer-events-none select-none", index > 0 && "border-transparent")}>
                     <td className="px-3 py-2.5 sm:py-3">
                       <p className="truncate font-semibold text-transparent">&nbsp;</p>
-                      <p className="mt-0.5 truncate text-[11px] text-transparent">&nbsp;</p>
                     </td>
                     <td className="px-3 py-2.5 sm:py-3 text-transparent">&nbsp;</td>
                     <td className="px-3 py-2.5 sm:py-3 text-transparent">&nbsp;</td>
@@ -494,49 +478,20 @@ function FilterSelect({ id, value, emptyLabel, options, onValueChange }: {
   )
 }
 
-const invitationTracking: Record<InvitationStatus, { label: string; icon: typeof Send; className: string }> = {
-  NOT_SENT: { label: "Davet gönderilmedi", icon: Send, className: "border-amber-200 bg-amber-50 text-amber-800" },
-  SENDING: { label: "Davet gönderiliyor", icon: LoaderCircle, className: "border-blue-200 bg-blue-50 text-blue-800" },
-  SENT: { label: "Davet gönderildi", icon: CheckCircle2, className: "border-emerald-200 bg-emerald-50 text-emerald-800" },
-  FAILED: { label: "Gönderim başarısız", icon: AlertCircle, className: "border-red-200 bg-red-50 text-red-800" },
-}
-
-function TrackingBadges({ visit }: { visit: Visit }) {
-  const invitation = invitationTracking[visit.invitationStatus]
-  const InvitationIcon = invitation.icon
-  return (
-    <div className="flex items-center gap-1.5 whitespace-nowrap overflow-hidden">
-      <div className="w-[146px] shrink-0">
-        <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium shrink-0", invitation.className)}>
-          <InvitationIcon className={cn("size-3", visit.invitationStatus === "SENDING" && "animate-spin")} />{invitation.label}
-        </span>
-      </div>
-      {visit.hasAdditionalRequirements && (
-        <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-800 shrink-0">
-          <ClipboardList className="size-3" />İlave gereksinim var
-        </span>
-      )}
-    </div>
-  )
-}
-
 function SortButton({ label, field, sorts, onToggle }: {
   label: string
   field: VisitSortField
   sorts: VisitSort[]
   onToggle(field: VisitSortField): void
 }) {
-  const activeSort = field === "visitor"
-    ? sorts.find((sort) => sort.field === "visitor" || sort.field === "visitType")
-    : sorts.find((sort) => sort.field === field)
+  const activeSort = sorts.find((sort) => sort.field === field)
 
   return (
     <button
       type="button"
       className="inline-flex items-center gap-1 rounded-sm hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-blue-600"
       onClick={() => onToggle(field)}
-      aria-label={`${label} sütununu ${activeSort?.direction === "asc" ? "azalan" : "artan"} sırala`}
-      title={activeSort?.field === "visitType" ? "Ziyaret türüne göre sıralı" : undefined}
+      aria-label={activeSort?.direction === "desc" ? `${label} sütunu sıralamasını kaldır` : `${label} sütununu ${activeSort?.direction === "asc" ? "azalan" : "artan"} sırala`}
     >
       {label}
       {activeSort ? (

@@ -71,6 +71,24 @@ describe("MockTransportAssignmentService", () => {
     expect(availability.drivers.map((resource) => resource.id)).toContain(baseInput.driverResourceId)
   })
 
+  it("treats an untimed daily reservation as conflicting with every timed interval on that day", async () => {
+    const { transportService } = makeServices()
+    await transportService.createAssignment({
+      ...baseInput,
+      plannedStart: "2027-01-20T00:00:00.000Z",
+      plannedEnd: "2027-01-21T00:00:00.000Z",
+    })
+
+    const availability = await transportService.getAvailability({
+      ...baseInput,
+      plannedStart: "2027-01-20T15:00:00.000Z",
+      plannedEnd: "2027-01-20T16:00:00.000Z",
+    })
+
+    expect(availability.vehicles.map((resource) => resource.id)).not.toContain(baseInput.vehicleResourceId)
+    expect(availability.drivers.map((resource) => resource.id)).not.toContain(baseInput.driverResourceId)
+  })
+
   it("detects real overlap across equivalent UTC offsets", async () => {
     const { transportService } = makeServices()
     await transportService.createAssignment({

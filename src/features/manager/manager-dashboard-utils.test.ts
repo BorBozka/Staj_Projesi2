@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest"
 
-import type { ExpectedAfterHoursDelivery } from "@/domain/manager-dashboard"
+import type { GoodsMovement } from "@/domain/goods-movements"
 import type { Visit, VisitStatus } from "@/domain/visits"
-import { getActiveTransportAssignments, getDashboardVisitStatus, getDelayMinutes, getNextPlannedVisits, getOperationBins, getOtherVisits, getScopedVisits, getStatusCounts, getTodayScopedTransportAssignments, getTodayVisits } from "./manager-dashboard-utils"
+import { getActiveTransportAssignments, getDashboardVisitStatus, getDelayMinutes, getNextPlannedVisits, getOperationBins, getOtherVisits, getScopedVisits, getStatusCounts, getTodayScopedGoodsMovements, getTodayScopedTransportAssignments, getTodayVisits } from "./manager-dashboard-utils"
 
 function makeVisit(id: string, status: VisitStatus, plannedStart: string, overrides: Partial<Visit> = {}): Visit {
   return {
@@ -44,9 +44,10 @@ describe("manager dashboard calculations", () => {
   })
 
   it("builds hourly planned, actual and delivery bins", () => {
-    const deliveries: ExpectedAfterHoursDelivery[] = [
-      { id: "delivery-1", supplierName: "Tedarikçi", companyId: "bplas", facilityId: "bplas-merkez", expectedAt: "2026-08-10T19:00:00+03:00", status: "EXPECTED" },
-      { id: "delivery-2", supplierName: "Gece Tedarikçisi", companyId: "bplas", facilityId: "bplas-merkez", expectedAt: "2026-08-10T23:30:00+03:00", status: "EXPECTED" },
+    const deliveries: GoodsMovement[] = [
+      { id: "delivery-1", direction: "INBOUND", companyId: "bplas", companyName: "BPLAS", facilityId: "bplas-merkez", facilityName: "Merkez", counterpartyName: "Tedarikçi", plannedDate: "2026-08-10", plannedTime: "19:00", goodsDescription: "Parça", status: "PLANNED", createdAt: "2026-08-10T08:00:00+03:00" },
+      { id: "delivery-2", direction: "OUTBOUND", companyId: "bplas", companyName: "BPLAS", facilityId: "bplas-merkez", facilityName: "Merkez", counterpartyName: "Gece Tedarikçisi", plannedDate: "2026-08-10", plannedTime: "23:30", goodsDescription: "Sevkiyat", status: "PLANNED", createdAt: "2026-08-10T08:00:00+03:00" },
+      { id: "delivery-3", direction: "INBOUND", companyId: "bplas", companyName: "BPLAS", facilityId: "bplas-merkez", facilityName: "Merkez", counterpartyName: "Saati yok", plannedDate: "2026-08-10", goodsDescription: "Günlük kayıt", status: "PLANNED", createdAt: "2026-08-10T08:00:00+03:00" },
     ]
     const assignments = [{
       id: "transport-1", companyId: "bplas", companyName: "BPLAS A.Ş.", facilityId: "bplas-merkez", facilityName: "Merkez Tesis", plannedStart: "2026-08-10T19:00:00+03:00", plannedEnd: "2026-08-10T20:00:00+03:00", purpose: "Saha görevi", vehicleResourceId: "vehicle-1", vehicleName: "Transit", vehicleLicensePlate: "16 BPL 101", driverResourceId: "driver-1", driverName: "Ayşe Demir", status: "ACTIVE" as const, createdAt: "2026-08-10T08:00:00+03:00",
@@ -56,7 +57,23 @@ describe("manager dashboard calculations", () => {
     expect(bins.find((bin) => bin.hour === 10)).toMatchObject({ planned: 2, actual: 1 })
     expect(bins.find((bin) => bin.hour === 19)?.deliveries).toHaveLength(1)
     expect(bins.find((bin) => bin.hour === 23)?.deliveries).toHaveLength(1)
+    expect(bins.flatMap((bin) => bin.deliveries).map((delivery) => delivery.id)).not.toContain("delivery-3")
     expect(bins.find((bin) => bin.hour === 19)?.transportAssignments).toHaveLength(1)
+  })
+
+  it("selects only today's planned, timed goods movements for dashboard markers", () => {
+    const base = { direction: "INBOUND" as const, companyId: "bplas", companyName: "BPLAS", facilityId: "bplas-merkez", facilityName: "Merkez", counterpartyName: "Tedarikçi", plannedDate: "2026-08-10", plannedTime: "19:00", goodsDescription: "Parça", status: "PLANNED" as const, createdAt: "2026-08-10T08:00:00+03:00" }
+    const movements: GoodsMovement[] = [
+      { ...base, id: "timed-today" },
+      { ...base, id: "without-time", plannedTime: undefined },
+      { ...base, id: "other-day", plannedDate: "2026-08-11" },
+      { ...base, id: "completed", status: "COMPLETED" },
+      { ...base, id: "other-facility", facilityId: "bplas-arge" },
+    ]
+
+    const selected = getTodayScopedGoodsMovements(movements, { companyId: "bplas", facilityId: "bplas-merkez" }, now)
+    expect(selected.map((movement) => movement.id)).toEqual(["timed-today"])
+    expect(getOperationBins([], selected, []).find((bin) => bin.hour === 19)?.deliveries.map((movement) => movement.id)).toEqual(["timed-today"])
   })
 
   it("selects only currently active Fleet assignments in scope", () => {

@@ -7,6 +7,20 @@ export function getPendingInvitationVisits(visits: Visit[]) {
   )
 }
 
+export function getVisiblePendingInvitationVisits(visits: Visit[], dismissedVisitIds: ReadonlySet<string>) {
+  return getPendingInvitationVisits(visits).filter((visit) => !dismissedVisitIds.has(visit.id))
+}
+
+export function getActionRequiredInvitationVisits(visits: Visit[], currentEmployeeId?: string) {
+  if (!currentEmployeeId) return []
+
+  return visits.filter((visit) =>
+    visit.creatorEmployeeId === currentEmployeeId &&
+    visit.status === "PLANNED" &&
+    (visit.invitationStatus === "NOT_SENT" || visit.invitationStatus === "FAILED"),
+  )
+}
+
 export function getInvitationActionLabel(visit: Visit, isSending = false) {
   if (isSending || visit.invitationStatus === "SENDING") return "Gönderiliyor…"
   if (visit.invitationStatus === "FAILED") return "Tekrar Dene"

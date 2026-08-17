@@ -20,6 +20,7 @@ export function MyVisitsPage() {
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [formOpen, setFormOpen] = useState(false)
   const [editingVisit, setEditingVisit] = useState<Visit | undefined>()
+  const [invitationScope, setInvitationScope] = useState<"MEETING" | "VISIT">("MEETING")
   const [viewingVisit, setViewingVisit] = useState<Visit | null>(null)
   const [reschedulingVisit, setReschedulingVisit] = useState<Visit | null>(null)
   const [cancellingVisit, setCancellingVisit] = useState<Visit | null>(null)
@@ -33,11 +34,19 @@ export function MyVisitsPage() {
 
   const openNewVisit = () => {
     setEditingVisit(undefined)
+    setInvitationScope("MEETING")
     setFormOpen(true)
   }
 
   const openEdit = (visit: Visit) => {
     setEditingVisit(visit)
+    setInvitationScope("MEETING")
+    setFormOpen(true)
+  }
+
+  const openInvitationAction = (visit: Visit) => {
+    setEditingVisit(visit)
+    setInvitationScope("VISIT")
     setFormOpen(true)
   }
 
@@ -84,7 +93,7 @@ export function MyVisitsPage() {
         onCancel={setCancellingVisit}
         viewerRole={referenceData?.currentEmployee.role ?? "EMPLOYEE"}
       />
-      <VisitFormDialog open={formOpen} onOpenChange={setFormOpen} visit={editingVisit} onSaved={setNotice} />
+      <VisitFormDialog open={formOpen} onOpenChange={setFormOpen} visit={editingVisit} invitationScope={invitationScope} onSaved={setNotice} />
       <RescheduleVisitDialog
         visit={reschedulingVisit}
         open={Boolean(reschedulingVisit)}
@@ -97,7 +106,7 @@ export function MyVisitsPage() {
         onOpenChange={(open) => !open && setCancellingVisit(null)}
         onSaved={setNotice}
       />
-      <HostedMeetingEndNotifications />
+      <HostedMeetingEndNotifications onInvitationAction={openInvitationAction} />
     </div>
   )
 }

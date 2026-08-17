@@ -4,8 +4,8 @@ export const transportAssignmentFormSchema = z.object({
   companyId: z.string().min(1, "Şirket zorunludur."),
   facilityId: z.string().min(1, "Tesis zorunludur."),
   date: z.string().min(1, "Tarih zorunludur."),
-  startTime: z.string().min(1, "Başlangıç saati zorunludur."),
-  endTime: z.string().min(1, "Bitiş saati zorunludur."),
+  startTime: z.string(),
+  endTime: z.string(),
   purpose: z.string().trim().min(1, "Görev/amaç zorunludur."),
   vehicleResourceId: z.string().min(1, "Bir araç seçin."),
   driverResourceId: z.string().min(1, "Bir şoför seçin."),
@@ -15,7 +15,13 @@ export const transportAssignmentFormSchema = z.object({
   if (value.relatedKind !== "none" && !value.relatedId) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["relatedId"], message: "İlişkili kayıt seçin." })
   }
-  if (value.startTime >= value.endTime) {
+  if (Boolean(value.startTime) !== Boolean(value.endTime)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: [value.startTime ? "endTime" : "startTime"],
+      message: "Başlangıç ve bitiş saatlerini birlikte belirtin.",
+    })
+  } else if (value.startTime && value.endTime && value.startTime >= value.endTime) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["endTime"], message: "Bitiş saati başlangıçtan sonra olmalıdır." })
   }
 })

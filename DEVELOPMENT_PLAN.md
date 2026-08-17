@@ -244,9 +244,11 @@ Includes:
   assignment tabs. It intentionally does not expose Meeting lifecycle information or actions,
   including when the current Manager is the Meeting host.
 - Employee UI (`src/features/visits/HostedMeetingEndNotifications.tsx`): one compact,
-  lower-right fixed and minimizable notification panel with a total count, internally
-  scrollable distinct rows, and host-only +15/+30/custom/close actions for overdue,
-  manually actionable hosted Meetings.
+  lower-right fixed and minimizable `İşlem gerekenler` panel with a total count and
+  internally scrollable Meeting and invitation groups. It keeps host-only
+  +15/+30/custom/close actions for overdue, manually actionable hosted Meetings and routes
+  creator-scoped `NOT_SENT`/`FAILED` Visit actions to the existing single-Visit invitation
+  dialog.
 - Shared lifecycle actions (`src/features/visits/MeetingLifecycleActions.tsx`): keeps quick
   actions in one stable row, presents custom minutes in an anchored popover, and performs
   MANUAL close without a confirmation dialog.
@@ -301,10 +303,12 @@ Includes:
 - centralized planned transport assignment domain models with immutable vehicle/driver display snapshots,
 - replaceable mock transport-assignment service with list, availability, create, update, and cancel operations,
 - service-boundary validation for required fields, company/facility scope, active catalog state,
-  optional Meeting-or-Visit link scope, and overlapping active assignments,
-- a compact Manager planning page with an initially blank planning context, instructional
-  availability state, selected-time available vehicles/drivers, upcoming assignments, contextual
-  filtering, and active-assignment edit/cancel controls,
+  optional paired start/end times, full-day reservation conflicts, optional Meeting-or-Visit
+  link scope, and overlapping active assignments,
+- a compact Manager planning page with an initially blank create-only planning context,
+  instructional availability state, selected-time available vehicles/drivers, contextual
+  filtering, and a three-record fixed-height paginated upcoming-assignment list whose clickable
+  rows open detail-dialog edit/cancel controls,
 - Manager navigation/route integration plus compact Dashboard Fleet integration: current tasks in
   `Şu Anda Aktif` and today's vehicle event markers in the existing operation chart,
 - unit coverage for availability, overlap, scope, active-state, optional-link, self-excluded edit,
@@ -320,18 +324,47 @@ Does not include:
 
 Acceptance:
 
-- A Manager can create an assignment only with company, facility, date, planned start/end,
-  task/purpose, exactly one available vehicle, and exactly one available driver.
+- A Manager can create an assignment with company, facility, date, task/purpose, exactly one
+  available vehicle, and exactly one available driver. Planned start/end times are supplied
+  together or omitted together; an untimed assignment reserves both resources for the full day.
 - A selected Meeting or Visit is optional; when present it must match the assignment scope.
 - Inactive, out-of-scope, or overlapping resources are omitted from availability and rejected by
   the service even if a caller bypasses the UI.
 - Availability remains instructional until all planning-context fields are present; cancelled
   assignments do not consume either resource and cannot be edited.
 - The page clearly shows selected-time availability plus upcoming/contextual assignments without
-  adding dashboard KPIs. The existing Dashboard can show active Fleet tasks and today's Fleet
+  adding dashboard KPIs. Editing stays inside the assignment detail dialog and the upper card
+  continues to create new assignments only. The existing Dashboard can show active Fleet tasks and today's Fleet
   event markers without changing visit, delivery, or bar-chart semantics.
 - Existing Meeting resource assignments remain unchanged.
 - TypeScript typecheck, lint, relevant unit tests, and build pass.
+
+Stop after this feature and request review before commit, push, PR, or merge.
+
+---
+
+## Approved Feature — Manager Goods Movement Frontend / Mock Service
+
+Goal: add a compact Manager-only initial goods inbound/outbound module backed by a replaceable
+in-memory service, while reusing its records for existing Dashboard delivery markers.
+
+Includes:
+
+- one centralized `GoodsMovement` model with direction, required planned date, optional planned time,
+  actual timestamps, and derived late state,
+  optional reference/note, and Security-owned optional plate/driver fields,
+- mock list/create/update/cancel service validation for required fields and company/facility scope,
+- Manager route, sidebar item, filters, compact table, adaptive direction label, detail dialog, and
+  planned-only edit/cancel actions,
+- Dashboard migration from the standalone delivery mock to today's planned goods movements,
+  retaining the marker and visit-bar interaction model,
+- targeted service and Dashboard utility tests.
+
+Does not include Security completion UI, plate/driver entry UI, depot/ERP fields, backend, or persistence.
+
+Acceptance: Managers can create and manage planned inbound/outbound records with a required date and
+optional time; completed records remain read-only; `Gecikti` is derived only when a time is supplied;
+Dashboard markers distinguish only time-scheduled records; visit and Fleet behavior remains unchanged.
 
 Stop after this feature and request review before commit, push, PR, or merge.
 

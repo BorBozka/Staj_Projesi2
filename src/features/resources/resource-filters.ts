@@ -70,21 +70,16 @@ export function toggleResourceSort(sorts: ResourceSort[], field: ResourceSortFie
 function compareResources(left: FacilityResource, right: FacilityResource, sortField: ResourceSortField) {
   switch (sortField) {
     case "name":
-      return getResourceName(left).localeCompare(getResourceName(right), "tr")
-        || left.type.localeCompare(right.type, "tr")
+      return getResourceName(left).localeCompare(getResourceName(right), "tr", { numeric: true, sensitivity: "base" })
     case "type":
       return left.type.localeCompare(right.type, "tr")
-        || getResourceName(left).localeCompare(getResourceName(right), "tr")
     case "location":
       return left.companyName.localeCompare(right.companyName, "tr")
         || left.facilityName.localeCompare(right.facilityName, "tr")
-        || getResourceName(left).localeCompare(getResourceName(right), "tr")
     case "quantity":
       return getQuantity(left) - getQuantity(right)
-        || getResourceName(left).localeCompare(getResourceName(right), "tr")
     case "status":
       return Number(left.isActive) - Number(right.isActive)
-        || getResourceName(left).localeCompare(getResourceName(right), "tr")
   }
 }
 
