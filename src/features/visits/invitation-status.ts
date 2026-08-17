@@ -23,7 +23,7 @@ export function getActionRequiredInvitationVisits(visits: Visit[], currentEmploy
 
 export function getInvitationActionLabel(visit: Visit, isSending = false) {
   if (isSending || visit.invitationStatus === "SENDING") return "Gönderiliyor…"
-  if (visit.invitationStatus === "FAILED") return "Tekrar Dene"
+  if (visit.invitationStatus === "FAILED") return "Yeniden gönder"
   if (visit.invitationStatus === "SENT") return "Davet gönderildi"
-  return "Daveti Gönder"
+  return "Daveti gönder"
 }
