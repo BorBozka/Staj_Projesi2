@@ -7,6 +7,8 @@ import {
   type VisitReferenceData,
   type VisitStatus,
 } from "@/domain/visits"
+import { getPageCount as getPageCountShared, paginate } from "@/lib/pagination"
+import { toggleSort } from "@/lib/sort"
 
 // Keeps the complete list, filters and pagination controls within a standard laptop viewport.
 export const ALL_VISITS_PAGE_SIZE = 8
@@ -87,10 +89,7 @@ export function parseAllVisitsQuery(searchParams: URLSearchParams, referenceData
 }
 
 export function toggleVisitSort(sorts: VisitSort[], field: VisitSortField): VisitSort[] {
-  const existing = sorts.find((sort) => sort.field === field)
-  if (!existing) return [...sorts, { field, direction: "asc" as const }]
-  if (existing.direction === "asc") return sorts.map((sort) => sort.field === field ? { ...sort, direction: "desc" as const } : sort)
-  return sorts.filter((sort) => sort.field !== field)
+  return toggleSort(sorts, field)
 }
 
 export function sortVisits(visits: Visit[], sorts: VisitSort[]): Visit[] {
@@ -220,12 +219,11 @@ export function countVisitsWithAdditionalRequirements(visits: Visit[], filters: 
 }
 
 export function paginateVisits(visits: Visit[], page: number, pageSize = ALL_VISITS_PAGE_SIZE) {
-  const start = (page - 1) * pageSize
-  return visits.slice(start, start + pageSize)
+  return paginate(visits, page, pageSize)
 }
 
 export function getPageCount(total: number, pageSize = ALL_VISITS_PAGE_SIZE) {
-  return Math.max(1, Math.ceil(total / pageSize))
+  return getPageCountShared(total, pageSize)
 }
 
 export function getVisiblePageNumbers(page: number, pageCount: number) {

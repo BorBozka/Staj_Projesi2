@@ -1,4 +1,6 @@
 import type { FacilityResource, ResourceType } from "@/domain/resources"
+import { getPageCount, paginate } from "@/lib/pagination"
+import { toggleSort } from "@/lib/sort"
 
 export const RESOURCE_PAGE_SIZE = 8
 
@@ -61,10 +63,7 @@ export function sortResources(resources: FacilityResource[], sorts: ResourceSort
 }
 
 export function toggleResourceSort(sorts: ResourceSort[], field: ResourceSortField) {
-  const existing = sorts.find((sort) => sort.field === field)
-  if (!existing) return [...sorts, { field, direction: "asc" as const }]
-  if (existing.direction === "asc") return sorts.map((sort) => sort.field === field ? { ...sort, direction: "desc" as const } : sort)
-  return sorts.filter((sort) => sort.field !== field)
+  return toggleSort(sorts, field)
 }
 
 function compareResources(left: FacilityResource, right: FacilityResource, sortField: ResourceSortField) {
@@ -94,12 +93,11 @@ export function hasActiveResourceFilters(filters: ResourceFilters) {
 }
 
 export function paginateResources(resources: FacilityResource[], page: number, pageSize = RESOURCE_PAGE_SIZE) {
-  const start = (page - 1) * pageSize
-  return resources.slice(start, start + pageSize)
+  return paginate(resources, page, pageSize)
 }
 
 export function getResourcePageCount(total: number, pageSize = RESOURCE_PAGE_SIZE) {
-  return Math.max(1, Math.ceil(total / pageSize))
+  return getPageCount(total, pageSize)
 }
 
 export function getVisibleResourcePageNumbers(page: number, pageCount: number) {

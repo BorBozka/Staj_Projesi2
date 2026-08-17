@@ -1,4 +1,6 @@
 import { getGoodsDirectionLabel, getGoodsMovementDisplayStatus, type GoodsMovement } from "@/domain/goods-movements"
+import { getPageCount, paginate } from "@/lib/pagination"
+import { toggleSort } from "@/lib/sort"
 
 export type SortField = "direction" | "counterparty" | "goods" | "companyFacility" | "plannedAt" | "actualAt" | "status"
 export type Sort = { field: SortField; direction: "asc" | "desc" }
@@ -7,10 +9,7 @@ export const GOODS_PAGE_SIZE = 9
 const turkishCollator = new Intl.Collator("tr-TR", { numeric: true, sensitivity: "base" })
 
 export function toggleGoodsSort(sorts: Sort[], field: SortField): Sort[] {
-  const existing = sorts.find((sort) => sort.field === field)
-  if (!existing) return [...sorts, { field, direction: "asc" }]
-  if (existing.direction === "asc") return sorts.map((sort) => sort.field === field ? { ...sort, direction: "desc" } : sort)
-  return sorts.filter((sort) => sort.field !== field)
+  return toggleSort(sorts, field)
 }
 
 export function sortGoodsMovements(movements: GoodsMovement[], sorts: Sort[]): GoodsMovement[] {
@@ -25,12 +24,11 @@ export function sortGoodsMovements(movements: GoodsMovement[], sorts: Sort[]): G
 }
 
 export function paginateGoodsMovements(movements: GoodsMovement[], page: number, pageSize = GOODS_PAGE_SIZE) {
-  const start = (page - 1) * pageSize
-  return movements.slice(start, start + pageSize)
+  return paginate(movements, page, pageSize)
 }
 
 export function getGoodsPageCount(total: number, pageSize = GOODS_PAGE_SIZE) {
-  return Math.max(1, Math.ceil(total / pageSize))
+  return getPageCount(total, pageSize)
 }
 
 export function getVisibleGoodsPageNumbers(page: number, pageCount: number) {
