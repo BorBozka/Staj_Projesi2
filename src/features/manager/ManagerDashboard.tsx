@@ -16,7 +16,7 @@ import { useManagerRefresh } from "@/features/manager/manager-refresh-context"
 import { VisitDetailsDialog } from "@/features/visits/VisitDetailsDialog"
 import { VisitStatusBadge } from "@/features/visits/VisitStatusBadge"
 import { useVisits } from "@/features/visits/visit-context"
-import { formatTr } from "@/lib/date"
+import { formatTr, getIsoHour } from "@/lib/date"
 import { cn } from "@/lib/utils"
 import { goodsMovementService, transportAssignmentService } from "@/services"
 import {
@@ -100,7 +100,7 @@ export function ManagerDashboard() {
     if (!selection) return
     const statusIsGone = selection.kind === "status" && !counts.some((count) => count.status === selection.status)
     const deliveryIsGone = selection.kind === "delivery" && !scopedDeliveries.some((delivery) => delivery.plannedTime?.startsWith(String(selection.hour).padStart(2, "0")))
-    const fleetIsGone = selection.kind === "fleet" && !scopedTransportAssignments.some((assignment) => new Date(assignment.plannedStart).getHours() === selection.hour)
+    const fleetIsGone = selection.kind === "fleet" && !scopedTransportAssignments.some((assignment) => getIsoHour(assignment.plannedStart) === selection.hour)
     if (statusIsGone || deliveryIsGone || fleetIsGone) setSelection(null)
   }, [counts, scopedDeliveries, scopedTransportAssignments, selection])
 
@@ -652,7 +652,7 @@ function resolveSelection(selection: SelectionDescriptor, visits: Visit[], deliv
 
   const hourLabel = String(selection.hour).padStart(2, "0")
   const selectedDeliveries = deliveries.filter((delivery) => delivery.plannedTime?.startsWith(String(selection.hour).padStart(2, "0")))
-  const selectedTransportAssignments = transportAssignments.filter((assignment) => new Date(assignment.plannedStart).getHours() === selection.hour)
+  const selectedTransportAssignments = transportAssignments.filter((assignment) => getIsoHour(assignment.plannedStart) === selection.hour)
   if (selection.kind === "delivery") {
     return { title: `${hourLabel}.00 · ${selectedDeliveries.length} kayıt`, visits: [], deliveries: selectedDeliveries, transportAssignments: [] }
   }
@@ -670,7 +670,7 @@ function resolveSelection(selection: SelectionDescriptor, visits: Visit[], deliv
 }
 
 function visitMatchesHour(visit: Visit, hour: number) {
-  return new Date(visit.plannedStart).getHours() === hour || Boolean(visit.actualCheckIn && new Date(visit.actualCheckIn).getHours() === hour)
+  return getIsoHour(visit.plannedStart) === hour || Boolean(visit.actualCheckIn && getIsoHour(visit.actualCheckIn) === hour)
 }
 
 function Bar({ value, max, color }: { value: number; max: number; color: string }) {

@@ -20,7 +20,7 @@ import type { Visit } from "@/domain/visits"
 import { VisitStatusBadge } from "@/features/visits/VisitStatusBadge"
 import { getTimelineRange, type TimelineRange } from "@/features/visits/timeline-range"
 import { visitStatusAccents, visitStatusSurfaces } from "@/features/visits/visit-status-styles"
-import { formatTr } from "@/lib/date"
+import { formatIsoWallClockTime, formatTr, getIsoWallClockMinutes } from "@/lib/date"
 import { cn } from "@/lib/utils"
 
 export type TimelineView = "day" | "week" | "month"
@@ -282,13 +282,11 @@ function layoutDayVisits(visits: Visit[]): DayVisitLayout[] {
 }
 
 function visitStartMinutes(visit: Visit) {
-  const start = new Date(visit.plannedStart)
-  return start.getHours() * 60 + start.getMinutes()
+  return getIsoWallClockMinutes(visit.plannedStart) ?? 0
 }
 
 function visitEndMinutes(visit: Visit) {
-  const end = new Date(visit.plannedEnd)
-  return end.getHours() * 60 + end.getMinutes()
+  return getIsoWallClockMinutes(visit.plannedEnd) ?? 0
 }
 
 function visitCollisionEndMinutes(visit: Visit) {
@@ -303,8 +301,8 @@ function dayHourLabelPosition(index: number, hourCount: number) {
 }
 
 function DayVisitCard({ visit, column, columnCount, timeRange, onOpen }: { visit: Visit; column: number; columnCount: number; timeRange: TimelineRange; onOpen(visit: Visit): void }) {
-  const start = new Date(visit.plannedStart)
-  const end = new Date(visit.plannedEnd)
+  const startLabel = formatIsoWallClockTime(visit.plannedStart)
+  const endLabel = formatIsoWallClockTime(visit.plannedEnd)
   const windowMinutes = timeRange.endMinutes - timeRange.startMinutes
   const startMinutes = Math.max(timeRange.startMinutes, visitStartMinutes(visit))
   const endMinutes = Math.min(timeRange.endMinutes, visitEndMinutes(visit))
@@ -332,22 +330,22 @@ function DayVisitCard({ visit, column, columnCount, timeRange, onOpen }: { visit
         width: `calc(${width}% - 6px)`,
         minHeight: minimumHeight,
       }}
-      title={`${visit.visitor.firstName} ${visit.visitor.lastName} · ${formatTr(start, "HH:mm")}–${formatTr(end, "HH:mm")} · ${visit.visitTypeName}`}
+      title={`${visit.visitor.firstName} ${visit.visitor.lastName} · ${startLabel}–${endLabel} · ${visit.visitTypeName}`}
     >
       <span className="block h-full overflow-hidden">
         {duration <= 30 ? (
           <span className={cn("block truncate text-[10px] font-semibold leading-4", visit.status === "CANCELLED" && "line-through")}>
-            {visit.visitor.firstName} {visit.visitor.lastName} · {formatTr(start, "HH:mm")}–{formatTr(end, "HH:mm")}
+            {visit.visitor.firstName} {visit.visitor.lastName} · {startLabel}–{endLabel}
           </span>
         ) : duration < 60 ? (
           <>
             <span className={cn("block truncate text-[10px] font-semibold leading-[14px]", visit.status === "CANCELLED" && "line-through")}>{visit.visitor.firstName} {visit.visitor.lastName}</span>
-            <span className="block truncate text-[10px] leading-[14px] opacity-80">{formatTr(start, "HH:mm")}–{formatTr(end, "HH:mm")} · {visit.visitTypeName}</span>
+            <span className="block truncate text-[10px] leading-[14px] opacity-80">{startLabel}–{endLabel} · {visit.visitTypeName}</span>
           </>
         ) : (
           <>
             <span className={cn("block truncate text-[11px] font-semibold leading-4", visit.status === "CANCELLED" && "line-through")}>{visit.visitor.firstName} {visit.visitor.lastName}</span>
-            <span className="block truncate text-[10px] leading-[13px] tabular-nums opacity-80">{formatTr(start, "HH:mm")}–{formatTr(end, "HH:mm")}</span>
+            <span className="block truncate text-[10px] leading-[13px] tabular-nums opacity-80">{startLabel}–{endLabel}</span>
             <span className="block truncate text-[10px] leading-[13px] opacity-80">{visit.visitTypeName}</span>
           </>
         )}
@@ -358,10 +356,10 @@ function DayVisitCard({ visit, column, columnCount, timeRange, onOpen }: { visit
 }
 
 function VisitBlock({ visit, timeRange, top = 10, currentFacilityId, onOpen }: { visit: Visit; timeRange: TimelineRange; top?: number; currentFacilityId?: string; onOpen(visit: Visit): void }) {
-  const start = new Date(visit.plannedStart)
-  const end = new Date(visit.plannedEnd)
-  const startMinutes = start.getHours() * 60 + start.getMinutes()
-  const endMinutes = end.getHours() * 60 + end.getMinutes()
+  const startLabel = formatIsoWallClockTime(visit.plannedStart)
+  const endLabel = formatIsoWallClockTime(visit.plannedEnd)
+  const startMinutes = visitStartMinutes(visit)
+  const endMinutes = visitEndMinutes(visit)
   const windowMinutes = timeRange.endMinutes - timeRange.startMinutes
   const left = Math.max(0, ((startMinutes - timeRange.startMinutes) / windowMinutes) * 100)
   const unclampedWidth = ((endMinutes - startMinutes) / windowMinutes) * 100
@@ -378,21 +376,21 @@ function VisitBlock({ visit, timeRange, top = 10, currentFacilityId, onOpen }: {
         visit.status === "CANCELLED" && "border-dashed",
       )}
       style={{ left: `${left}%`, width: `${width}%`, top }}
-      title={`${visit.visitor.firstName} ${visit.visitor.lastName} · ${formatTr(start, "HH:mm")}–${formatTr(end, "HH:mm")} · ${visit.visitTypeName}`}
+      title={`${visit.visitor.firstName} ${visit.visitor.lastName} · ${startLabel}–${endLabel} · ${visit.visitTypeName}`}
     >
       <span className="block overflow-hidden">
         <span className={cn("block truncate text-[10px] font-semibold leading-[11px]", visit.status === "CANCELLED" && "line-through")}>
           {visit.visitor.firstName} {visit.visitor.lastName}
           {currentFacilityId && visit.facilityId !== currentFacilityId && <span className="text-primary"> · {visit.facilityName}</span>}
         </span>
-        <span className="block truncate text-[10px] leading-[11px] opacity-80">{formatTr(start, "HH:mm")}–{formatTr(end, "HH:mm")}</span>
+        <span className="block truncate text-[10px] leading-[11px] opacity-80">{startLabel}–{endLabel}</span>
       </span>
     </button>
   )
 }
 
 function WeekCurrentTimeIndicator({ now, timeRange }: { now: Date; timeRange: TimelineRange }) {
-  const currentMinutes = now.getHours() * 60 + now.getMinutes()
+  const currentMinutes = getIsoWallClockMinutes(now) ?? 0
   const windowMinutes = timeRange.endMinutes - timeRange.startMinutes
   if (currentMinutes < timeRange.startMinutes || currentMinutes > timeRange.endMinutes) return null
 
@@ -407,7 +405,7 @@ function WeekCurrentTimeIndicator({ now, timeRange }: { now: Date; timeRange: Ti
 }
 
 function DayCurrentTimeIndicator({ now, timeRange }: { now: Date; timeRange: TimelineRange }) {
-  const currentMinutes = now.getHours() * 60 + now.getMinutes()
+  const currentMinutes = getIsoWallClockMinutes(now) ?? 0
   const windowMinutes = timeRange.endMinutes - timeRange.startMinutes
   if (currentMinutes < timeRange.startMinutes || currentMinutes > timeRange.endMinutes) return null
 
@@ -422,8 +420,6 @@ function DayCurrentTimeIndicator({ now, timeRange }: { now: Date; timeRange: Tim
 }
 
 function VisitHoverTooltip({ visit }: { visit: Visit }) {
-  const start = new Date(visit.plannedStart)
-  const end = new Date(visit.plannedEnd)
   return (
     <span
       role="tooltip"
@@ -431,7 +427,7 @@ function VisitHoverTooltip({ visit }: { visit: Visit }) {
     >
       <span className="block font-semibold">{visit.visitor.firstName} {visit.visitor.lastName}</span>
       <span className="block text-slate-300">{visit.visitTypeName}</span>
-      <span className="block tabular-nums text-slate-300">{formatTr(start, "HH:mm")}–{formatTr(end, "HH:mm")}</span>
+      <span className="block tabular-nums text-slate-300">{formatIsoWallClockTime(visit.plannedStart)}–{formatIsoWallClockTime(visit.plannedEnd)}</span>
     </span>
   )
 }
