@@ -1,4 +1,3 @@
-import { formatTr } from "@/lib/date"
 
 export interface MinuteClockEnvironment {
   now(): Date
@@ -54,12 +53,23 @@ export function startMinuteClock(
   }
 }
 
+function extractTimeFromISO(isoString: string): { hour: number; minutes: number } | null {
+  const match = isoString.match(/T(\d{2}):(\d{2}):/);
+  return match ? { hour: parseInt(match[1], 10), minutes: parseInt(match[2], 10) } : null;
+}
+
 export function getOperationNowIndicator(now: Date, startHour: number, endHour: number) {
-  const currentHour = now.getHours() + now.getMinutes() / 60
-  if (currentHour < startHour || currentHour > endHour) return null
+  const time = extractTimeFromISO(now.toISOString());
+  if (!time) return null;
+
+  const currentHour = time.hour + time.minutes / 60;
+  if (currentHour < startHour || currentHour > endHour) return null;
+
+  const hStr = String(time.hour).padStart(2, "0");
+  const mStr = String(time.minutes).padStart(2, "0");
 
   return {
-    label: `Şimdi ${formatTr(now, "HH.mm")}`,
+    label: `Şimdi ${hStr}.${mStr}`,
     labelAlignment: currentHour < startHour + 1.5
       ? "translate-x-1"
       : currentHour > endHour - 1.5

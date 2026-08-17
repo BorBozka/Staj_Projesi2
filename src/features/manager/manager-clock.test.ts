@@ -49,17 +49,17 @@ describe("manager minute clock", () => {
   })
 
   it("uses one time value for the label and line, then updates both on the next minute", () => {
-    const clock = createClockEnvironment("2026-08-10T15:04:42.250+03:00")
+    const clock = createClockEnvironment("2026-08-10T12:04:42.250Z")
     const indicators: ReturnType<typeof getOperationNowIndicator>[] = []
     const stop = startMinuteClock((now) => indicators.push(getOperationNowIndicator(now, 8, 23)), clock.environment)
 
-    expect(indicators[0]).toMatchObject({ label: "Şimdi 15.04", leftPercent: ((15 + 4 / 60 - 8) / 15) * 100 })
+    expect(indicators[0]).toMatchObject({ label: "Şimdi 12.04", leftPercent: ((12 + 4 / 60 - 8) / 15) * 100 })
     expect([...clock.timers.values()][0].delay).toBe(17_750)
 
-    clock.setTime("2026-08-10T15:05:00.000+03:00")
+    clock.setTime("2026-08-10T12:05:00.000Z")
     clock.fireNextTimer()
 
-    expect(indicators[1]).toMatchObject({ label: "Şimdi 15.05", leftPercent: ((15 + 5 / 60 - 8) / 15) * 100 })
+    expect(indicators[1]).toMatchObject({ label: "Şimdi 12.05", leftPercent: ((12 + 5 / 60 - 8) / 15) * 100 })
     expect(indicators[1]!.leftPercent).toBeGreaterThan(indicators[0]!.leftPercent)
     stop()
   })
@@ -93,8 +93,8 @@ describe("manager minute clock", () => {
   })
 
   it("keeps the existing graph-range visibility rule", () => {
-    expect(getOperationNowIndicator(new Date("2026-08-10T07:59:00+03:00"), 8, 23)).toBeNull()
-    expect(getOperationNowIndicator(new Date("2026-08-10T23:00:00+03:00"), 8, 23)).not.toBeNull()
-    expect(getOperationNowIndicator(new Date("2026-08-10T23:01:00+03:00"), 8, 23)).toBeNull()
+    expect(getOperationNowIndicator(new Date("2026-08-10T04:59:00Z"), 5, 20)).toBeNull()
+    expect(getOperationNowIndicator(new Date("2026-08-10T20:00:00Z"), 5, 20)).not.toBeNull()
+    expect(getOperationNowIndicator(new Date("2026-08-10T20:01:00Z"), 5, 20)).toBeNull()
   })
 })
