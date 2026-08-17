@@ -69,7 +69,7 @@ describe("HostedMeetingEndNotifications", () => {
     expect(markup).toContain("Davetler")
     expect(markup).toContain("Ece Kaya")
     expect(markup).toContain("Gönderilmedi")
-    expect(markup).toContain("Daveti Gönder")
+    expect(markup).toContain("Daveti gönder")
     expect(markup).not.toContain("Toplantılar")
   })
 
@@ -96,8 +96,8 @@ describe("HostedMeetingEndNotifications", () => {
     const notSent = renderToStaticMarkup(<InvitationNotificationRow visit={invitationVisit} onAction={vi.fn()} />)
     const failed = renderToStaticMarkup(<InvitationNotificationRow visit={{ ...invitationVisit, invitationStatus: "FAILED" }} onAction={vi.fn()} />)
 
-    expect(notSent).toContain("Daveti Gönder")
-    expect(failed).toContain("Tekrar Dene")
+    expect(notSent).toContain("Daveti gönder")
+    expect(failed).toContain("Yeniden gönder")
     expect(failed).toContain("Gönderim başarısız")
   })
 
