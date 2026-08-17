@@ -1,9 +1,8 @@
 import { endOfDay, format, isAfter, isValid, parse, startOfDay } from "date-fns"
 
 import {
-  invitationStatuses,
+  visitStatusLabels,
   visitStatuses,
-  type InvitationStatus,
   type Visit,
   type VisitReferenceData,
   type VisitStatus,
@@ -13,7 +12,7 @@ import {
 export const ALL_VISITS_PAGE_SIZE = 8
 
 export type AdditionalRequirementFilter = "all" | "with" | "without"
-export type VisitSortField = "visitor" | "visitType" | "host" | "companyFacility" | "plannedStart" | "invitation" | "status"
+export type VisitSortField = "visitor" | "visitType" | "host" | "companyFacility" | "plannedStart" | "status"
 export type VisitSortDirection = "asc" | "desc"
 
 export interface VisitSort {
@@ -30,7 +29,6 @@ export interface AllVisitsFilters {
   status: "all" | VisitStatus
   visitTypeId: string
   hostEmployeeId: string
-  invitationStatus: "all" | InvitationStatus
   additionalRequirement: AdditionalRequirementFilter
 }
 
@@ -66,7 +64,6 @@ export function parseAllVisitsQuery(searchParams: URLSearchParams, referenceData
   const facility = referenceData.facilities.find((item) => item.id === facilityParam)
   const facilityId = facility && (companyId === "all" || facility.companyId === companyId) ? facility.id : "all"
   const statusParam = searchParams.get("status")
-  const invitationParam = searchParams.get("invitation")
   const additionalParam = searchParams.get("additional")
   const visitTypeParam = searchParams.get("type")
   const hostParam = searchParams.get("host")
@@ -82,7 +79,6 @@ export function parseAllVisitsQuery(searchParams: URLSearchParams, referenceData
       status: visitStatuses.includes(statusParam as VisitStatus) ? statusParam as VisitStatus : "all",
       visitTypeId: referenceData.visitTypes.some((type) => type.id === visitTypeParam) ? visitTypeParam! : "all",
       hostEmployeeId: referenceData.employees.some((employee) => employee.id === hostParam) ? hostParam! : "all",
-      invitationStatus: invitationStatuses.includes(invitationParam as InvitationStatus) ? invitationParam as InvitationStatus : "all",
       additionalRequirement: additionalParam === "with" || additionalParam === "without" ? additionalParam : "all",
     },
     page: Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1,
@@ -91,30 +87,6 @@ export function parseAllVisitsQuery(searchParams: URLSearchParams, referenceData
 }
 
 export function toggleVisitSort(sorts: VisitSort[], field: VisitSortField): VisitSort[] {
-  if (field === "visitor") {
-    const existing = sorts.find((sort) => sort.field === "visitor" || sort.field === "visitType")
-    const otherSorts = sorts.filter((sort) => sort.field !== "visitor" && sort.field !== "visitType")
-    if (!existing) {
-      return [...otherSorts, { field: "visitor", direction: "asc" as const }]
-    }
-    if (existing.field === "visitor" && existing.direction === "asc") {
-      return [...otherSorts, { field: "visitor", direction: "desc" as const }]
-    }
-    if (existing.field === "visitor" && existing.direction === "desc") {
-      return [...otherSorts, { field: "visitType", direction: "asc" as const }]
-    }
-    return otherSorts
-  }
-
-  if (field === "invitation") {
-    const existing = sorts.find((sort) => sort.field === "invitation")
-    if (!existing) {
-      return [...sorts, { field: "invitation", direction: "asc" as const }]
-    }
-    // 2nd click on Takip directly removes the sort (returns to original table)
-    return sorts.filter((sort) => sort.field !== "invitation")
-  }
-
   const existing = sorts.find((sort) => sort.field === field)
   if (!existing) return [...sorts, { field, direction: "asc" as const }]
   if (existing.direction === "asc") return sorts.map((sort) => sort.field === field ? { ...sort, direction: "desc" as const } : sort)
@@ -163,7 +135,6 @@ export function hasActiveAllVisitsFilters(filters: AllVisitsFilters) {
       || filters.status !== "all"
       || filters.visitTypeId !== "all"
       || filters.hostEmployeeId !== "all"
-      || filters.invitationStatus !== "all"
       || filters.additionalRequirement !== "all",
   )
 }
@@ -185,11 +156,7 @@ function compareVisits(left: Visit, right: Visit, field: VisitSortField): number
       return compareTr(leftName, rightName)
     }
     case "visitType": {
-      const typeDiff = compareTr(left.visitTypeName, right.visitTypeName)
-      if (typeDiff !== 0) return typeDiff
-      const leftName = `${left.visitor.firstName} ${left.visitor.lastName}`
-      const rightName = `${right.visitor.firstName} ${right.visitor.lastName}`
-      return compareTr(leftName, rightName)
+      return compareTr(left.visitTypeName, right.visitTypeName)
     }
     case "host":
       return compareTr(left.hostEmployeeName, right.hostEmployeeName)
@@ -200,13 +167,8 @@ function compareVisits(left: Visit, right: Visit, field: VisitSortField): number
     }
     case "plannedStart":
       return new Date(left.plannedStart).getTime() - new Date(right.plannedStart).getTime()
-    case "invitation": {
-      const invDiff = compareTr(left.invitationStatus, right.invitationStatus)
-      if (invDiff !== 0) return invDiff
-      return Number(right.hasAdditionalRequirements ?? false) - Number(left.hasAdditionalRequirements ?? false)
-    }
     case "status":
-      return compareTr(left.status, right.status)
+      return compareTr(visitStatusLabels[left.status], visitStatusLabels[right.status])
     default:
       return 0
   }
@@ -233,7 +195,8 @@ export function filterAndSortVisits(visits: Visit[], filters: AllVisitsFilters, 
       || (filters.additionalRequirement === "with" && Boolean(visit.hasAdditionalRequirements))
       || (filters.additionalRequirement === "without" && !visit.hasAdditionalRequirements)
 
-    return (!query || searchableText.includes(query))
+    return visit.invitationStatus !== "NOT_SENT"
+      && (!query || searchableText.includes(query))
       && (!rangeStart || plannedStart >= rangeStart)
       && (!rangeEnd || plannedStart <= rangeEnd)
       && (filters.companyId === "all" || visit.hostCompanyId === filters.companyId)
@@ -241,7 +204,6 @@ export function filterAndSortVisits(visits: Visit[], filters: AllVisitsFilters, 
       && (filters.status === "all" || visit.status === filters.status)
       && (filters.visitTypeId === "all" || visit.visitTypeId === filters.visitTypeId)
       && (filters.hostEmployeeId === "all" || visit.hostEmployeeId === filters.hostEmployeeId)
-      && (filters.invitationStatus === "all" || visit.invitationStatus === filters.invitationStatus)
       && additionalMatches
   })
 

@@ -36,9 +36,9 @@ describe("resource catalog filters", () => {
 
   it("sorts resources in ascending groups by the selected column", () => {
     expect(sortResources(initialMockResources, [{ field: "type", direction: "asc" }]).map((resource) => resource.type)).toEqual([
-      "DRIVER", "DRIVER", "POOLED_EQUIPMENT", "POOLED_EQUIPMENT", "POOLED_EQUIPMENT", "ROOM", "ROOM", "VEHICLE", "VEHICLE",
+      "DRIVER", "DRIVER", "DRIVER", "DRIVER", "DRIVER", "DRIVER", "POOLED_EQUIPMENT", "POOLED_EQUIPMENT", "POOLED_EQUIPMENT", "ROOM", "ROOM", "VEHICLE", "VEHICLE", "VEHICLE", "VEHICLE", "VEHICLE", "VEHICLE",
     ])
-    expect(sortResources(initialMockResources, [{ field: "status", direction: "asc" }]).map((resource) => resource.isActive)).toEqual([false, false, true, true, true, true, true, true, true])
+    expect(sortResources(initialMockResources, [{ field: "status", direction: "asc" }]).map((resource) => resource.isActive)).toEqual([false, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true])
   })
 
   it("cycles individual sorts without clearing other sort fields", () => {
@@ -52,9 +52,24 @@ describe("resource catalog filters", () => {
     expect(toggleResourceSort(third, "type")).toEqual([{ field: "status", direction: "asc" }])
   })
 
+  it("uses later active sorts inside equal primary-column groups", () => {
+    const room = initialMockResources.find((resource) => resource.type === "ROOM")!
+    const equipment = initialMockResources.find((resource) => resource.type === "POOLED_EQUIPMENT")!
+    const resources = [
+      { ...room, id: "room-active", isActive: true },
+      { ...room, id: "room-inactive", isActive: false },
+      { ...equipment, id: "equipment-active", isActive: true },
+    ]
+
+    expect(sortResources(resources, [
+      { field: "type", direction: "asc" },
+      { field: "status", direction: "asc" },
+    ]).map((resource) => resource.id)).toEqual(["equipment-active", "room-inactive", "room-active"])
+  })
+
   it.each([
-    { type: "VEHICLE" as const, ids: ["resource-vehicle-transit-merkez", "resource-vehicle-megane-otomotiv"] },
-    { type: "DRIVER" as const, ids: ["resource-driver-ayse-demir", "resource-driver-mehmet-kaya"] },
+    { type: "VEHICLE" as const, ids: ["resource-vehicle-transit-merkez", "resource-vehicle-megane-otomotiv", "resource-vehicle-sprinter-merkez", "resource-vehicle-courier-merkez", "resource-vehicle-daily-merkez", "resource-vehicle-kangoo-merkez"] },
+    { type: "DRIVER" as const, ids: ["resource-driver-ayse-demir", "resource-driver-mehmet-kaya", "resource-driver-zeynep-arslan", "resource-driver-burak-cetin", "resource-driver-selin-yildiz", "resource-driver-emre-aksoy"] },
   ])("filters $type resources", ({ type, ids }) => {
     expect(filterResources(initialMockResources, { ...defaultResourceFilters, type }).map((resource) => resource.id)).toEqual(ids)
   })
@@ -68,7 +83,7 @@ describe("resource catalog filters", () => {
       active: "active",
     })
 
-    expect(result.map((resource) => resource.id)).toEqual(["resource-driver-ayse-demir"])
+    expect(result.map((resource) => resource.id)).toEqual(["resource-driver-ayse-demir", "resource-driver-zeynep-arslan", "resource-driver-burak-cetin", "resource-driver-selin-yildiz", "resource-driver-emre-aksoy"])
   })
 
   it.each([

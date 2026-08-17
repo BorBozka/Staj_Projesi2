@@ -4,10 +4,10 @@ import {
   CarFront,
   CalendarDays,
   FileBarChart,
+  LoaderCircle,
   LayoutDashboard,
   Menu,
   PackageCheck,
-  Send,
 } from "lucide-react"
 import { lazy, Suspense, useCallback, useEffect, useState } from "react"
 import { NavLink, Outlet, useLocation } from "react-router-dom"
@@ -21,11 +21,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { startMinuteClock } from "@/features/manager/manager-clock"
 import { ManagerRefreshProvider } from "@/features/manager/manager-refresh-context"
-import { getInvitationActionLabel, getPendingInvitationVisits } from "@/features/visits/invitation-status"
+import { getVisiblePendingInvitationVisits } from "@/features/visits/invitation-status"
 import { useVisits } from "@/features/visits/visit-context"
+import type { InvitationStatus } from "@/domain/visits"
 import { formatTr } from "@/lib/date"
 import { cn } from "@/lib/utils"
 
@@ -37,8 +38,8 @@ const managementNavigationItems = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/manager/dashboard" },
   { label: "Tüm Ziyaretler", icon: CalendarDays, to: "/manager/all-visits" },
   { label: "Kaynaklar", icon: Boxes, to: "/manager/resources" },
-  { label: "Araç & Şoför Planı", icon: CarFront, to: "/manager/transport-planning" },
-  { label: "Mal Giriş / Çıkış", icon: PackageCheck, to: "/manager/goods-movements" },
+  { label: "Mal hareketleri", icon: PackageCheck, to: "/manager/goods-movements" },
+  { label: "Araç planı", icon: CarFront, to: "/manager/transport-planning" },
   { label: "Raporlar", icon: FileBarChart },
 ]
 
@@ -130,7 +131,9 @@ function ManagerSidebar({ collapsed, onCollapsedChange }: { collapsed: boolean; 
 function ManagerNotifications({ collapsed }: { collapsed: boolean }) {
   const { visits } = useVisits()
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null)
-  const pendingInvitations = getPendingInvitationVisits(visits)
+  const [dismissedVisitIds, setDismissedVisitIds] = useState<Set<string>>(() => new Set())
+  const pendingInvitations = getVisiblePendingInvitationVisits(visits, dismissedVisitIds)
+  const allPendingInvitations = getVisiblePendingInvitationVisits(visits, new Set())
   const selectedVisit = visits.find((visit) => visit.id === selectedVisitId)
 
   return (
@@ -149,31 +152,55 @@ function ManagerNotifications({ collapsed }: { collapsed: boolean }) {
             {pendingInvitations.length > 0 && <span className="absolute right-1 top-0.5 flex min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white">{pendingInvitations.length}</span>}
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent side="right" align="end" className="w-80 p-1.5" aria-label="Yönetici bildirimleri">
-          <DropdownMenuLabel className="text-sm text-slate-900">Bildirimler</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <p className="px-2 pb-1 pt-1.5 text-xs font-semibold text-slate-600">Eylem bekleyenler</p>
-          {pendingInvitations.length === 0 ? (
-            <p className="px-2 py-5 text-center text-xs text-slate-500">Eylem bekleyen davet yok.</p>
-          ) : pendingInvitations.map((visit) => (
-            <DropdownMenuItem
-              key={visit.id}
-              className="block cursor-pointer whitespace-normal px-2 py-2.5 focus:bg-blue-50"
-              aria-label={`${visit.visitor.firstName} ${visit.visitor.lastName} için ${getInvitationActionLabel(visit)} aksiyonunu aç`}
-              onSelect={() => setSelectedVisitId(visit.id)}
+        <DropdownMenuContent side="right" align="end" className="w-[360px] max-w-[calc(100vw-1rem)] overflow-hidden p-0" aria-label="Yönetici bildirimleri">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-3 py-2.5">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <DropdownMenuLabel className="p-0 text-sm font-semibold text-slate-900">Bildirimler</DropdownMenuLabel>
+              <span className="inline-flex min-w-4 items-center justify-center rounded-full bg-slate-100 px-1 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-slate-600">{pendingInvitations.length}</span>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 shrink-0 px-1.5 text-[11px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+              onClick={() => setDismissedVisitIds(new Set(allPendingInvitations.map((visit) => visit.id)))}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
+              Tümünü temizle
+            </Button>
+          </div>
+          <div className="max-h-[min(28rem,calc(100vh-7rem))] overflow-y-auto">
+            {pendingInvitations.length === 0 ? (
+              <p className="px-3 py-6 text-center text-xs text-slate-500">Eylem bekleyen davet yok.</p>
+            ) : pendingInvitations.map((visit) => (
+              <DropdownMenuItem
+                key={visit.id}
+                className="items-start gap-3 rounded-none border-b border-slate-100 px-3 py-2 whitespace-normal hover:bg-slate-50 focus:bg-slate-50 last:border-b-0"
+                aria-label={`${visit.visitor.firstName} ${visit.visitor.lastName} için bildirim`}
+                onSelect={() => setSelectedVisitId(visit.id)}
+              >
+                <div className="min-w-0 flex-1">
                   <p className="truncate text-xs font-semibold text-slate-900">{visit.visitor.firstName} {visit.visitor.lastName}</p>
-                  <p className="mt-1 text-xs text-slate-600">{formatTr(new Date(visit.plannedStart), "d MMM yyyy · HH:mm")}</p>
-                  <p className={cn("mt-1 text-[11px] font-medium", visit.invitationStatus === "FAILED" ? "text-red-700" : "text-amber-700")}>
-                    {visit.invitationStatus === "FAILED" ? "Gönderim hatası" : "Davet gönderilmedi"}
-                  </p>
+                  <p className="mt-0.5 truncate text-[11px] text-slate-500">{formatTr(new Date(visit.plannedStart), "d MMM yyyy · HH:mm")}</p>
+                  {visit.invitationStatus !== "SENDING" && <InvitationNotificationStatus status={visit.invitationStatus} />}
                 </div>
-                <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-blue-700"><Send className="size-3.5" />{getInvitationActionLabel(visit)}</span>
-              </div>
-            </DropdownMenuItem>
-          ))}
+                {visit.invitationStatus === "SENDING" ? (
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700" role="status">
+                    <LoaderCircle className="size-3 animate-spin" />Gönderiliyor…
+                  </span>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 shrink-0 px-2 text-[11px] font-semibold text-blue-700 hover:bg-blue-50 hover:text-blue-800"
+                    onClick={(event) => { event.stopPropagation(); setSelectedVisitId(visit.id) }}
+                  >
+                    {visit.invitationStatus === "FAILED" ? "Yeniden gönder" : "Daveti gönder"}
+                  </Button>
+                )}
+              </DropdownMenuItem>
+            ))}
+          </div>
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -190,6 +217,18 @@ function ManagerNotifications({ collapsed }: { collapsed: boolean }) {
       )}
     </>
   )
+}
+
+function InvitationNotificationStatus({ status }: { status: InvitationStatus }) {
+  const statusContent = status === "FAILED" ? "Gönderim başarısız" : status === "SENDING" ? "Gönderiliyor…" : status === "SENT" ? "Davet gönderildi" : "Davet gönderilmedi"
+  const statusClass = status === "FAILED"
+    ? "border-red-200 bg-red-50 text-red-700"
+    : status === "SENDING"
+      ? "border-blue-200 bg-blue-50 text-blue-700"
+      : status === "SENT"
+        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+        : "border-amber-200 bg-amber-50 text-amber-700"
+  return <span className={cn("mt-1 inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium", statusClass)}>{statusContent}</span>
 }
 
 function ManagerProfile({ collapsed = false }: { collapsed?: boolean }) {

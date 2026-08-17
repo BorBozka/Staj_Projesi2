@@ -509,6 +509,9 @@ Planned:
 
 No host overdue email.
 
+Clearing invitation notifications is a local presentation action. It does not mutate the
+Visit invitation state, and the same Visit may remain actionable in other authorized UI surfaces.
+
 ---
 
 ## 20. Employee Interface
@@ -606,7 +609,8 @@ The manager `All Visits` view is read-only and provides:
 
 - URL-persisted date-range and operational filters,
 - compact paginated visit records,
-- invitation and additional-requirement visibility,
+- only operationally opened Visits whose invitation state is not `NOT_SENT`,
+- invitation and additional-requirement visibility in the detail dialog,
 - a centered, compact Manager Visit Detail dialog.
 
 The table continues to display one row per visitor/Visit and is not redesigned for Meeting
@@ -752,10 +756,11 @@ Once a Meeting is closed (`actualMeetingEnd` is set):
   `plannedEnd` arrives or passes.
 - Lifecycle actions are never shown in Security UI screens (Security UI scope is a separate phase).
 
-### Host Meeting-End Notification in My Visits
+### Action-Required Panel in My Visits
 
-- When a manually actionable Meeting hosted by the current employee reaches or passes
-  `plannedEnd`, My Visits shows a persistent, actionable notification panel regardless of
+- My Visits shows one persistent, actionable `İşlem gerekenler` panel. When a manually
+  actionable Meeting hosted by the current employee reaches or passes `plannedEnd`, the
+  panel includes it regardless of
   who created the Meeting. Meetings whose linked Visits are all terminal do not produce a
   notification even when legacy/mock data has no `actualMeetingEnd`. On desktop, the panel
   is fixed at the lower-right and does not take space from the personal timeline or Upcoming
@@ -764,8 +769,13 @@ Once a Meeting is closed (`actualMeetingEnd` is set):
   extension in a small anchored popover, and an immediate `Toplantıyı Bitir` action.
 - A successful extension hides that Meeting's notification until its new `plannedEnd` is
   reached. Closing the Meeting removes its notification.
-- Multiple qualifying Meetings are shown as distinct compact rows in one notification
-  surface with an internal scroll area and total count. The panel can be minimized to a
+- Planned Visits created by the current employee whose invitation state is `NOT_SENT` or
+  `FAILED` are listed as a distinct invitation-action group in the same panel. Their action
+  opens the existing single-Visit invitation flow; `SENDING` does not require user action
+  and is not listed. The left-navigation invitation notification behavior remains unchanged.
+- Multiple qualifying actions are shown as distinct compact rows in one notification
+  surface with an internal scroll area and total count. Meeting and invitation actions are
+  visibly grouped. The panel can be minimized to a
   lower-right count control but notifications cannot be dismissed. No recurring popup or
   escalation is generated.
 - Notification selection is host-scoped and independent from the creator-scoped personal
@@ -781,12 +791,14 @@ and does not change existing Meeting resource-assignment behavior.
 
 ### Business Rules
 
-- Each assignment requires company, facility, planned start and end, a non-empty task/purpose,
-  one vehicle, and one driver.
+- Each assignment requires company, facility, planned date, a non-empty task/purpose, one
+  vehicle, and one driver. Planned start and end times are optional together: both are supplied
+  or both are omitted.
 - A related Meeting or Visit may be selected, but is optional. One assignment may link to one
   Meeting or one Visit, not both; the linked record must be in the selected company and facility.
 - Only active `VEHICLE` and `DRIVER` records in the selected company and facility are eligible.
-- Availability uses half-open planned time intervals. A vehicle or driver already used by an
+- A time-less assignment reserves the selected vehicle and driver for the full selected day.
+  Availability uses half-open planned time intervals. A vehicle or driver already used by an
   overlapping active assignment is unavailable for a new assignment. Adjacent assignments where
   one ends exactly when the other starts do not conflict.
 - Availability and all required-field, active-state, scope, link, and conflict rules are verified

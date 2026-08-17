@@ -341,56 +341,21 @@ export function ResourceCatalogPage() {
             )}
             {(() => {
               const visible = getVisibleResourcePageNumbers(page, Math.max(1, pageCount))
-              const num1 = visible[0] ?? null
-              const num2 = visible[1] ?? null
-              const num3 = visible[2] ?? null
               return (
                 <>
-                  {num1 !== null ? (
+                  {visible.map((pageNumber) => (
                     <Button
-                      key={num1}
-                      variant={num1 === page ? "default" : "outline"}
+                      key={pageNumber}
+                      variant={pageNumber === page ? "default" : "outline"}
                       size="icon-sm"
                       className="h-8 w-8 text-xs"
-                      aria-current={num1 === page ? "page" : undefined}
-                      aria-label={`${num1}. sayfa`}
-                      onClick={() => changePage(num1)}
+                      aria-current={pageNumber === page ? "page" : undefined}
+                      aria-label={`${pageNumber}. sayfa`}
+                      onClick={() => changePage(pageNumber)}
                     >
-                      {num1}
+                      {pageNumber}
                     </Button>
-                  ) : (
-                    <span key="slot-num-1" className="h-8 w-8 invisible" aria-hidden="true" />
-                  )}
-                  {num2 !== null ? (
-                    <Button
-                      key={num2}
-                      variant={num2 === page ? "default" : "outline"}
-                      size="icon-sm"
-                      className="h-8 w-8 text-xs"
-                      aria-current={num2 === page ? "page" : undefined}
-                      aria-label={`${num2}. sayfa`}
-                      onClick={() => changePage(num2)}
-                    >
-                      {num2}
-                    </Button>
-                  ) : (
-                    <span key="slot-num-2" className="h-8 w-8 invisible" aria-hidden="true" />
-                  )}
-                  {num3 !== null ? (
-                    <Button
-                      key={num3}
-                      variant={num3 === page ? "default" : "outline"}
-                      size="icon-sm"
-                      className="h-8 w-8 text-xs"
-                      aria-current={num3 === page ? "page" : undefined}
-                      aria-label={`${num3}. sayfa`}
-                      onClick={() => changePage(num3)}
-                    >
-                      {num3}
-                    </Button>
-                  ) : (
-                    <span key="slot-num-3" className="h-8 w-8 invisible" aria-hidden="true" />
-                  )}
+                  ))}
                 </>
               )
             })()}

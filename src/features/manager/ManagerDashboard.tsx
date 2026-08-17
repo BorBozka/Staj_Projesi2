@@ -28,6 +28,7 @@ import {
   getScopedVisits,
   getStatusCounts,
   getTodayScopedTransportAssignments,
+  getTodayScopedGoodsMovements,
   getTodayVisits,
   type DashboardVisitStatus,
 } from "./manager-dashboard-utils"
@@ -81,12 +82,7 @@ export function ManagerDashboard() {
   const insideVisits = scopedVisits
     .filter((visit) => visit.status === "CHECKED_IN")
     .sort((left, right) => getDelayMinutes(right, now) - getDelayMinutes(left, now))
-  const scopedDeliveries = deliveries.filter((delivery) =>
-    delivery.status === "PLANNED" &&
-    (companyId === "all" || delivery.companyId === companyId) &&
-    (facilityId === "all" || delivery.facilityId === facilityId) &&
-    delivery.plannedDate === format(currentTime, "yyyy-MM-dd"),
-  )
+  const scopedDeliveries = getTodayScopedGoodsMovements(deliveries, { companyId, facilityId }, currentTime)
   const scopedTransportAssignments = getTodayScopedTransportAssignments(transportAssignments, { companyId, facilityId }, currentTime)
   const activeTransportAssignments = getActiveTransportAssignments(transportAssignments, { companyId, facilityId }, currentTime)
   const counts = getStatusCounts(todayVisits, currentTime)

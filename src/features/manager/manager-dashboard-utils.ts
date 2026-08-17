@@ -1,4 +1,4 @@
-import { differenceInMinutes, isAfter, isBefore, isSameDay } from "date-fns"
+import { differenceInMinutes, format, isAfter, isBefore, isSameDay } from "date-fns"
 
 import type { GoodsMovement } from "@/domain/goods-movements"
 import type { PlannedTransportAssignment } from "@/domain/transport-assignments"
@@ -36,6 +36,17 @@ export function getTodayScopedTransportAssignments(assignments: PlannedTransport
     && (scope.companyId === "all" || assignment.companyId === scope.companyId)
     && (scope.facilityId === "all" || assignment.facilityId === scope.facilityId)
     && isSameDay(new Date(assignment.plannedStart), now),
+  )
+}
+
+export function getTodayScopedGoodsMovements(movements: GoodsMovement[], scope: DashboardScope, now: Date) {
+  const today = format(now, "yyyy-MM-dd")
+  return movements.filter((movement) =>
+    movement.status === "PLANNED"
+    && Boolean(movement.plannedTime)
+    && (scope.companyId === "all" || movement.companyId === scope.companyId)
+    && (scope.facilityId === "all" || movement.facilityId === scope.facilityId)
+    && movement.plannedDate === today,
   )
 }
 
