@@ -502,6 +502,49 @@ The table is primary.
 
 Limit charts to useful summaries.
 
+### Manager Reports
+
+- A tabbed page (`Ziyaretler` | `Araç/Şoför` | `Mal Hareketi`) reachable from the Manager
+  sidebar `Raporlar` entry. The active tab persists in the URL (`?tab=...`), omitted for the
+  default `Ziyaretler` tab. All three tabs are implemented and enabled.
+- A single filter bar sits above the tabs and stays fixed across tab switches: date range
+  (default last 30 days, quick-select chips for `Bugün` / `Son 7 gün` / `Son 30 gün` / `Bu ay`,
+  no maximum span) plus a company/facility scope control using the Dashboard's combined
+  `Şirket: … · Tesis: …` dropdown pattern. All shared filters persist in the URL the same way
+  All Visits filters do.
+- The `Ziyaretler` tab reuses the All Visits filter/sort core (`all-visits-utils`) rather than
+  reimplementing it, but is a distinct, read-only reporting surface:
+  - report-specific KPI cards above the table: total visits, completed (`CHECKED_OUT`) visits,
+    the no-show + cancellation rate, and average visit duration,
+  - a dense export-ready table with visitor, visitor company, host, date, planned and actual
+    check-in/check-out, status, and delay-in-minutes columns,
+  - no row click or detail dialog — the operational drill-down affordances from All Visits are
+    intentionally not carried over,
+  - CSV, Excel, and PDF export buttons that export the currently filtered and sorted result.
+  - Unlike All Visits, it does not exclude Visits whose invitation state is `NOT_SENT`; a report
+    must stay complete for audit purposes.
+- The `Araç/Şoför` tab reads `PlannedTransportAssignment` (planned data only — no actual
+  start/end or odometer capture exists yet):
+  - KPI cards: total assignments, cancelled assignments, the cancellation rate, and the average
+    planned duration (`plannedEnd − plannedStart`),
+  - a dense export-ready table with purpose, vehicle (name + plate), driver, company/facility,
+    planned start–end (reusing the existing untimed-daily-aware schedule formatter), status
+    (`Aktif` / `İptal`), and the related Visit or Meeting if the assignment originated from one
+    (otherwise `—`),
+  - no row click or detail dialog,
+  - CSV, Excel, and PDF export of the currently filtered result.
+  - A vehicle distance/km report is a separate later mini-phase once odometer capture exists.
+- The `Mal Hareketi` tab reads `GoodsMovement`:
+  - KPI cards: total movements, inbound movements, outbound movements, and the late rate
+    (derived with the same `getGoodsMovementDisplayStatus` logic the operational Goods
+    Movements list uses),
+  - a dense export-ready table with direction, company/facility, counterparty, planned
+    date/time, actual time (if recorded, otherwise `—`), status (`Planlandı` / `Tamamlandı` /
+    `İptal` / `Gecikti`), reference number (otherwise `—`), and the actual plate/driver recorded
+    at completion (otherwise `—`),
+  - no row click or detail dialog,
+  - CSV, Excel, and PDF export of the currently filtered result.
+
 ### Manager All Visits
 
 - Remains a read-only operational list.

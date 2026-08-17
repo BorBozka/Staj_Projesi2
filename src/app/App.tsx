@@ -22,6 +22,9 @@ const TransportPlanningPage = lazy(() =>
 const GoodsMovementsPage = lazy(() =>
   import("@/features/goods/GoodsMovementsPage").then((module) => ({ default: module.GoodsMovementsPage })),
 )
+const ReportsPage = lazy(() =>
+  import("@/features/reports/ReportsPage").then((module) => ({ default: module.ReportsPage })),
+)
 
 export function App() {
   const { pathname } = useLocation()
@@ -33,6 +36,7 @@ export function App() {
       "/manager/all-visits": "BPLAS — Tüm Ziyaretler",
       "/manager/resources": "BPLAS — Kaynaklar",
       "/manager/goods-movements": "BPLAS — Mal Giriş / Çıkış",
+      "/manager/reports": "BPLAS — Raporlar",
       "/manager/my-visits": "BPLAS — Ziyaretlerim",
       "/my-visits": "BPLAS — Ziyaretlerim",
     }
@@ -65,6 +69,7 @@ export function App() {
         <Route path="resources" element={<Suspense fallback={<RouteSkeleton />}><ResourceCatalogPage /></Suspense>} />
         <Route path="transport-planning" element={<Suspense fallback={<RouteSkeleton />}><TransportPlanningPage /></Suspense>} />
         <Route path="goods-movements" element={<Suspense fallback={<RouteSkeleton />}><GoodsMovementsPage /></Suspense>} />
+        <Route path="reports" element={<Suspense fallback={<RouteSkeleton />}><ReportsPage /></Suspense>} />
         <Route index element={<Navigate to="dashboard" replace />} />
       </Route>
       <Route path="*" element={<Navigate to="/manager/dashboard" replace />} />

@@ -40,7 +40,7 @@ const managementNavigationItems = [
   { label: "Kaynaklar", icon: Boxes, to: "/manager/resources" },
   { label: "Mal hareketleri", icon: PackageCheck, to: "/manager/goods-movements" },
   { label: "Araç planı", icon: CarFront, to: "/manager/transport-planning" },
-  { label: "Raporlar", icon: FileBarChart },
+  { label: "Raporlar", icon: FileBarChart, to: "/manager/reports" },
 ]
 
 export function ManagerShell() {

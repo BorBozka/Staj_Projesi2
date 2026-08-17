@@ -618,6 +618,38 @@ grouping. The centered Manager Visit Detail dialog provides visit details and Me
 room and pooled equipment resource assignments. It does not show Meeting lifecycle data or
 actions; host lifecycle management is available only from the My Visits floating notification.
 
+The Manager `Reports` area is a separate, tabbed surface (`Ziyaretler`, `Araç/Şoför`,
+`Mal Hareketi`) reachable from Manager navigation. A single filter bar sits above the tabs and
+is shared by all of them:
+
+- date range, defaulting to the last 30 days, with `Bugün` / `Son 7 gün` / `Son 30 gün` / `Bu ay`
+  quick-select options and no maximum span,
+- company and facility, using the same unscoped-by-default (`all`) pattern as the Dashboard.
+
+All shared filters are URL-persisted, matching the All Visits pattern. All three tabs are
+read-only reporting surfaces with no row-level detail dialog, and each offers CSV, Excel, and
+PDF export of its currently filtered result.
+
+The `Ziyaretler` report tab reuses the All Visits filter/sort logic but is not the All Visits
+list: it has its own report-specific KPI cards (total visits, completed visits, the
+no-show/cancellation rate, and average visit duration), and unlike All Visits it does not
+exclude Visits whose invitation state is `NOT_SENT` — a report must stay complete for audit
+purposes.
+
+The `Araç/Şoför` report tab reads planned transport assignment data only (no actual start/end
+time or odometer capture exists yet, so a distance/km report is a separate later phase). Its
+KPI cards are total assignments, cancelled assignments, the cancellation rate, and the average
+planned duration. Its table shows purpose, vehicle (name and plate), driver, company/facility,
+planned start–end, status (Aktif/İptal), and the related Visit or Meeting if the assignment was
+created from one (otherwise `—`).
+
+The `Mal Hareketi` report tab reads goods movement data. Its KPI cards are total movements,
+inbound movements, outbound movements, and the late rate (derived the same way the operational
+Goods Movements list derives a `Gecikti` status). Its table shows direction, company/facility,
+counterparty, planned date/time, actual time (if recorded), status (Planlandı/Tamamlandı/
+İptal/Gecikti), reference number, and the actual plate/driver recorded at completion (otherwise
+`—`).
+
 ---
 
 ## 22A. Resource Catalog
