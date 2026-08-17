@@ -568,6 +568,30 @@ Includes:
 
 Recharts may be added only if actual stakeholder-reviewed charts are needed.
 
+**Manager Reports: functionally complete for all three tabs.** A tabbed `Raporlar` page exists
+with a shared date-range/company/facility filter bar (URL-persisted) above the tabs. All three
+tabs are implemented and enabled:
+
+- `Ziyaretler` — report KPI cards, an export-ready read-only table, and CSV/Excel/PDF export,
+  reusing the All Visits filter/sort core without changing All Visits itself.
+- `Araç/Şoför` — reads `PlannedTransportAssignment` (planned data only; no actual start/end or
+  odometer capture yet), with its own KPI cards (total assignments, cancelled, cancellation
+  rate, average planned duration), a read-only table, and CSV/Excel/PDF export. Reuses the
+  shared filter bar, KPI card, and export infrastructure introduced for the `Ziyaretler` tab.
+- `Mal Hareketi` — reads `GoodsMovement`, with its own KPI cards (total, inbound, outbound,
+  late rate) and the same read-only table + export pattern.
+
+Both new tabs are salt-okunur (read-only): no row click, no detail dialog.
+
+Next steps for this phase:
+
+- A vehicle distance/km report is a separate follow-on mini-phase, gated on Security completion
+  and odometer capture landing first (it depends on odometer readings that do not exist yet).
+- Visual polish and cross-tab consistency pass (spacing, empty/loading states, KPI hint
+  formatting) is intentionally deferred to a single dedicated "UI polish" pass once every Reports
+  tab is functionally complete, aligned with the Phase 7 UI Review and Freeze normalization work
+  rather than done piecemeal per tab.
+
 Acceptance:
 
 - managers can navigate overview and reporting using mock data.

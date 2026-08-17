@@ -173,14 +173,16 @@ function compareVisits(left: Visit, right: Visit, field: VisitSortField): number
   }
 }
 
-export function filterAndSortVisits(visits: Visit[], filters: AllVisitsFilters, sorts: VisitSort[] = []) {
+// Shared filter core: every AllVisitsFilters predicate except invitation-state visibility,
+// which differs between the operational All Visits list and reporting surfaces (see filterAndSortVisits vs. Reports).
+export function filterVisits(visits: Visit[], filters: AllVisitsFilters): Visit[] {
   if (isDateRangeInvalid(filters)) return []
 
   const query = filters.search.trim().toLocaleLowerCase("tr-TR")
   const rangeStart = filters.startDate ? startOfDay(toLocalDate(filters.startDate)) : null
   const rangeEnd = filters.endDate ? endOfDay(toLocalDate(filters.endDate)) : null
 
-  const filtered = visits.filter((visit) => {
+  return visits.filter((visit) => {
     const plannedStart = new Date(visit.plannedStart)
     const searchableText = [
       visit.visitor.firstName,
@@ -194,8 +196,7 @@ export function filterAndSortVisits(visits: Visit[], filters: AllVisitsFilters, 
       || (filters.additionalRequirement === "with" && Boolean(visit.hasAdditionalRequirements))
       || (filters.additionalRequirement === "without" && !visit.hasAdditionalRequirements)
 
-    return visit.invitationStatus !== "NOT_SENT"
-      && (!query || searchableText.includes(query))
+    return (!query || searchableText.includes(query))
       && (!rangeStart || plannedStart >= rangeStart)
       && (!rangeEnd || plannedStart <= rangeEnd)
       && (filters.companyId === "all" || visit.hostCompanyId === filters.companyId)
@@ -205,8 +206,11 @@ export function filterAndSortVisits(visits: Visit[], filters: AllVisitsFilters, 
       && (filters.hostEmployeeId === "all" || visit.hostEmployeeId === filters.hostEmployeeId)
       && additionalMatches
   })
+}
 
-  return sortVisits(filtered, sorts)
+export function filterAndSortVisits(visits: Visit[], filters: AllVisitsFilters, sorts: VisitSort[] = []) {
+  const operationallyOpened = filterVisits(visits, filters).filter((visit) => visit.invitationStatus !== "NOT_SENT")
+  return sortVisits(operationallyOpened, sorts)
 }
 
 export function countVisitsWithAdditionalRequirements(visits: Visit[], filters: AllVisitsFilters): number {

@@ -18,6 +18,10 @@ Supporting libraries:
 - React Hook Form — form state and form workflows
 - Zod — client-side schemas and validation
 - date-fns — date/time formatting and calculations
+- xlsx (SheetJS) — Manager Reports Excel export
+- jspdf + jspdf-autotable — Manager Reports PDF export
+
+CSV export uses the native Blob/download APIs and does not require a dedicated library.
 
 Libraries that may be added later only when an actual requirement appears:
 
