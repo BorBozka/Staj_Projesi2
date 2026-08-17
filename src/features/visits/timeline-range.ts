@@ -1,4 +1,5 @@
 import type { Visit } from "@/domain/visits"
+import { getIsoWallClockMinutes } from "@/lib/date"
 
 const defaultTimelineStartHour = 8
 const defaultTimelineEndHour = 18
@@ -13,14 +14,8 @@ export function getTimelineRange(visits: Visit[]): TimelineRange {
     return { startMinutes: defaultTimelineStartHour * 60, endMinutes: defaultTimelineEndHour * 60 }
   }
 
-  const visitStartMinutes = (visit: Visit) => {
-    const start = new Date(visit.plannedStart)
-    return start.getHours() * 60 + start.getMinutes()
-  }
-  const visitEndMinutes = (visit: Visit) => {
-    const end = new Date(visit.plannedEnd)
-    return end.getHours() * 60 + end.getMinutes()
-  }
+  const visitStartMinutes = (visit: Visit) => getIsoWallClockMinutes(visit.plannedStart) ?? 0
+  const visitEndMinutes = (visit: Visit) => getIsoWallClockMinutes(visit.plannedEnd) ?? 0
 
   const earliestStart = Math.min(...visits.map(visitStartMinutes))
   const latestEnd = Math.max(...visits.map(visitEndMinutes))

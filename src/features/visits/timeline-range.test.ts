@@ -3,9 +3,12 @@ import { describe, expect, it } from "vitest"
 import type { Visit } from "@/domain/visits"
 import { getTimelineRange } from "@/features/visits/timeline-range"
 
+function isoAt(hour: number, minute: number) {
+  return `2026-08-10T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00.000Z`
+}
+
 function visitAt(hour: number, minute: number, endHour: number, endMinute: number): Visit {
-  const start = new Date(2026, 7, 10, hour, minute)
-  const end = new Date(2026, 7, 10, endHour, endMinute)
+  const plannedStart = isoAt(hour, minute)
   return {
     id: `${hour}-${minute}`,
     meetingId: `meeting-${hour}-${minute}`,
@@ -19,13 +22,13 @@ function visitAt(hour: number, minute: number, endHour: number, endMinute: numbe
     hostCompanyName: "BPLAS",
     facilityId: "bplas-merkez",
     facilityName: "Merkez Tesis",
-    plannedStart: start.toISOString(),
-    plannedEnd: end.toISOString(),
+    plannedStart,
+    plannedEnd: isoAt(endHour, endMinute),
     status: "PLANNED",
     invitationStatus: "SENT",
     hasAdditionalRequirements: false,
-    createdAt: start.toISOString(),
-    updatedAt: start.toISOString(),
+    createdAt: plannedStart,
+    updatedAt: plannedStart,
   }
 }
 
