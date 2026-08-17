@@ -10,16 +10,34 @@ export interface IsoWallClockTime {
   minute: number
 }
 
+const istanbulWallClockFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: "Europe/Istanbul",
+  hourCycle: "h23",
+  hour: "2-digit",
+  minute: "2-digit",
+})
+
 /**
- * Reads the wall-clock hour/minute directly out of an ISO timestamp's digits,
- * instead of converting through the runtime's system timezone (Date#getHours).
- * A Date is first normalized via toISOString() so "now" comparisons stay
- * consistent with stored ISO timestamps regardless of CI/deployment timezone.
+ * Reads a wall-clock hour/minute for a given ISO timestamp string or a
+ * moment in time, independent of the runtime's own system timezone.
+ * - A string is read literally out of its ISO digits (e.g. stored
+ *   "plannedStart" values already encode the intended wall-clock time).
+ * - A Date represents an absolute instant, so it's converted to the
+ *   Europe/Istanbul wall clock via Intl.DateTimeFormat, instead of
+ *   Date#getHours()/toISOString() (both of which depend on/produce a
+ *   timezone other than Istanbul depending on the runtime).
  */
 export function getIsoWallClockTime(value: Date | string): IsoWallClockTime | null {
-  const isoString = typeof value === "string" ? value : value.toISOString()
-  const match = isoString.match(/T(\d{2}):(\d{2})/)
-  return match ? { hour: parseInt(match[1], 10), minute: parseInt(match[2], 10) } : null
+  if (typeof value === "string") {
+    const match = value.match(/T(\d{2}):(\d{2})/)
+    return match ? { hour: parseInt(match[1], 10), minute: parseInt(match[2], 10) } : null
+  }
+
+  if (Number.isNaN(value.getTime())) return null
+  const parts = istanbulWallClockFormatter.formatToParts(value)
+  const hour = parts.find((part) => part.type === "hour")?.value
+  const minute = parts.find((part) => part.type === "minute")?.value
+  return hour && minute ? { hour: parseInt(hour, 10), minute: parseInt(minute, 10) } : null
 }
 
 export function getIsoHour(value: Date | string): number | null {
