@@ -279,6 +279,7 @@ Visitors:
 - At least one visitor is required.
 - Visitors can be added and removed without repeating shared meeting fields.
 - First name, last name, and email are validated separately for every visitor.
+- Visitor company is required the same way email is — left blank, it blocks Save the same way.
 - Phone remains optional.
 
 Shared meeting/visit information, shown once:
@@ -512,10 +513,16 @@ Limit charts to useful summaries.
   no maximum span) plus a company/facility scope control using the Dashboard's combined
   `Şirket: … · Tesis: …` dropdown pattern. All shared filters persist in the URL the same way
   All Visits filters do.
+- A single "Dışa Aktar" button + dropdown (CSV/Excel/PDF) sits fixed at the top-right of the tab
+  row, independent of the active tab, and triggers that tab's own export handlers.
 - The `Ziyaretler` tab reuses the All Visits filter/sort core (`all-visits-utils`) rather than
   reimplementing it, but is a distinct, read-only reporting surface:
-  - report-specific KPI cards above the table: total visits, completed (`CHECKED_OUT`) visits,
-    the no-show + cancellation rate, and average visit duration,
+  - a compact summary row above the table, laid out horizontally: a narrow number-focused stat
+    strip (small icon + value, total visits and average visit duration only), a compact
+    read-only status-distribution donut in the same visual language as the Dashboard's
+    `Durum Dağılımı` donut (covering `Planlandı` / `İçeride` / `Çıkış Yapıldı` / `Gelmedi` /
+    `İptal Edildi` for the visits in the selected date range and scope), and a simple Recharts
+    bar chart of daily visit counts across the selected date range,
   - a dense export-ready table with visitor, visitor company, host, date, planned and actual
     check-in/check-out, status, and delay-in-minutes columns,
   - no row click or detail dialog — the operational drill-down affordances from All Visits are
@@ -544,6 +551,8 @@ Limit charts to useful summaries.
     at completion (otherwise `—`),
   - no row click or detail dialog,
   - CSV, Excel, and PDF export of the currently filtered result.
+- Each tab's table lives in a single bordered/shadowed card whose footer follows the Manager
+  All Visits pattern: record-count text (`{start}–{end} / {total} kayıt`) on the left, page-numbered pagination on the right.
 
 ### Manager All Visits
 

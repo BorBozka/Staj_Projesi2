@@ -1,23 +1,25 @@
-import { ChevronLeft, ChevronRight, Download, FileSpreadsheet, FileText, Search } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { Search } from "lucide-react"
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react"
 
-import { Button } from "@/components/ui/button"
 import { getGoodsDirectionLabel, getGoodsMovementDisplayStatus, type GoodsMovement } from "@/domain/goods-movements"
 import {
   calculateGoodsReportKpis,
   filterGoodsMovementsForReport,
   getGoodsReportPageCount,
+  getVisibleGoodsReportPageNumbers,
   GOODS_REPORT_PAGE_SIZE,
   GOODS_REPORT_STATUS_LABELS,
   paginateGoodsReport,
 } from "@/features/reports/goods-report-utils"
 import { ReportKpiCard } from "@/features/reports/ReportKpiCard"
+import { ReportPagination } from "@/features/reports/ReportPagination"
 import {
   buildGoodsReportRows,
   downloadReportCsv,
   downloadReportExcel,
   downloadReportPdf,
   GOODS_REPORT_COLUMNS,
+  type ReportExportHandle,
 } from "@/features/reports/report-export"
 import type { ReportsScopeFilters } from "@/features/reports/reports-filters"
 import { formatTr } from "@/lib/date"
@@ -30,7 +32,7 @@ const statusBadgeClass: Record<ReturnType<typeof getGoodsMovementDisplayStatus>,
   LATE: "bg-amber-50 text-amber-700",
 }
 
-export function GoodsReportTab({ filters, dateRangeInvalid }: { filters: ReportsScopeFilters; dateRangeInvalid: boolean }) {
+export const GoodsReportTab = forwardRef<ReportExportHandle, { filters: ReportsScopeFilters; dateRangeInvalid: boolean; onExportAvailabilityChange?(canExport: boolean): void }>(function GoodsReportTab({ filters, dateRangeInvalid, onExportAvailabilityChange }, ref) {
   const [movements, setMovements] = useState<GoodsMovement[]>([])
   const [page, setPage] = useState(1)
 
@@ -57,7 +59,17 @@ export function GoodsReportTab({ filters, dateRangeInvalid }: { filters: Reports
     if (page > pageCount) setPage(pageCount)
   }, [page, pageCount])
 
+  useEffect(() => {
+    onExportAvailabilityChange?.(reportMovements.length > 0)
+  }, [onExportAvailabilityChange, reportMovements.length])
+
   const exportRows = () => buildGoodsReportRows(reportMovements)
+
+  useImperativeHandle(ref, () => ({
+    exportCsv: () => downloadReportCsv(headers, exportRows(), `${exportFilenameBase}.csv`),
+    exportExcel: () => { void downloadReportExcel("Mal Hareketi", headers, exportRows(), `${exportFilenameBase}.xlsx`) },
+    exportPdf: () => { void downloadReportPdf("Mal Hareketi Raporu", headers, exportRows(), `${exportFilenameBase}.pdf`) },
+  }))
 
   return (
     <div className="space-y-3">
@@ -66,21 +78,6 @@ export function GoodsReportTab({ filters, dateRangeInvalid }: { filters: Reports
         <ReportKpiCard label="Gelen" value={String(kpis.inbound)} />
         <ReportKpiCard label="Giden" value={String(kpis.outbound)} />
         <ReportKpiCard label="Geciken Oranı" value={`%${kpis.lateRate.toFixed(1)}`} />
-      </section>
-
-      <section className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2 shadow-panel" aria-label="Rapor dışa aktarma">
-        <p className="text-xs text-slate-600 tabular-nums">{visibleStart}–{visibleEnd} / {reportMovements.length} kayıt</p>
-        <div className="flex flex-wrap gap-1.5">
-          <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" disabled={reportMovements.length === 0} onClick={() => downloadReportCsv(headers, exportRows(), `${exportFilenameBase}.csv`)}>
-            <Download className="size-3.5" />CSV
-          </Button>
-          <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" disabled={reportMovements.length === 0} onClick={() => void downloadReportExcel("Mal Hareketi", headers, exportRows(), `${exportFilenameBase}.xlsx`)}>
-            <FileSpreadsheet className="size-3.5" />Excel
-          </Button>
-          <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" disabled={reportMovements.length === 0} onClick={() => void downloadReportPdf("Mal Hareketi Raporu", headers, exportRows(), `${exportFilenameBase}.pdf`)}>
-            <FileText className="size-3.5" />PDF
-          </Button>
-        </div>
       </section>
 
       <section className="flex min-h-[26rem] flex-col justify-between overflow-hidden rounded-lg border bg-card shadow-panel" aria-label="Mal hareketi rapor tablosu">
@@ -136,18 +133,17 @@ export function GoodsReportTab({ filters, dateRangeInvalid }: { filters: Reports
           </div>
         )}
 
-        <div className="flex items-center justify-between gap-2 border-t bg-slate-50/50 px-3 py-2.5">
-          <p className="text-xs tabular-nums text-slate-600">Sayfa {pageCount === 0 ? 0 : page} / {pageCount}</p>
-          <nav className="flex items-center gap-1" aria-label="Mal hareketi rapor sayfaları">
-            <Button variant="outline" size="icon-sm" className="h-8 w-8 text-xs" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} aria-label="Önceki sayfa">
-              <ChevronLeft className="size-4" />
-            </Button>
-            <Button variant="outline" size="icon-sm" className="h-8 w-8 text-xs" disabled={page >= pageCount} onClick={() => setPage((current) => Math.min(pageCount, current + 1))} aria-label="Sonraki sayfa">
-              <ChevronRight className="size-4" />
-            </Button>
-          </nav>
-        </div>
+        <ReportPagination
+          page={page}
+          pageCount={pageCount}
+          visibleStart={visibleStart}
+          visibleEnd={visibleEnd}
+          total={reportMovements.length}
+          visiblePageNumbers={getVisibleGoodsReportPageNumbers(page, Math.max(1, pageCount))}
+          onPageChange={setPage}
+          ariaLabel="Mal hareketi rapor sayfaları"
+        />
       </section>
     </div>
   )
-}
+})

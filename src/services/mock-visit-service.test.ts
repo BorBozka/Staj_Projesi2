@@ -6,7 +6,7 @@ import { getOwnVisits, getVisibleAdditionalRequirementNote } from "@/features/vi
 import { MockVisitService } from "@/services/mock-visit-service"
 
 const meetingInput: MeetingInput = {
-  visitors: [{ firstName: "Test", lastName: "Ziyaretci", email: "test@example.com" }],
+  visitors: [{ firstName: "Test", lastName: "Ziyaretci", email: "test@example.com", company: "Test A.Ş." }],
   visitTypeId: "meeting",
   hostEmployeeName: "Maya Kara",
   hostCompanyId: "bplas",
@@ -36,9 +36,9 @@ describe("MockVisitService Meeting–Visit behavior", () => {
     const created = await service.createMeeting({
       ...meetingInput,
       visitors: [
-        { firstName: "Ada", lastName: "Ak", email: "ada@example.com" },
-        { firstName: "Bora", lastName: "Boz", email: "bora@example.com" },
-        { firstName: "Cem", lastName: "Can", email: "cem@example.com" },
+        { firstName: "Ada", lastName: "Ak", email: "ada@example.com", company: "Test A.Ş." },
+        { firstName: "Bora", lastName: "Boz", email: "bora@example.com", company: "Test A.Ş." },
+        { firstName: "Cem", lastName: "Can", email: "cem@example.com", company: "Test A.Ş." },
       ],
     })
 
@@ -51,8 +51,8 @@ describe("MockVisitService Meeting–Visit behavior", () => {
     const created = await service.createMeeting({
       ...meetingInput,
       visitors: [
-        { firstName: "Ada", lastName: "Ak", email: "ada@example.com" },
-        { firstName: "Bora", lastName: "Boz", email: "bora@example.com" },
+        { firstName: "Ada", lastName: "Ak", email: "ada@example.com", company: "Test A.Ş." },
+        { firstName: "Bora", lastName: "Boz", email: "bora@example.com", company: "Test A.Ş." },
       ],
     })
     const updated = await service.updateMeeting(created.meeting.id, {
@@ -63,6 +63,7 @@ describe("MockVisitService Meeting–Visit behavior", () => {
         firstName: visit.visitor.firstName,
         lastName: visit.visitor.lastName,
         email: visit.visitor.email,
+        company: visit.visitor.company,
       })),
     })
 
@@ -88,6 +89,7 @@ describe("MockVisitService Meeting–Visit behavior", () => {
           firstName: visit.visitor.firstName,
           lastName: visit.visitor.lastName,
           email: visit.visitor.email,
+          company: visit.visitor.company,
           phone: visit.visitor.phone,
         })),
         visitTypeId: closedMeeting.visitTypeId,
@@ -119,8 +121,8 @@ describe("MockVisitService Meeting–Visit behavior", () => {
     const created = await service.createMeeting({
       ...meetingInput,
       visitors: [
-        { firstName: "Ada", lastName: "Ak", email: "ada@example.com" },
-        { firstName: "Bora", lastName: "Boz", email: "bora@example.com" },
+        { firstName: "Ada", lastName: "Ak", email: "ada@example.com", company: "Test A.Ş." },
+        { firstName: "Bora", lastName: "Boz", email: "bora@example.com", company: "Test A.Ş." },
       ],
     })
 
@@ -136,9 +138,9 @@ describe("MockVisitService Meeting–Visit behavior", () => {
     const created = await service.createMeeting({
       ...meetingInput,
       visitors: [
-        { firstName: "Planlı", lastName: "Kişi", email: "planned@example.com" },
-        { firstName: "İçeride", lastName: "Kişi", email: "inside@example.com" },
-        { firstName: "Çıktı", lastName: "Kişi", email: "completed@example.com" },
+        { firstName: "Planlı", lastName: "Kişi", email: "planned@example.com", company: "Test A.Ş." },
+        { firstName: "İçeride", lastName: "Kişi", email: "inside@example.com", company: "Test A.Ş." },
+        { firstName: "Çıktı", lastName: "Kişi", email: "completed@example.com", company: "Test A.Ş." },
       ],
     })
     const storedRecords = (service as unknown as { visits: VisitRecord[] }).visits
@@ -164,8 +166,8 @@ describe("MockVisitService Meeting–Visit behavior", () => {
     const created = await service.createMeeting({
       ...meetingInput,
       visitors: [
-        { firstName: "Ada", lastName: "Ak", email: "ada@example.com" },
-        { firstName: "Bora", lastName: "Boz", email: "bora@example.com" },
+        { firstName: "Ada", lastName: "Ak", email: "ada@example.com", company: "Test A.Ş." },
+        { firstName: "Bora", lastName: "Boz", email: "bora@example.com", company: "Test A.Ş." },
       ],
     })
 
@@ -200,7 +202,7 @@ describe("MockVisitService Meeting–Visit behavior", () => {
     const service = new MockVisitService()
     const created = await service.createMeeting({
       ...meetingInput,
-      visitors: [{ firstName: "Test", lastName: "Ziyaretci", email: "test@example.com", phone: undefined }],
+      visitors: [{ firstName: "Test", lastName: "Ziyaretci", email: "test@example.com", company: "Test A.Ş.", phone: undefined }],
       note: "Güvenliğin görebileceği genel not",
       hasAdditionalRequirements: true,
       additionalRequirementNote: "Erişilebilir giriş hazırlanmalı.",

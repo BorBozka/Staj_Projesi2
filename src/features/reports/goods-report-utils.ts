@@ -56,3 +56,8 @@ export function paginateGoodsReport(movements: GoodsMovement[], page: number, pa
 export function getGoodsReportPageCount(total: number, pageSize = GOODS_REPORT_PAGE_SIZE) {
   return getPageCountShared(total, pageSize)
 }
+
+export function getVisibleGoodsReportPageNumbers(page: number, pageCount: number) {
+  const start = Math.max(1, Math.min(page - 1, pageCount - 2))
+  return Array.from({ length: Math.min(3, pageCount) }, (_, index) => start + index)
+}

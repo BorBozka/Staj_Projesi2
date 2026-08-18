@@ -31,10 +31,10 @@ const baseFilters: AllVisitsFilters = {
 }
 
 const visits = [
-  visit("1", "2026-08-10T08:00:00+03:00", { firstName: "Ayşe", companyId: "bplas", facilityId: "bplas-merkez", employeeId: "maya-kara" }),
-  visit("2", "2026-08-11T10:00:00+03:00", { firstName: "Bora", companyId: "bplas", facilityId: "bplas-arge", employeeId: "emre-yilmaz", invitationStatus: "FAILED", hasAdditionalRequirements: true }),
-  visit("3", "2026-08-12T12:00:00+03:00", { firstName: "Ceren", companyId: "bplas-otomotiv", facilityId: "otomotiv-uretim", employeeId: "selin-aydin", status: "CHECKED_IN", typeId: "audit", hasAdditionalRequirements: true }),
-  visit("4", "2026-08-13T09:00:00+03:00", { firstName: "Deniz", companyId: "bplas", facilityId: "bplas-merkez", employeeId: "maya-kara", invitationStatus: "NOT_SENT", hasAdditionalRequirements: true }),
+  visit("1", "2026-08-10T08:00:00+03:00", { firstName: "Ayşe", companyId: "bplas", facilityId: "bplas-merkez", employeeId: "maya-kara", visitorCompany: "Vega Endüstri" }),
+  visit("2", "2026-08-11T10:00:00+03:00", { firstName: "Bora", companyId: "bplas", facilityId: "bplas-arge", employeeId: "emre-yilmaz", invitationStatus: "FAILED", hasAdditionalRequirements: true, visitorCompany: "Akın Tedarik" }),
+  visit("3", "2026-08-12T12:00:00+03:00", { firstName: "Ceren", companyId: "bplas-otomotiv", facilityId: "otomotiv-uretim", employeeId: "selin-aydin", status: "CHECKED_IN", typeId: "audit", hasAdditionalRequirements: true, visitorCompany: "Marmara Lojistik" }),
+  visit("4", "2026-08-13T09:00:00+03:00", { firstName: "Deniz", companyId: "bplas", facilityId: "bplas-merkez", employeeId: "maya-kara", invitationStatus: "NOT_SENT", hasAdditionalRequirements: true, visitorCompany: "Doğuş Mühendislik" }),
 ]
 
 describe("all visits operations", () => {
@@ -67,7 +67,7 @@ describe("all visits operations", () => {
     expect(filterAndSortVisits(visits, { ...baseFilters, search: "Deniz" })).toEqual([])
   })
 
-  it.each<VisitSortField>(["visitor", "visitType", "host", "companyFacility", "plannedStart", "status"])("cycles %s through asc, desc and removed without clearing other sorts", (field) => {
+  it.each<VisitSortField>(["visitor", "visitorCompany", "visitType", "host", "companyFacility", "plannedStart", "status"])("cycles %s through asc, desc and removed without clearing other sorts", (field) => {
     const existing: VisitSort = field === "plannedStart"
       ? { field: "visitor", direction: "asc" }
       : { field: "plannedStart", direction: "asc" }
@@ -84,6 +84,7 @@ describe("all visits operations", () => {
   })
 
   it("sorts visit type, host, company/facility and status within active priorities", () => {
+    expect(ids(filterAndSortVisits(visits, baseFilters, [{ field: "visitorCompany", direction: "asc" }]))).toEqual(["2", "3", "1"])
     expect(ids(filterAndSortVisits(visits, baseFilters, [{ field: "visitType", direction: "asc" }]))).toEqual(["3", "1", "2"])
     expect(ids(filterAndSortVisits(visits, baseFilters, [{ field: "host", direction: "asc" }]))).toEqual(["2", "1", "3"])
     expect(ids(filterAndSortVisits(visits, baseFilters, [{ field: "companyFacility", direction: "asc" }]))).toEqual(["2", "1", "3"])
@@ -148,6 +149,7 @@ function visit(id: string, plannedStart: string, overrides: {
   typeId?: string
   invitationStatus?: Visit["invitationStatus"]
   hasAdditionalRequirements?: boolean
+  visitorCompany?: string
 }): Visit {
   const company = mockVisitReferenceData.companies.find((item) => item.id === overrides.companyId)!
   const facility = mockVisitReferenceData.facilities.find((item) => item.id === overrides.facilityId)!
@@ -158,7 +160,7 @@ function visit(id: string, plannedStart: string, overrides: {
     id,
     meetingId: `meeting-${id}`,
     creatorEmployeeId: "creator-1",
-    visitor: { id: `visitor-${id}`, firstName: overrides.firstName, lastName: "Test", email: `${id}@example.com` },
+    visitor: { id: `visitor-${id}`, firstName: overrides.firstName, lastName: "Test", email: `${id}@example.com`, company: overrides.visitorCompany ?? "Test A.Ş." },
     visitTypeId: typeId,
     visitTypeName: type.name,
     hostEmployeeId: employee.id,

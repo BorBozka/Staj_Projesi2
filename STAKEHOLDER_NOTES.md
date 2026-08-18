@@ -232,3 +232,17 @@ Decision needed later:
 Approved portions have been transferred to the authoritative specifications. Do not
 implement these phases until the user explicitly requests the corresponding phase; keep
 the remaining questions above open rather than inventing answers.
+
+## 9. Required Visitor Company
+
+Source: the manager's monthly report notes call out a need to identify the "most
+frequently visiting company," which cannot be computed unless every visitor has a company
+value.
+
+Approved direction (moved to `PRODUCT_SPEC.md` and `UI_SPEC.md`):
+
+- Company is a required field on `Visitor`, enforced the same way email is (blocks Save).
+- The visitor may later correct it during pre-registration.
+- Security may correct it under the existing permitted-fields rule.
+
+Status: **Approved, moved to `PRODUCT_SPEC.md`/`UI_SPEC.md`.**

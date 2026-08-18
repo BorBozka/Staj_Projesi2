@@ -1,34 +1,41 @@
-import { ChevronLeft, ChevronRight, Download, FileSpreadsheet, FileText, Search } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { Search, Timer, Users } from "lucide-react"
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react"
 
-import { Button } from "@/components/ui/button"
 import type { Visit } from "@/domain/visits"
-import { ReportKpiCard } from "@/features/reports/ReportKpiCard"
+import { ReportPagination } from "@/features/reports/ReportPagination"
 import {
   buildVisitsReportRows,
   downloadReportCsv,
   downloadReportExcel,
   downloadReportPdf,
   VISITS_REPORT_COLUMNS,
+  type ReportExportHandle,
 } from "@/features/reports/report-export"
 import { formatDurationMinutes } from "@/features/reports/report-format"
 import type { ReportsScopeFilters } from "@/features/reports/reports-filters"
 import {
+  calculateVisitsReportDailyTrend,
   calculateVisitsReportKpis,
+  calculateVisitsReportStatusCounts,
   filterVisitsForReport,
   getReportPageCount,
+  getVisibleReportPageNumbers,
   getVisitDelayMinutes,
   paginateReportVisits,
   VISITS_REPORT_PAGE_SIZE,
 } from "@/features/reports/visits-report-utils"
+import { VisitsStatusDonut } from "@/features/reports/VisitsStatusDonut"
+import { VisitsTrendChart } from "@/features/reports/VisitsTrendChart"
 import { VisitStatusBadge } from "@/features/visits/VisitStatusBadge"
 import { formatTr } from "@/lib/date"
 
-export function VisitsReportTab({ visits, filters, dateRangeInvalid }: { visits: Visit[]; filters: ReportsScopeFilters; dateRangeInvalid: boolean }) {
+export const VisitsReportTab = forwardRef<ReportExportHandle, { visits: Visit[]; filters: ReportsScopeFilters; dateRangeInvalid: boolean; onExportAvailabilityChange?(canExport: boolean): void }>(function VisitsReportTab({ visits, filters, dateRangeInvalid, onExportAvailabilityChange }, ref) {
   const [page, setPage] = useState(1)
 
   const reportVisits = useMemo(() => filterVisitsForReport(visits, filters), [filters, visits])
   const kpis = useMemo(() => calculateVisitsReportKpis(reportVisits), [reportVisits])
+  const statusCounts = useMemo(() => calculateVisitsReportStatusCounts(reportVisits), [reportVisits])
+  const dailyTrend = useMemo(() => calculateVisitsReportDailyTrend(reportVisits, filters), [reportVisits, filters])
   const pageCount = getReportPageCount(reportVisits.length)
   const paginatedVisits = paginateReportVisits(reportVisits, page)
   const visibleStart = reportVisits.length === 0 ? 0 : (page - 1) * VISITS_REPORT_PAGE_SIZE + 1
@@ -44,30 +51,39 @@ export function VisitsReportTab({ visits, filters, dateRangeInvalid }: { visits:
     if (page > pageCount) setPage(pageCount)
   }, [page, pageCount])
 
+  useEffect(() => {
+    onExportAvailabilityChange?.(reportVisits.length > 0)
+  }, [onExportAvailabilityChange, reportVisits.length])
+
   const exportRows = () => buildVisitsReportRows(reportVisits)
+
+  useImperativeHandle(ref, () => ({
+    exportCsv: () => downloadReportCsv(headers, exportRows(), `${exportFilenameBase}.csv`),
+    exportExcel: () => { void downloadReportExcel("Ziyaretler", headers, exportRows(), `${exportFilenameBase}.xlsx`) },
+    exportPdf: () => { void downloadReportPdf("Ziyaretler Raporu", headers, exportRows(), `${exportFilenameBase}.pdf`) },
+  }))
 
   return (
     <div className="space-y-3">
-      <section className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4" aria-label="Ziyaret rapor özeti">
-        <ReportKpiCard label="Toplam Ziyaret" value={String(kpis.total)} />
-        <ReportKpiCard label="Tamamlanan" value={String(kpis.completed)} hint={kpis.total > 0 ? `${Math.round((kpis.completed / kpis.total) * 100)}%` : undefined} />
-        <ReportKpiCard label="No-show + İptal Oranı" value={`%${kpis.noShowCancelledRate.toFixed(1)}`} />
-        <ReportKpiCard label="Ort. Ziyaret Süresi" value={formatDurationMinutes(kpis.averageDurationMinutes)} />
-      </section>
-
-      <section className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2 shadow-panel" aria-label="Rapor dışa aktarma">
-        <p className="text-xs text-slate-600 tabular-nums">{visibleStart}–{visibleEnd} / {reportVisits.length} kayıt</p>
-        <div className="flex flex-wrap gap-1.5">
-          <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" disabled={reportVisits.length === 0} onClick={() => downloadReportCsv(headers, exportRows(), `${exportFilenameBase}.csv`)}>
-            <Download className="size-3.5" />CSV
-          </Button>
-          <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" disabled={reportVisits.length === 0} onClick={() => void downloadReportExcel("Ziyaretler", headers, exportRows(), `${exportFilenameBase}.xlsx`)}>
-            <FileSpreadsheet className="size-3.5" />Excel
-          </Button>
-          <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" disabled={reportVisits.length === 0} onClick={() => void downloadReportPdf("Ziyaretler Raporu", headers, exportRows(), `${exportFilenameBase}.pdf`)}>
-            <FileText className="size-3.5" />PDF
-          </Button>
+      <section className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-[200px_minmax(220px,280px)_minmax(0,1fr)]" aria-label="Ziyaret rapor özeti">
+        <div className="flex flex-col justify-center gap-2.5 rounded-lg border bg-card p-3 shadow-panel">
+          <div className="flex items-center gap-2">
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-700"><Users className="size-3.5" /></span>
+            <div className="min-w-0">
+              <p className="truncate text-[10px] font-medium uppercase tracking-wide text-slate-500">Toplam Ziyaret</p>
+              <p className="text-base font-semibold tabular-nums text-slate-900">{kpis.total}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-emerald-50 text-emerald-700"><Timer className="size-3.5" /></span>
+            <div className="min-w-0">
+              <p className="truncate text-[10px] font-medium uppercase tracking-wide text-slate-500">Ort. Ziyaret Süresi</p>
+              <p className="text-base font-semibold tabular-nums text-slate-900">{formatDurationMinutes(kpis.averageDurationMinutes)}</p>
+            </div>
+          </div>
         </div>
+        <VisitsStatusDonut counts={statusCounts} />
+        <VisitsTrendChart points={dailyTrend} />
       </section>
 
       <section className="flex min-h-[26rem] flex-col justify-between overflow-hidden rounded-lg border bg-card shadow-panel" aria-label="Ziyaret rapor tablosu">
@@ -106,7 +122,7 @@ export function VisitsReportTab({ visits, filters, dateRangeInvalid }: { visits:
                         <p className="truncate font-semibold text-slate-900" title={`${visit.visitor.firstName} ${visit.visitor.lastName}`}>{visit.visitor.firstName} {visit.visitor.lastName}</p>
                       </td>
                       <td className="px-3 py-2.5 sm:py-3">
-                        <p className="truncate" title={visit.hostCompanyName}>{visit.hostCompanyName}</p>
+                        <p className="truncate" title={visit.visitor.company}>{visit.visitor.company}</p>
                         <p className="mt-0.5 truncate text-[11px] text-slate-500" title={visit.facilityName}>{visit.facilityName}</p>
                       </td>
                       <td className="px-3 py-2.5 sm:py-3"><p className="truncate" title={visit.hostEmployeeName}>{visit.hostEmployeeName}</p></td>
@@ -125,18 +141,17 @@ export function VisitsReportTab({ visits, filters, dateRangeInvalid }: { visits:
           </div>
         )}
 
-        <div className="flex items-center justify-between gap-2 border-t bg-slate-50/50 px-3 py-2.5">
-          <p className="text-xs tabular-nums text-slate-600">Sayfa {pageCount === 0 ? 0 : page} / {pageCount}</p>
-          <nav className="flex items-center gap-1" aria-label="Ziyaret rapor sayfaları">
-            <Button variant="outline" size="icon-sm" className="h-8 w-8 text-xs" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} aria-label="Önceki sayfa">
-              <ChevronLeft className="size-4" />
-            </Button>
-            <Button variant="outline" size="icon-sm" className="h-8 w-8 text-xs" disabled={page >= pageCount} onClick={() => setPage((current) => Math.min(pageCount, current + 1))} aria-label="Sonraki sayfa">
-              <ChevronRight className="size-4" />
-            </Button>
-          </nav>
-        </div>
+        <ReportPagination
+          page={page}
+          pageCount={pageCount}
+          visibleStart={visibleStart}
+          visibleEnd={visibleEnd}
+          total={reportVisits.length}
+          visiblePageNumbers={getVisibleReportPageNumbers(page, Math.max(1, pageCount))}
+          onPageChange={setPage}
+          ariaLabel="Ziyaret rapor sayfaları"
+        />
       </section>
     </div>
   )
-}
+})

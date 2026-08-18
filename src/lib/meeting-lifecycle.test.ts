@@ -42,7 +42,7 @@ function makeVisit(meeting: Meeting, status: VisitRecord["status"] = "CHECKED_IN
   return {
     id,
     meetingId: meeting.id,
-    visitor: { id: `visitor-${id}`, firstName: "Test", lastName: "Ziyaretçi", email: "test@example.com" },
+    visitor: { id: `visitor-${id}`, firstName: "Test", lastName: "Ziyaretçi", email: "test@example.com", company: "Test A.Ş." },
     status,
     invitationStatus: "SENT",
     createdAt: meeting.createdAt,

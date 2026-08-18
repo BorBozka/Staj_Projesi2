@@ -5,6 +5,7 @@ const visitorSchema = z.object({
   visitorFirstName: z.string().trim().min(1, "Ad zorunludur."),
   visitorLastName: z.string().trim().min(1, "Soyad zorunludur."),
   visitorEmail: z.string().trim().email("Geçerli bir e-posta adresi girin."),
+  visitorCompany: z.string().trim().min(1, "Ziyaretçi şirketi zorunludur."),
   phoneCountryCode: z.string().default("+90"),
   customPhoneCountryCode: z.string().trim().optional(),
   visitorPhone: z.string().trim().optional(),
@@ -56,6 +57,7 @@ export function toMeetingInput(values: VisitFormValues) {
       firstName: visitor.visitorFirstName,
       lastName: visitor.visitorLastName,
       email: visitor.visitorEmail,
+      company: visitor.visitorCompany,
       phone: visitor.visitorPhone?.trim()
         ? `${visitor.phoneCountryCode === "other" ? visitor.customPhoneCountryCode : visitor.phoneCountryCode} ${visitor.visitorPhone.trim()}`
         : undefined,

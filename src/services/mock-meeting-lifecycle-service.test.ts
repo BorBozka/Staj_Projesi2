@@ -35,7 +35,7 @@ function removeLinkedVisits(visitService: MockVisitService, meetingId: string) {
 
 async function createFutureMeeting(visitService: MockVisitService) {
   return visitService.createMeeting({
-    visitors: [{ firstName: "Gelecek", lastName: "Ziyaretçi", email: "future@example.com" }],
+    visitors: [{ firstName: "Gelecek", lastName: "Ziyaretçi", email: "future@example.com", company: "Test A.Ş." }],
     visitTypeId: "meeting",
     hostEmployeeName: "Maya Kara",
     hostCompanyId: "bplas",
@@ -353,8 +353,8 @@ describe("checkoutVisit", () => {
   it("does NOT auto-close when other visitors are still CHECKED_IN", async () => {
     await visitService.createMeeting({
       visitors: [
-        { firstName: "A", lastName: "Test", email: "a@test.com" },
-        { firstName: "B", lastName: "Test", email: "b@test.com" },
+        { firstName: "A", lastName: "Test", email: "a@test.com", company: "Test A.Ş." },
+        { firstName: "B", lastName: "Test", email: "b@test.com", company: "Test A.Ş." },
       ],
       visitTypeId: "meeting",
       hostEmployeeName: "Maya Kara",

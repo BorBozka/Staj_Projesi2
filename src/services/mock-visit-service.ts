@@ -379,6 +379,7 @@ export class MockVisitService implements VisitService {
       firstName: input.firstName.trim(),
       lastName: input.lastName.trim(),
       email: input.email.trim(),
+      company: input.company.trim(),
       phone: input.phone?.trim() || undefined,
     }
   }

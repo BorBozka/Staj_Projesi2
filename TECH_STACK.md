@@ -20,13 +20,13 @@ Supporting libraries:
 - date-fns — date/time formatting and calculations
 - xlsx (SheetJS) — Manager Reports Excel export
 - jspdf + jspdf-autotable — Manager Reports PDF export
+- Recharts — limited manager/reporting charts (Manager Reports' Ziyaretler tab daily trend chart)
 
 CSV export uses the native Blob/download APIs and does not require a dedicated library.
 
 Libraries that may be added later only when an actual requirement appears:
 
 - TanStack Query — server-state/API data fetching after backend integration begins
-- Recharts — limited manager/reporting charts
 - Zustand — only if genuine cross-screen client state becomes difficult to manage with local state/context
 
 Do not add Redux by default.

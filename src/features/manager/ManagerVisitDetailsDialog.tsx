@@ -106,6 +106,7 @@ export function ManagerVisitDetailsDialog({ visit, open, onOpenChange, returnFoc
               <div className="grid gap-0 md:grid-cols-[minmax(0,45fr)_minmax(0,55fr)] md:divide-x md:divide-slate-200">
                 <DetailSection title="Ziyaretçi">
                   <Field label="E-posta" value={visit.visitor.email} />
+                  <Field label="Ziyaretçi Şirketi" value={visit.visitor.company} />
                   {visit.visitor.phone && <Field label="Telefon" value={visit.visitor.phone} />}
                   <Field label="Davet" value={<InvitationStatus visit={visit} />} />
                 </DetailSection>

@@ -59,6 +59,7 @@ function blankVisitor() {
     visitorFirstName: "",
     visitorLastName: "",
     visitorEmail: "",
+    visitorCompany: "",
     phoneCountryCode: "+90",
     customPhoneCountryCode: "",
     visitorPhone: "",
@@ -76,6 +77,7 @@ function defaultsFor(visits: Visit[] = []): VisitFormValues {
           visitorFirstName: item.visitor.firstName,
           visitorLastName: item.visitor.lastName,
           visitorEmail: item.visitor.email,
+          visitorCompany: item.visitor.company,
           ...getPhoneDefaults(item.visitor.phone),
         }))
       : [blankVisitor()],
@@ -326,6 +328,9 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
                       </FormField>
                       <FormField label="E-posta" required error={fieldError(`visitors.${index}.visitorEmail`)}>
                         <Input type="email" placeholder="ziyaretci@firma.com" {...form.register(`visitors.${index}.visitorEmail`)} />
+                      </FormField>
+                      <FormField label="Ziyaretçi Şirketi" required error={fieldError(`visitors.${index}.visitorCompany`)}>
+                        <Input {...form.register(`visitors.${index}.visitorCompany`)} />
                       </FormField>
                       <FormField label="Telefon (opsiyonel)" error={fieldError(`visitors.${index}.visitorPhone`)}>
                         <div className={phoneCountryCode === "other" ? "grid gap-2 sm:grid-cols-[150px_96px_minmax(0,1fr)]" : "grid gap-2 sm:grid-cols-[150px_minmax(0,1fr)]"}>

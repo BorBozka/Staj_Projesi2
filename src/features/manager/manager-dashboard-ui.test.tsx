@@ -14,6 +14,7 @@ const visit: Visit = {
     firstName: "Ayça",
     lastName: "Korkmaz",
     email: "ayca@example.com",
+    company: "Test A.Ş.",
   },
   visitTypeId: "meeting",
   visitTypeName: "Toplantı",

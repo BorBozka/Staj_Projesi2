@@ -14,7 +14,7 @@ import { toggleSort } from "@/lib/sort"
 export const ALL_VISITS_PAGE_SIZE = 8
 
 export type AdditionalRequirementFilter = "all" | "with" | "without"
-export type VisitSortField = "visitor" | "visitType" | "host" | "companyFacility" | "plannedStart" | "status"
+export type VisitSortField = "visitor" | "visitorCompany" | "visitType" | "host" | "companyFacility" | "plannedStart" | "status"
 export type VisitSortDirection = "asc" | "desc"
 
 export interface VisitSort {
@@ -154,6 +154,8 @@ function compareVisits(left: Visit, right: Visit, field: VisitSortField): number
       const rightName = `${right.visitor.firstName} ${right.visitor.lastName}`
       return compareTr(leftName, rightName)
     }
+    case "visitorCompany":
+      return compareTr(left.visitor.company, right.visitor.company)
     case "visitType": {
       return compareTr(left.visitTypeName, right.visitTypeName)
     }

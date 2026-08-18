@@ -52,7 +52,7 @@ describe("buildVisitsReportRows", () => {
     expect(rows[0]).toHaveLength(VISITS_REPORT_COLUMNS.length)
     expect(rows[0]).toEqual([
       "Ayşe Test",
-      "BPLAS A.Ş.",
+      "Test A.Ş.",
       "Maya Kara",
       "10 Ağu 2026",
       "08:00",
@@ -64,7 +64,7 @@ describe("buildVisitsReportRows", () => {
     ])
     expect(rows[1]).toEqual([
       "Bora Test",
-      "BPLAS A.Ş.",
+      "Test A.Ş.",
       "Maya Kara",
       "10 Ağu 2026",
       "08:00",
@@ -285,7 +285,7 @@ function baseVisit(overrides: {
     id: "v-1",
     meetingId: "meeting-1",
     creatorEmployeeId: "creator-1",
-    visitor: { id: "visitor-1", firstName: overrides.firstName, lastName: "Test", email: "test@example.com" },
+    visitor: { id: "visitor-1", firstName: overrides.firstName, lastName: "Test", email: "test@example.com", company: "Test A.Ş." },
     visitTypeId: type.id,
     visitTypeName: type.name,
     hostEmployeeId: employee.id,
