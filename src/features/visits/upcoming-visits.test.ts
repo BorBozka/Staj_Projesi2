@@ -8,7 +8,7 @@ function visitWithStatus(id: string, plannedStart: string, status: VisitStatus):
     id,
     meetingId: `meeting-${id}`,
     creatorEmployeeId: "creator-1",
-    visitor: { id: `visitor-${id}`, firstName: "Test", lastName: "Kisi", email: "test@example.com" },
+    visitor: { id: `visitor-${id}`, firstName: "Test", lastName: "Kisi", email: "test@example.com", company: "Test A.Ş." },
     visitTypeId: "meeting",
     visitTypeName: "Toplanti",
     hostEmployeeId: "maya-kara",

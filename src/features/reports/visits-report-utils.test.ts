@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest"
 import type { Visit } from "@/domain/visits"
 import type { ReportsScopeFilters } from "@/features/reports/reports-filters"
 import {
+  calculateVisitsReportDailyTrend,
   calculateVisitsReportKpis,
+  calculateVisitsReportStatusCounts,
   filterVisitsForReport,
   getReportPageCount,
   getVisitDelayMinutes,
@@ -78,6 +80,42 @@ describe("calculateVisitsReportKpis", () => {
   })
 })
 
+describe("calculateVisitsReportStatusCounts", () => {
+  it("counts every status in a fixed order, including zero counts", () => {
+    const statusVisits = [
+      visit("a", "2026-08-10T08:00:00+03:00", { firstName: "A", companyId: "bplas", facilityId: "bplas-merkez", employeeId: "maya-kara", status: "PLANNED" }),
+      visit("b", "2026-08-10T08:00:00+03:00", { firstName: "B", companyId: "bplas", facilityId: "bplas-merkez", employeeId: "maya-kara", status: "PLANNED" }),
+      visit("c", "2026-08-10T08:00:00+03:00", { firstName: "C", companyId: "bplas", facilityId: "bplas-merkez", employeeId: "maya-kara", status: "CANCELLED" }),
+    ]
+    expect(calculateVisitsReportStatusCounts(statusVisits)).toEqual([
+      { status: "PLANNED", count: 2 },
+      { status: "CHECKED_IN", count: 0 },
+      { status: "CHECKED_OUT", count: 0 },
+      { status: "NO_SHOW", count: 0 },
+      { status: "CANCELLED", count: 1 },
+    ])
+  })
+})
+
+describe("calculateVisitsReportDailyTrend", () => {
+  it("fills every day in a bounded range with zero counts where there is no data", () => {
+    const trendVisits = [visit("a", "2026-08-11T08:00:00+03:00", { firstName: "A", companyId: "bplas", facilityId: "bplas-merkez", employeeId: "maya-kara" })]
+    const trend = calculateVisitsReportDailyTrend(trendVisits, { ...baseFilters, startDate: "2026-08-10", endDate: "2026-08-12" })
+    expect(trend.map((point) => point.date)).toEqual(["2026-08-10", "2026-08-11", "2026-08-12"])
+    expect(trend.map((point) => point.count)).toEqual([0, 1, 0])
+  })
+
+  it("only returns days that have visits when the range is unbounded", () => {
+    const trendVisits = [
+      visit("a", "2026-08-11T08:00:00+03:00", { firstName: "A", companyId: "bplas", facilityId: "bplas-merkez", employeeId: "maya-kara" }),
+      visit("b", "2026-08-13T08:00:00+03:00", { firstName: "B", companyId: "bplas", facilityId: "bplas-merkez", employeeId: "maya-kara" }),
+    ]
+    const trend = calculateVisitsReportDailyTrend(trendVisits, baseFilters)
+    expect(trend.map((point) => point.date)).toEqual(["2026-08-11", "2026-08-13"])
+    expect(trend.map((point) => point.count)).toEqual([1, 1])
+  })
+})
+
 describe("report pagination", () => {
   it("paginates using the shared pagination helpers", () => {
     const records = Array.from({ length: 25 }, (_, index) => ({ id: String(index) }))
@@ -110,7 +148,7 @@ function visit(id: string, plannedStart: string, overrides: {
     id,
     meetingId: `meeting-${id}`,
     creatorEmployeeId: "creator-1",
-    visitor: { id: `visitor-${id}`, firstName: overrides.firstName, lastName: "Test", email: `${id}@example.com` },
+    visitor: { id: `visitor-${id}`, firstName: overrides.firstName, lastName: "Test", email: `${id}@example.com`, company: "Test A.Ş." },
     visitTypeId: type.id,
     visitTypeName: type.name,
     hostEmployeeId: employee.id,

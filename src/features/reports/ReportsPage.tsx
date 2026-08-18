@@ -1,11 +1,12 @@
-import { AlertCircle, Building2, ChevronDown, FilterX } from "lucide-react"
-import { useMemo, useState } from "react"
+import { AlertCircle, Building2, ChevronDown, Download, FileSpreadsheet, FileText, FilterX } from "lucide-react"
+import { useMemo, useRef, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -16,6 +17,7 @@ import { Input } from "@/components/ui/input"
 import { isDateRangeInvalid } from "@/features/manager/all-visits-utils"
 import { FleetReportTab } from "@/features/reports/FleetReportTab"
 import { GoodsReportTab } from "@/features/reports/GoodsReportTab"
+import type { ReportExportHandle } from "@/features/reports/report-export"
 import {
   getDefaultReportsRange,
   getQuickRangeOptions,
@@ -43,6 +45,8 @@ export function ReportsPage() {
   const { meetings, visits, referenceData, isLoading, error, reload } = useVisits()
   const [searchParams, setSearchParams] = useSearchParams()
   const [now] = useState(() => new Date())
+  const exportRef = useRef<ReportExportHandle>(null)
+  const [canExport, setCanExport] = useState(false)
 
   const queryState = useMemo(
     () => referenceData ? parseReportsQuery(searchParams, referenceData, now) : null,
@@ -149,42 +153,63 @@ export function ReportsPage() {
         {dateRangeInvalid && <p className="mt-2 text-xs font-medium text-red-700" role="alert">Başlangıç tarihi bitiş tarihinden sonra olamaz.</p>}
       </section>
 
-      <nav className="flex items-center gap-1 border-b" aria-label="Rapor sekmeleri" role="tablist">
-        {reportTabs.map((tab) => {
-          const enabled = enabledTabs.has(tab)
-          const active = queryState.tab === tab
-          return (
-            <button
-              key={tab}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              aria-disabled={!enabled}
-              disabled={!enabled}
-              tabIndex={enabled ? 0 : -1}
-              className={cn(
-                "border-b-2 px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed",
-                active && enabled
-                  ? "border-blue-600 text-blue-700"
-                  : enabled
-                    ? "border-transparent text-slate-600 hover:text-slate-900"
-                    : "border-transparent text-slate-400",
-              )}
-              onClick={() => selectTab(tab)}
-            >
-              {tabLabels[tab]}
-            </button>
-          )
-        })}
-      </nav>
+      <div className="flex items-end justify-between gap-2 border-b pb-1.5">
+        <nav className="flex items-center gap-1" aria-label="Rapor sekmeleri" role="tablist">
+          {reportTabs.map((tab) => {
+            const enabled = enabledTabs.has(tab)
+            const active = queryState.tab === tab
+            return (
+              <button
+                key={tab}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                aria-disabled={!enabled}
+                disabled={!enabled}
+                tabIndex={enabled ? 0 : -1}
+                className={cn(
+                  "border-b-2 px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed",
+                  active && enabled
+                    ? "border-blue-600 text-blue-700"
+                    : enabled
+                      ? "border-transparent text-slate-600 hover:text-slate-900"
+                      : "border-transparent text-slate-400",
+                )}
+                onClick={() => selectTab(tab)}
+              >
+                {tabLabels[tab]}
+              </button>
+            )
+          })}
+        </nav>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" disabled={!canExport}>
+              <Download className="size-3.5" />Dışa Aktar<ChevronDown className="size-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => exportRef.current?.exportCsv()}>
+              <Download className="size-3.5" />CSV
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => exportRef.current?.exportExcel()}>
+              <FileSpreadsheet className="size-3.5" />Excel
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => exportRef.current?.exportPdf()}>
+              <FileText className="size-3.5" />PDF
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
       <div role="tabpanel">
         {queryState.tab === "visits" ? (
-          <VisitsReportTab visits={visits} filters={filters} dateRangeInvalid={dateRangeInvalid} />
+          <VisitsReportTab ref={exportRef} visits={visits} filters={filters} dateRangeInvalid={dateRangeInvalid} onExportAvailabilityChange={setCanExport} />
         ) : queryState.tab === "vehicle" ? (
-          <FleetReportTab meetings={meetings} visits={visits} filters={filters} dateRangeInvalid={dateRangeInvalid} />
+          <FleetReportTab ref={exportRef} meetings={meetings} visits={visits} filters={filters} dateRangeInvalid={dateRangeInvalid} onExportAvailabilityChange={setCanExport} />
         ) : (
-          <GoodsReportTab filters={filters} dateRangeInvalid={dateRangeInvalid} />
+          <GoodsReportTab ref={exportRef} filters={filters} dateRangeInvalid={dateRangeInvalid} onExportAvailabilityChange={setCanExport} />
         )}
       </div>
     </div>

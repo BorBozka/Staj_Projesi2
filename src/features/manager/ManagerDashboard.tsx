@@ -202,10 +202,10 @@ export function InsideVisits({ visits, transportAssignments = [], now, controls,
           <table className="w-full min-w-[760px] table-fixed text-left text-[13px]">
             <thead className="sticky top-0 z-[1] border-y border-emerald-100 bg-white text-xs font-semibold text-slate-600">
               <tr>
-                <th className="w-[22%] px-3 py-2">Ziyaretçi / şirket</th>
+                <th className="w-[22%] px-3 py-2">Ziyaretçi</th>
                 <th className="w-[14%] px-2 py-2">Ev sahibi</th>
                 <th className="w-[14%] px-2 py-2">Ziyaret türü</th>
-                <th className="w-[15%] px-2 py-2">Tesis</th>
+                <th className="w-[15%] px-2 py-2">Şirket</th>
                 <th className="w-[8%] px-2 py-2">Giriş</th>
                 <th className="w-[12%] px-2 py-2">Planlanan çıkış</th>
                 <th className="w-[15%] px-2 py-2">Uyarı</th>
@@ -234,13 +234,13 @@ export function InsideVisits({ visits, transportAssignments = [], now, controls,
                         <UserRound className="size-4 shrink-0 text-emerald-700" />
                         <div className="min-w-0">
                           <p className="truncate font-semibold">{visit.visitor.firstName} {visit.visitor.lastName}</p>
-                          <p className="truncate text-xs text-slate-600">{visit.hostCompanyName}</p>
+                          <p className="truncate text-xs text-slate-600">{visit.visitor.company}</p>
                         </div>
                       </div>
                     </td>
                     <td className="truncate px-2 py-1.5">{visit.hostEmployeeName}</td>
                     <td className="truncate px-2 py-1.5">{visit.visitTypeName}</td>
-                    <td className="truncate px-2 py-1.5">{visit.facilityName}</td>
+                    <td className="truncate px-2 py-1.5">{visit.hostCompanyName}</td>
                     <td className="px-2 py-1.5 tabular-nums">{visit.actualCheckIn ? formatTr(new Date(visit.actualCheckIn), "HH:mm") : "—"}</td>
                     <td className="px-2 py-1.5 tabular-nums">{formatTr(new Date(visit.plannedEnd), "HH:mm")}</td>
                     <td className="px-2 py-1.5">
@@ -623,18 +623,16 @@ export function NextVisits({
             <button
               key={visit.id}
               type="button"
-              className="grid w-full grid-cols-[64px_minmax(0,1fr)] items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600 md:grid-cols-[72px_minmax(150px,1.3fr)_minmax(115px,1fr)_minmax(120px,1fr)_minmax(120px,1fr)]"
+              className="grid w-full grid-cols-[64px_minmax(0,1fr)] items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600 md:grid-cols-[72px_minmax(150px,1.3fr)_minmax(115px,1fr)_minmax(115px,1fr)_minmax(120px,1fr)_minmax(120px,1fr)]"
               onClick={() => onVisitOpen(visit)}
               aria-label={`${visit.visitor.firstName} ${visit.visitor.lastName} ziyaret detaylarını aç`}
             >
               <p className="font-semibold tabular-nums">{formatTr(new Date(visit.plannedStart), "HH:mm")}</p>
-              <div className="min-w-0">
-                <p className="truncate font-semibold">{visit.visitor.firstName} {visit.visitor.lastName}</p>
-                <p className="truncate text-[13px] text-slate-600">{visit.hostCompanyName}<span className="md:hidden"> · {visit.visitTypeName}</span></p>
-              </div>
+              <p className="min-w-0 truncate font-semibold">{visit.visitor.firstName} {visit.visitor.lastName}</p>
+              <p className="hidden truncate text-sm text-slate-700 md:block">{visit.visitor.company}</p>
               <p className="hidden truncate text-sm text-slate-700 md:block">{visit.visitTypeName}</p>
               <p className="hidden truncate text-sm text-slate-700 md:block">{visit.hostEmployeeName}</p>
-              <p className="hidden truncate text-sm text-slate-700 md:block">{visit.facilityName}</p>
+              <p className="hidden truncate text-sm text-slate-700 md:block">{visit.hostCompanyName}</p>
             </button>
           ))}
         </div>

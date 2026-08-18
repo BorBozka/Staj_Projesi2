@@ -122,6 +122,9 @@ Security may correct fields such as:
 - optional visitor information,
 - note.
 
+Visitor company is a required field; Security's correction here may update it but must not
+clear it.
+
 ### Manager
 
 Can:
@@ -235,11 +238,14 @@ Potential fields:
 - last name,
 - email,
 - phone,
-- company,
 - arrives by vehicle,
 - plate if applicable.
 
 For a planned visitor, email is required because pre-registration is sent via email.
+
+Company is a required field on every visitor, not a potential/optional one, since a monthly
+manager report depends on a company value existing for every visit (see
+`STAKEHOLDER_NOTES.md`).
 
 Plate is required only if the person is arriving by vehicle and the flow requires it.
 
@@ -250,6 +256,7 @@ Plate is required only if the person is arriving by vehicle and the flow require
 At minimum:
 
 - visitor,
+- visitor company,
 - creator,
 - host company,
 - host facility,
@@ -266,7 +273,6 @@ Optional/additional:
 
 - security gate,
 - note,
-- visitor company,
 - plate,
 - visitor card,
 - actual check-in,
@@ -327,6 +333,9 @@ Visitor can use the invitation link to:
 - enter plate if applicable,
 - read rules,
 - explicitly accept rules.
+
+Company is mandatory here, the same way email is; the visitor cannot complete
+pre-registration without entering it. Phone remains optional.
 
 Pre-registration itself must not block arrival.
 

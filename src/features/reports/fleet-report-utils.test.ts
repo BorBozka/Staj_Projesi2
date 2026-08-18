@@ -141,7 +141,7 @@ function visit(id: string, firstName: string, lastName: string): Visit {
     id,
     meetingId: `meeting-for-${id}`,
     creatorEmployeeId: "creator-1",
-    visitor: { id: `visitor-${id}`, firstName, lastName, email: `${id}@example.com` },
+    visitor: { id: `visitor-${id}`, firstName, lastName, email: `${id}@example.com`, company: "Test A.Ş." },
     visitTypeId: "meeting",
     visitTypeName: "Toplantı",
     hostEmployeeId: "host-1",

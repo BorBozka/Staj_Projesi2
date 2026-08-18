@@ -13,7 +13,7 @@ function visitAt(hour: number, minute: number, endHour: number, endMinute: numbe
     id: `${hour}-${minute}`,
     meetingId: `meeting-${hour}-${minute}`,
     creatorEmployeeId: "creator-1",
-    visitor: { id: "visitor", firstName: "Test", lastName: "Kisi", email: "test@example.com" },
+    visitor: { id: "visitor", firstName: "Test", lastName: "Kisi", email: "test@example.com", company: "Test A.Ş." },
     visitTypeId: "meeting",
     visitTypeName: "Toplanti",
     hostEmployeeId: "maya-kara",

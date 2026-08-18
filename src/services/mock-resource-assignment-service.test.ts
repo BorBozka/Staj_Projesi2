@@ -38,7 +38,7 @@ async function createMeeting(
   const plannedEnd = addHours(new Date(plannedStart), durationHours).toISOString()
 
   const result = await visitService.createMeeting({
-    visitors: [{ firstName: "Test", lastName: "Ziyaretçi", email: "test@example.com" }],
+    visitors: [{ firstName: "Test", lastName: "Ziyaretçi", email: "test@example.com", company: "Test A.Ş." }],
     visitTypeId: "meeting",
     hostEmployeeName: "Maya Kara",
     hostCompanyId: companyId,
@@ -678,8 +678,8 @@ describe("MockResourceAssignmentService — completed meeting read-only protecti
     // Create meeting with two visitors
     const result = await visitService.createMeeting({
       visitors: [
-        { firstName: "Ziyaretçi 1", lastName: "A", email: "a@example.com" },
-        { firstName: "Ziyaretçi 2", lastName: "B", email: "b@example.com" },
+        { firstName: "Ziyaretçi 1", lastName: "A", email: "a@example.com", company: "Test A.Ş." },
+        { firstName: "Ziyaretçi 2", lastName: "B", email: "b@example.com", company: "Test A.Ş." },
       ],
       visitTypeId: "meeting",
       hostEmployeeName: "Maya Kara",
@@ -882,7 +882,7 @@ describe("MockResourceAssignmentService — saveMeetingAssignments", () => {
   it("rejects save on a completed Meeting", async () => {
     const { visitService, assignmentService } = makeServices()
     const result = await visitService.createMeeting({
-      visitors: [{ firstName: "Tamamlanan", lastName: "Ziyaretçi", email: "done@example.com" }],
+      visitors: [{ firstName: "Tamamlanan", lastName: "Ziyaretçi", email: "done@example.com", company: "Test A.Ş." }],
       visitTypeId: "meeting",
       hostEmployeeName: "Maya Kara",
       hostCompanyId: "bplas",

@@ -13,6 +13,14 @@ export interface ReportColumn {
   header: string
 }
 
+// Exposed via ref from each report tab so the single "Dışa Aktar" dropdown fixed at the
+// Reports tab row can trigger the active tab's own export handlers unchanged.
+export interface ReportExportHandle {
+  exportCsv(): void
+  exportExcel(): void
+  exportPdf(): void
+}
+
 // Single source of truth for the Visits report table, CSV, Excel, and PDF exports —
 // keeps the on-screen table and every export format aligned to the same column set.
 export const VISITS_REPORT_COLUMNS: ReportColumn[] = [
@@ -33,7 +41,7 @@ export function buildVisitsReportRows(visits: Visit[]): string[][] {
     const delay = getVisitDelayMinutes(visit)
     return [
       `${visit.visitor.firstName} ${visit.visitor.lastName}`,
-      visit.hostCompanyName,
+      visit.visitor.company,
       visit.hostEmployeeName,
       formatTr(new Date(visit.plannedStart), "d MMM yyyy"),
       formatTr(new Date(visit.plannedStart), "HH:mm"),

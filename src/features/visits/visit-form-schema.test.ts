@@ -6,6 +6,7 @@ const validVisitor = {
   visitorFirstName: "Deniz",
   visitorLastName: "Aksoy",
   visitorEmail: "deniz.aksoy@example.com",
+  visitorCompany: "Aksoy Lojistik",
 }
 
 const validValues = {
@@ -25,12 +26,12 @@ describe("visitFormSchema", () => {
     expect(visitFormSchema.safeParse({ ...validValues, visitors: [] }).success).toBe(false)
   })
 
-  it("validates first name, last name, and email separately for every visitor", () => {
+  it("validates first name, last name, email, and company separately for every visitor", () => {
     const result = visitFormSchema.safeParse({
       ...validValues,
       visitors: [
         validVisitor,
-        { visitorFirstName: "", visitorLastName: "", visitorEmail: "invalid-email" },
+        { visitorFirstName: "", visitorLastName: "", visitorEmail: "invalid-email", visitorCompany: "" },
       ],
     })
 
@@ -40,6 +41,7 @@ describe("visitFormSchema", () => {
         "visitors.1.visitorFirstName",
         "visitors.1.visitorLastName",
         "visitors.1.visitorEmail",
+        "visitors.1.visitorCompany",
       ]))
     }
   })
@@ -73,7 +75,7 @@ describe("visitFormSchema", () => {
     })
 
     expect(toMeetingInput(selected)).toMatchObject({
-      visitors: [{ firstName: "Deniz" }, { firstName: "Bora" }],
+      visitors: [{ firstName: "Deniz", company: "Aksoy Lojistik" }, { firstName: "Bora", company: "Aksoy Lojistik" }],
       note: "Genel not",
       additionalRequirementNote: "Projeksiyon gerekiyor.",
     })

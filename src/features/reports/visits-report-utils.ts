@@ -1,8 +1,9 @@
-import { differenceInMinutes } from "date-fns"
+import { differenceInMinutes, eachDayOfInterval, parse } from "date-fns"
 
-import type { Visit } from "@/domain/visits"
+import type { Visit, VisitStatus } from "@/domain/visits"
 import { filterVisits, type AllVisitsFilters } from "@/features/manager/all-visits-utils"
 import type { ReportsScopeFilters } from "@/features/reports/reports-filters"
+import { formatTr } from "@/lib/date"
 import { getPageCount as getPageCountShared, paginate } from "@/lib/pagination"
 
 export const VISITS_REPORT_PAGE_SIZE = 10
@@ -63,4 +64,55 @@ export function paginateReportVisits(visits: Visit[], page: number, pageSize = V
 
 export function getReportPageCount(total: number, pageSize = VISITS_REPORT_PAGE_SIZE) {
   return getPageCountShared(total, pageSize)
+}
+
+export function getVisibleReportPageNumbers(page: number, pageCount: number) {
+  const start = Math.max(1, Math.min(page - 1, pageCount - 2))
+  return Array.from({ length: Math.min(3, pageCount) }, (_, index) => start + index)
+}
+
+const REPORT_STATUS_ORDER: VisitStatus[] = ["PLANNED", "CHECKED_IN", "CHECKED_OUT", "NO_SHOW", "CANCELLED"]
+
+export interface VisitsReportStatusCount {
+  status: VisitStatus
+  count: number
+}
+
+export function calculateVisitsReportStatusCounts(visits: Visit[]): VisitsReportStatusCount[] {
+  return REPORT_STATUS_ORDER.map((status) => ({
+    status,
+    count: visits.filter((visit) => visit.status === status).length,
+  }))
+}
+
+export interface VisitsReportDailyTrendPoint {
+  date: string
+  label: string
+  count: number
+}
+
+function toLocalDate(value: string) {
+  return parse(value, "yyyy-MM-dd", new Date())
+}
+
+// Fills every day in the filter range with visitors when the range is bounded on both ends;
+// falls back to only the days that actually have visits when either bound is left open, since
+// an unbounded range has no natural day count to fill zeros for.
+export function calculateVisitsReportDailyTrend(visits: Visit[], filters: ReportsScopeFilters): VisitsReportDailyTrendPoint[] {
+  const countsByDay = new Map<string, number>()
+  for (const visit of visits) {
+    const day = formatTr(new Date(visit.plannedStart), "yyyy-MM-dd")
+    countsByDay.set(day, (countsByDay.get(day) ?? 0) + 1)
+  }
+
+  if (filters.startDate && filters.endDate) {
+    return eachDayOfInterval({ start: toLocalDate(filters.startDate), end: toLocalDate(filters.endDate) }).map((day) => {
+      const key = formatTr(day, "yyyy-MM-dd")
+      return { date: key, label: formatTr(day, "d MMM"), count: countsByDay.get(key) ?? 0 }
+    })
+  }
+
+  return [...countsByDay.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([date, count]) => ({ date, label: formatTr(new Date(`${date}T12:00:00`), "d MMM"), count }))
 }

@@ -9,7 +9,7 @@ function makeVisit(id: string, status: VisitStatus, plannedStart: string, overri
     id,
     meetingId: `meeting-${id}`,
     creatorEmployeeId: "creator-1",
-    visitor: { id: `visitor-${id}`, firstName: id, lastName: "Ziyaretçi", email: `${id}@example.com` },
+    visitor: { id: `visitor-${id}`, firstName: id, lastName: "Ziyaretçi", email: `${id}@example.com`, company: "Test A.Ş." },
     visitTypeId: "meeting",
     visitTypeName: "Toplantı",
     hostEmployeeId: "host-1",

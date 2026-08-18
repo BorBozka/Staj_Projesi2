@@ -233,35 +233,38 @@ export function AllVisitsPage() {
         )}
       </section>
 
-      <section ref={tableSectionRef} className="scroll-mt-3 flex h-[35.5rem] flex-col justify-between overflow-hidden rounded-lg border bg-card shadow-panel" aria-label="Ziyaret listesi">
+      <section ref={tableSectionRef} className="scroll-mt-3 flex flex-col overflow-hidden rounded-lg border bg-card shadow-panel" aria-label="Ziyaret listesi">
         {filteredVisits.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center px-4 py-24 text-center">
+          <div className="flex h-[35.5rem] flex-col items-center justify-center px-4 py-24 text-center">
             <Search className="mx-auto size-8 text-slate-400" />
             <h3 className="mt-3 text-sm font-semibold text-slate-900">Eşleşen ziyaret bulunamadı</h3>
             <p className="mt-1 text-xs text-slate-600">Arama veya filtre ölçütlerini değiştirerek yeniden deneyin.</p>
             {activeFilters && <Button variant="outline" size="sm" className="mt-4" onClick={clearFilters}>Filtreleri temizle</Button>}
           </div>
         ) : (
-          <div className="flex-1 overflow-x-auto scrollbar-thin">
-            <table className="w-full min-w-[1080px] table-fixed text-left text-xs">
+          <div className="overflow-x-auto scrollbar-thin">
+            <table className="w-full min-w-[1220px] table-fixed text-left text-xs">
               <thead className="sticky top-0 z-10 border-b bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 <tr>
-                  <th className="w-[16%] px-3 py-2.5">
+                  <th className="w-[14%] px-3 py-2.5">
                     <SortButton label="ZİYARETÇİ" field="visitor" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
                   </th>
                   <th className="w-[14%] px-3 py-2.5">
+                    <SortButton label="ZİYARETÇİ ŞİRKETİ" field="visitorCompany" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
+                  </th>
+                  <th className="w-[12%] px-3 py-2.5">
                     <SortButton label="ZİYARET TÜRÜ" field="visitType" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
                   </th>
-                  <th className="w-[14%] px-3 py-2.5">
+                  <th className="w-[12%] px-3 py-2.5">
                     <SortButton label="EV SAHİBİ" field="host" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
                   </th>
-                  <th className="w-[18%] px-3 py-2.5">
+                  <th className="w-[16%] px-3 py-2.5">
                     <SortButton label="ŞİRKET / TESİS" field="companyFacility" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
                   </th>
-                  <th className="w-[24%] px-3 py-2.5">
+                  <th className="w-[20%] px-3 py-2.5">
                     <SortButton label="PLANLANAN ZAMAN" field="plannedStart" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
                   </th>
-                  <th className="w-[14%] px-3 py-2.5">
+                  <th className="w-[12%] px-3 py-2.5">
                     <SortButton label="DURUM" field="status" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
                   </th>
                 </tr>
@@ -283,6 +286,7 @@ export function AllVisitsPage() {
                     <td className="px-3 py-2.5 sm:py-3">
                       <p className="truncate font-semibold text-slate-900" title={`${visit.visitor.firstName} ${visit.visitor.lastName}`}>{visit.visitor.firstName} {visit.visitor.lastName}</p>
                     </td>
+                    <td className="px-3 py-2.5 sm:py-3"><p className="truncate" title={visit.visitor.company}>{visit.visitor.company}</p></td>
                     <td className="px-3 py-2.5 sm:py-3"><p className="truncate" title={visit.visitTypeName}>{visit.visitTypeName}</p></td>
                     <td className="px-3 py-2.5 sm:py-3"><p className="truncate" title={visit.hostEmployeeName}>{visit.hostEmployeeName}</p></td>
                     <td className="px-3 py-2.5 sm:py-3">
@@ -298,6 +302,7 @@ export function AllVisitsPage() {
                     <td className="px-3 py-2.5 sm:py-3">
                       <p className="truncate font-semibold text-transparent">&nbsp;</p>
                     </td>
+                    <td className="px-3 py-2.5 sm:py-3 text-transparent">&nbsp;</td>
                     <td className="px-3 py-2.5 sm:py-3 text-transparent">&nbsp;</td>
                     <td className="px-3 py-2.5 sm:py-3 text-transparent">&nbsp;</td>
                     <td className="px-3 py-2.5 sm:py-3 text-transparent">&nbsp;</td>

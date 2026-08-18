@@ -18,7 +18,7 @@ const meeting: Meeting = {
 
 const visit: Visit = {
   ...meeting, id: "visit-1", meetingId: meeting.id,
-  visitor: { id: "visitor-1", firstName: "Ali", lastName: "Demir", email: "ali@example.com" },
+  visitor: { id: "visitor-1", firstName: "Ali", lastName: "Demir", email: "ali@example.com", company: "Test A.Ş." },
   status: "CHECKED_IN", invitationStatus: "SENT", createdAt: meeting.createdAt, updatedAt: meeting.updatedAt,
 }
 
@@ -26,7 +26,7 @@ const invitationVisit: Visit = {
   ...visit,
   id: "visit-2",
   creatorEmployeeId: "host-1",
-  visitor: { id: "visitor-2", firstName: "Ece", lastName: "Kaya", email: "ece@example.com" },
+  visitor: { id: "visitor-2", firstName: "Ece", lastName: "Kaya", email: "ece@example.com", company: "Test A.Ş." },
   status: "PLANNED",
   invitationStatus: "NOT_SENT",
 }

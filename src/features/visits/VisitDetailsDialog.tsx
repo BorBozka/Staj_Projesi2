@@ -59,6 +59,7 @@ export function VisitDetailsDialog({ visit, open, onOpenChange, onEdit, onResche
           <div className="grid gap-0 min-[560px]:grid-cols-2 min-[560px]:divide-x min-[560px]:divide-slate-200">
             <DetailSection title="Ziyaretçi">
               <Field label="E-posta" value={visit.visitor.email} valueClassName="sm:whitespace-nowrap" />
+              <Field label="Ziyaretçi Şirketi" value={visit.visitor.company} />
               {visit.visitor.phone && <Field label="Telefon" value={visit.visitor.phone} />}
               <Field label="Davet" labelClassName="whitespace-nowrap" value={<InvitationStatus visit={{ ...visit, invitationSentAt: visit.invitationStatus === "SENT" ? visit.invitationSentAt : undefined, invitationError: visit.invitationStatus === "FAILED" ? visit.invitationError : undefined }} />} />
             </DetailSection>
