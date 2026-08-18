@@ -1,4 +1,9 @@
-# CODEX.md
+---
+name: coding-guidelines
+description: Apply cautious, minimal, goal-driven coding behavior when implementing, fixing, refactoring, or reviewing code. Use for coding tasks where assumptions, scope control, surgical changes, and verification matter; do not use for non-coding tasks.
+---
+
+# CLAUDE.md
 
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
