@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest"
 
 import {
   getDefaultReportsRange,
+  getMaxEndDate,
+  getPreviousPeriod,
   getQuickRangeOptions,
   matchesQuickRange,
   parseReportsQuery,
@@ -19,7 +21,7 @@ describe("reports quick ranges", () => {
     expect(today).toMatchObject({ key: "today", startDate: "2026-08-17", endDate: "2026-08-17" })
     expect(sevenDays).toMatchObject({ key: "7d", startDate: "2026-08-11", endDate: "2026-08-17" })
     expect(thirtyDays).toMatchObject({ key: "30d", startDate: "2026-07-19", endDate: "2026-08-17" })
-    expect(month).toMatchObject({ key: "month", startDate: "2026-08-01", endDate: "2026-08-31" })
+    expect(month).toMatchObject({ key: "month", startDate: "2026-08-01", endDate: "2026-08-17" })
   })
 
   it("defaults the reports range to the last 30 days", () => {
@@ -30,6 +32,34 @@ describe("reports quick ranges", () => {
     const option = getQuickRangeOptions(now)[0]
     expect(matchesQuickRange({ startDate: "2026-08-17", endDate: "2026-08-17" }, option)).toBe(true)
     expect(matchesQuickRange({ startDate: "2026-08-16", endDate: "2026-08-17" }, option)).toBe(false)
+  })
+
+  it("never lets a quick range's end date land in the future", () => {
+    for (const option of getQuickRangeOptions(now)) {
+      expect(option.endDate <= getMaxEndDate(now)).toBe(true)
+    }
+  })
+})
+
+describe("getMaxEndDate", () => {
+  it("returns today as an ISO date", () => {
+    expect(getMaxEndDate(now)).toBe("2026-08-17")
+  })
+})
+
+describe("getPreviousPeriod", () => {
+  it("mirrors the same-length period immediately preceding the range", () => {
+    expect(getPreviousPeriod({ startDate: "2026-08-10", endDate: "2026-08-19" })).toEqual({ startDate: "2026-07-31", endDate: "2026-08-09" })
+  })
+
+  it("handles a single-day range", () => {
+    expect(getPreviousPeriod({ startDate: "2026-08-19", endDate: "2026-08-19" })).toEqual({ startDate: "2026-08-18", endDate: "2026-08-18" })
+  })
+
+  it("returns null for an open-ended or inverted range", () => {
+    expect(getPreviousPeriod({ startDate: "", endDate: "2026-08-19" })).toBeNull()
+    expect(getPreviousPeriod({ startDate: "2026-08-19", endDate: "" })).toBeNull()
+    expect(getPreviousPeriod({ startDate: "2026-08-19", endDate: "2026-08-01" })).toBeNull()
   })
 })
 
@@ -55,6 +85,11 @@ describe("parseReportsQuery", () => {
 
     const invalid = parseReportsQuery(new URLSearchParams("from=not-a-date"), mockVisitReferenceData, now)
     expect(invalid.filters).toMatchObject({ startDate: "2026-07-19", endDate: "2026-08-17" })
+  })
+
+  it("clamps a future end date from the URL to today, since reports are historical", () => {
+    const future = parseReportsQuery(new URLSearchParams("from=2026-08-01&to=2099-01-01"), mockVisitReferenceData, now)
+    expect(future.filters).toMatchObject({ startDate: "2026-08-01", endDate: "2026-08-17" })
   })
 
   it("validates company and clears a facility that no longer matches the company", () => {

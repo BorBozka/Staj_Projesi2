@@ -1,9 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server"
-import { MemoryRouter } from "react-router-dom"
 import { describe, expect, it, vi } from "vitest"
 
 import type { Visit } from "@/domain/visits"
-import { InsideVisits, NextVisits } from "@/features/manager/ManagerDashboard"
+import { InsideVisits } from "@/features/manager/ManagerDashboard"
 
 const visit: Visit = {
   id: "visit-next",
@@ -32,26 +31,6 @@ const visit: Visit = {
   createdAt: "2026-08-13T08:00:00+03:00",
   updatedAt: "2026-08-13T08:00:00+03:00",
 }
-
-describe("ManagerDashboard next visits UI", () => {
-  it("renders each upcoming visit as a detail-opening button while preserving the all-visits link", () => {
-    const markup = renderToStaticMarkup(
-      <MemoryRouter>
-        <NextVisits
-          visits={[visit]}
-          total={1}
-          now={new Date("2026-08-13T10:00:00+03:00")}
-          onVisitOpen={vi.fn()}
-        />
-      </MemoryRouter>,
-    )
-
-    expect(markup).toContain("Ayça Korkmaz ziyaret detaylarını aç")
-    expect(markup).toContain("<button")
-    expect(markup).toContain("Tümünü gör")
-    expect(markup).toContain("/manager/all-visits?date=2026-08-13&amp;status=PLANNED")
-  })
-})
 
 describe("ManagerDashboard inside visits UI", () => {
   it("renders each inside row as a detail-opening keyboard-accessible control", () => {

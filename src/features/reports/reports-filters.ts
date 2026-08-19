@@ -1,4 +1,4 @@
-import { endOfMonth, format, startOfMonth, subDays } from "date-fns"
+import { differenceInCalendarDays, format, parse, startOfMonth, subDays } from "date-fns"
 
 import type { VisitReferenceData } from "@/domain/visits"
 
@@ -28,13 +28,19 @@ export interface QuickRangeOption {
 
 const isoDate = (date: Date) => format(date, "yyyy-MM-dd")
 
+// Reports are historical analysis only — no filter or quick range may reach past today.
+export function getMaxEndDate(now: Date): string {
+  return isoDate(now)
+}
+
 export function getQuickRangeOptions(now: Date): QuickRangeOption[] {
   const today = isoDate(now)
   return [
     { key: "today", label: "Bugün", startDate: today, endDate: today },
     { key: "7d", label: "Son 7 gün", startDate: isoDate(subDays(now, 6)), endDate: today },
     { key: "30d", label: "Son 30 gün", startDate: isoDate(subDays(now, 29)), endDate: today },
-    { key: "month", label: "Bu ay", startDate: isoDate(startOfMonth(now)), endDate: isoDate(endOfMonth(now)) },
+    // The current, still-in-progress month: 1st through today, not through month-end.
+    { key: "month", label: "Bu ay", startDate: isoDate(startOfMonth(now)), endDate: today },
   ]
 }
 
@@ -48,7 +54,11 @@ export function parseReportsQuery(searchParams: URLSearchParams, referenceData: 
   const tab: ReportTab = reportTabs.includes(tabParam as ReportTab) ? (tabParam as ReportTab) : "visits"
 
   const fromParam = parseDateParameter(searchParams.get("from"))
-  const toParam = parseDateParameter(searchParams.get("to"))
+  const rawToParam = parseDateParameter(searchParams.get("to"))
+  const maxEndDate = getMaxEndDate(now)
+  // Clamp here (the single source of truth for `filters`) rather than only in the date-picker's
+  // onChange, so a hand-edited URL or bookmark can't sneak a future end date into the analysis.
+  const toParam = rawToParam && rawToParam > maxEndDate ? maxEndDate : rawToParam
   const hasExplicitRange = Boolean(fromParam || toParam)
   const defaultRange = getDefaultReportsRange(now)
 
@@ -98,6 +108,21 @@ export function setReportsRange(current: URLSearchParams, startDate: string, end
 
 export function matchesQuickRange(filters: Pick<ReportsScopeFilters, "startDate" | "endDate">, option: QuickRangeOption) {
   return filters.startDate === option.startDate && filters.endDate === option.endDate
+}
+
+// The immediately preceding period of the same length, e.g. 10–19 Aug (10 days) compares against
+// 31 Jul–9 Aug. Returns null for an open-ended or inverted range, since neither has a natural
+// length to mirror.
+export function getPreviousPeriod(filters: Pick<ReportsScopeFilters, "startDate" | "endDate">): { startDate: string; endDate: string } | null {
+  if (!filters.startDate || !filters.endDate) return null
+  const start = parse(filters.startDate, "yyyy-MM-dd", new Date())
+  const end = parse(filters.endDate, "yyyy-MM-dd", new Date())
+  if (start > end) return null
+
+  const lengthDays = differenceInCalendarDays(end, start) + 1
+  const previousEnd = subDays(start, 1)
+  const previousStart = subDays(previousEnd, lengthDays - 1)
+  return { startDate: isoDate(previousStart), endDate: isoDate(previousEnd) }
 }
 
 function parseDateParameter(value: string | null) {

@@ -68,6 +68,10 @@ export const FleetReportTab = forwardRef<ReportExportHandle, { meetings: Meeting
 
   return (
     <div className="space-y-3">
+      <section aria-label="Araç / Şoför Analizi başlığı">
+        <h2 className="text-lg font-semibold text-slate-900">ARAÇ / ŞOFÖR ANALİZİ</h2>
+      </section>
+
       <section className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4" aria-label="Araç / şoför rapor özeti">
         <ReportKpiCard label="Toplam Görev" value={String(kpis.total)} />
         <ReportKpiCard label="İptal Edilen" value={String(kpis.cancelled)} />

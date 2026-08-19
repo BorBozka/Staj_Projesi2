@@ -73,6 +73,10 @@ export const GoodsReportTab = forwardRef<ReportExportHandle, { filters: ReportsS
 
   return (
     <div className="space-y-3">
+      <section aria-label="Mal Hareketi Analizi başlığı">
+        <h2 className="text-lg font-semibold text-slate-900">MAL HAREKETİ ANALİZİ</h2>
+      </section>
+
       <section className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4" aria-label="Mal hareketi rapor özeti">
         <ReportKpiCard label="Toplam Hareket" value={String(kpis.total)} />
         <ReportKpiCard label="Gelen" value={String(kpis.inbound)} />
