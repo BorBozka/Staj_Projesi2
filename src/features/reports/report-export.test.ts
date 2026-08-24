@@ -46,9 +46,9 @@ describe("VISITS_REPORT_COLUMNS", () => {
 
 describe("buildVisitsReportRows", () => {
   it("produces one formatted row per visit matching the column order", () => {
-    const rows = buildVisitsReportRows([completedVisit(), noCheckInVisit()])
+    const rows = buildVisitsReportRows([completedVisit(), noCheckInVisit(), noShowVisit()])
 
-    expect(rows).toHaveLength(2)
+    expect(rows).toHaveLength(3)
     expect(rows[0]).toHaveLength(VISITS_REPORT_COLUMNS.length)
     expect(rows[0]).toEqual([
       "Ayşe Test",
@@ -59,7 +59,7 @@ describe("buildVisitsReportRows", () => {
       "09:00",
       "08:12",
       "08:58",
-      "Çıkış Yapıldı",
+      "Gerçekleşti",
       "12",
     ])
     expect(rows[1]).toEqual([
@@ -74,6 +74,7 @@ describe("buildVisitsReportRows", () => {
       "Planlandı",
       "—",
     ])
+    expect(rows[2][8]).toBe("Gerçekleşmedi")
   })
 })
 
@@ -269,6 +270,10 @@ function completedVisit(): Visit {
 
 function noCheckInVisit(): Visit {
   return baseVisit({ firstName: "Bora", status: "PLANNED" })
+}
+
+function noShowVisit(): Visit {
+  return baseVisit({ firstName: "Ceren", status: "NO_SHOW" })
 }
 
 function baseVisit(overrides: {

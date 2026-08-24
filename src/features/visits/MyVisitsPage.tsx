@@ -70,7 +70,7 @@ export function MyVisitsPage() {
         </div>
       )}
 
-      <div className={"grid gap-3 xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_320px] " + (isManagerView ? "xl:h-[calc(111.112dvh-36px)]" : "xl:h-[calc(100dvh-16px)]")}>
+      <div className={"grid gap-3 xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_320px] " + (isManagerView ? "xl:h-[calc(111.112dvh-27.5556px)]" : "mt-[3px] xl:h-[calc(100dvh-25px)]")}>
         <VisitTimeline
           visits={ownVisits}
           view={view}

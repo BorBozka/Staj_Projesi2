@@ -11,8 +11,8 @@ import { useLayoutEffect, useRef, useState, type DependencyList } from "react"
 // under/overshoot by the zoom factor. Probing the element with a known height first measures
 // that factor directly instead of assuming a fixed value that would silently drift if the shell's
 // zoom level ever changes.
-export function useFillViewportHeight(bottomGutterPx = 16, deps: DependencyList = []) {
-  const ref = useRef<HTMLDivElement>(null)
+export function useFillViewportHeight<T extends HTMLElement = HTMLDivElement>(bottomGutterPx = 16, deps: DependencyList = []) {
+  const ref = useRef<T>(null)
   const [height, setHeight] = useState<number>()
 
   useLayoutEffect(() => {

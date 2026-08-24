@@ -36,9 +36,12 @@ describe("resource catalog filters", () => {
 
   it("sorts resources in ascending groups by the selected column", () => {
     expect(sortResources(initialMockResources, [{ field: "type", direction: "asc" }]).map((resource) => resource.type)).toEqual([
-      "DRIVER", "DRIVER", "DRIVER", "DRIVER", "DRIVER", "DRIVER", "POOLED_EQUIPMENT", "POOLED_EQUIPMENT", "POOLED_EQUIPMENT", "ROOM", "ROOM", "VEHICLE", "VEHICLE", "VEHICLE", "VEHICLE", "VEHICLE", "VEHICLE",
+      ...Array.from({ length: 10 }, () => "DRIVER"),
+      ...Array.from({ length: 3 }, () => "POOLED_EQUIPMENT"),
+      ...Array.from({ length: 2 }, () => "ROOM"),
+      ...Array.from({ length: 10 }, () => "VEHICLE"),
     ])
-    expect(sortResources(initialMockResources, [{ field: "status", direction: "asc" }]).map((resource) => resource.isActive)).toEqual([false, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true])
+    expect(sortResources(initialMockResources, [{ field: "status", direction: "asc" }]).map((resource) => resource.isActive)).toEqual([false, false, ...Array.from({ length: 23 }, () => true)])
   })
 
   it("cycles individual sorts without clearing other sort fields", () => {
@@ -68,8 +71,8 @@ describe("resource catalog filters", () => {
   })
 
   it.each([
-    { type: "VEHICLE" as const, ids: ["resource-vehicle-transit-merkez", "resource-vehicle-megane-otomotiv", "resource-vehicle-sprinter-merkez", "resource-vehicle-courier-merkez", "resource-vehicle-daily-merkez", "resource-vehicle-kangoo-merkez"] },
-    { type: "DRIVER" as const, ids: ["resource-driver-ayse-demir", "resource-driver-mehmet-kaya", "resource-driver-zeynep-arslan", "resource-driver-burak-cetin", "resource-driver-selin-yildiz", "resource-driver-emre-aksoy"] },
+    { type: "VEHICLE" as const, ids: ["resource-vehicle-transit-merkez", "resource-vehicle-megane-otomotiv", "resource-vehicle-sprinter-merkez", "resource-vehicle-courier-merkez", "resource-vehicle-daily-merkez", "resource-vehicle-kangoo-merkez", "resource-vehicle-doblo-merkez", "resource-vehicle-master-merkez", "resource-vehicle-transporter-arge", "resource-vehicle-proace-otomotiv"] },
+    { type: "DRIVER" as const, ids: ["resource-driver-ayse-demir", "resource-driver-mehmet-kaya", "resource-driver-zeynep-arslan", "resource-driver-burak-cetin", "resource-driver-selin-yildiz", "resource-driver-emre-aksoy", "resource-driver-hakan-yalcin", "resource-driver-elif-sahin", "resource-driver-can-ozdemir", "resource-driver-deniz-gok"] },
   ])("filters $type resources", ({ type, ids }) => {
     expect(filterResources(initialMockResources, { ...defaultResourceFilters, type }).map((resource) => resource.id)).toEqual(ids)
   })
@@ -83,17 +86,17 @@ describe("resource catalog filters", () => {
       active: "active",
     })
 
-    expect(result.map((resource) => resource.id)).toEqual(["resource-driver-ayse-demir", "resource-driver-zeynep-arslan", "resource-driver-burak-cetin", "resource-driver-selin-yildiz", "resource-driver-emre-aksoy"])
+    expect(result.map((resource) => resource.id)).toEqual(["resource-driver-ayse-demir", "resource-driver-zeynep-arslan", "resource-driver-burak-cetin", "resource-driver-selin-yildiz", "resource-driver-emre-aksoy", "resource-driver-hakan-yalcin", "resource-driver-elif-sahin"])
   })
 
   it.each([
     { total: 0, expected: 1 },
     { total: 1, expected: 1 },
     { total: 8, expected: 1 },
-    { total: 9, expected: 2 },
+    { total: 9, expected: 1 },
     { total: 28, expected: 4 },
   ])("calculates a viewport-friendly page count for $total resources", ({ total, expected }) => {
-    expect(RESOURCE_PAGE_SIZE).toBe(8)
+    expect(RESOURCE_PAGE_SIZE).toBe(9)
     expect(getResourcePageCount(total)).toBe(expected)
   })
 
@@ -103,8 +106,8 @@ describe("resource catalog filters", () => {
       id: `resource-${index}`,
     }))
 
-    expect(paginateResources(resources, 1)).toHaveLength(8)
-    expect(paginateResources(resources, 3)).toHaveLength(4)
+    expect(paginateResources(resources, 1)).toHaveLength(9)
+    expect(paginateResources(resources, 3)).toHaveLength(2)
     expect(getVisibleResourcePageNumbers(3, 5)).toEqual([2, 3, 4])
   })
 })

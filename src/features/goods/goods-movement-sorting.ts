@@ -4,7 +4,7 @@ import { toggleSort } from "@/lib/sort"
 
 export type SortField = "direction" | "counterparty" | "goods" | "companyFacility" | "plannedAt" | "actualAt" | "status"
 export type Sort = { field: SortField; direction: "asc" | "desc" }
-export const GOODS_PAGE_SIZE = 9
+export const GOODS_PAGE_SIZE = 10
 
 const turkishCollator = new Intl.Collator("tr-TR", { numeric: true, sensitivity: "base" })
 

@@ -10,6 +10,7 @@ import {
   getPageCount,
   paginateVisits,
   parseAllVisitsQuery,
+  setAllVisitsRange,
   toggleVisitSort,
   updateAllVisitsSearchParams,
   type AllVisitsFilters,
@@ -114,13 +115,21 @@ describe("all visits operations", () => {
     expect(clearAllVisitsSearchParams(changed).toString()).toBe("custom=kept")
   })
 
+  it("sets both operational quick-range boundaries without applying report clamping", () => {
+    const changed = setAllVisitsRange(new URLSearchParams("page=3&date=2026-08-01&custom=kept"), "2099-01-10", "2099-01-20")
+    expect(changed.get("from")).toBe("2099-01-10")
+    expect(changed.get("to")).toBe("2099-01-20")
+    expect(changed.get("date")).toBeNull()
+    expect(changed.get("page")).toBeNull()
+    expect(changed.get("custom")).toBe("kept")
+  })
+
   it("paginates 58 records into viewport-friendly pages", () => {
     const records = Array.from({ length: 58 }, (_, index) => ({ id: String(index) }))
-    expect(ALL_VISITS_PAGE_SIZE).toBe(8)
-    expect(getPageCount(records.length)).toBe(8)
-    expect(paginateVisits(records as Visit[], 1)).toHaveLength(8)
-    expect(paginateVisits(records as Visit[], 7)).toHaveLength(8)
-    expect(paginateVisits(records as Visit[], 8)).toHaveLength(2)
+    expect(ALL_VISITS_PAGE_SIZE).toBe(9)
+    expect(getPageCount(records.length)).toBe(7)
+    expect(paginateVisits(records as Visit[], 1)).toHaveLength(9)
+    expect(paginateVisits(records as Visit[], 7)).toHaveLength(4)
   })
 
   it("supports legacy dashboard date/status params and ignores invalid values", () => {

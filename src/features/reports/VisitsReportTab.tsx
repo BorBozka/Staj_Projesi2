@@ -1,6 +1,6 @@
 import { parse } from "date-fns"
-import { ArrowDown, ArrowUp, ChevronDown, Search } from "lucide-react"
-import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { Search } from "lucide-react"
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react"
 
 import type { Visit } from "@/domain/visits"
 import {
@@ -13,17 +13,17 @@ import {
 } from "@/features/reports/report-export"
 import { formatDurationMinutes } from "@/features/reports/report-format"
 import { ReportPagination } from "@/features/reports/ReportPagination"
-import { getPreviousPeriod, type ReportsScopeFilters } from "@/features/reports/reports-filters"
+import type { ReportsScopeFilters } from "@/features/reports/reports-filters"
 import {
   buildVisitsReportSummarySentences,
   calculateSharedTrendYAxisMax,
-  calculateVisitsReportChangePercent,
-  calculateVisitsReportDailyTrendWithStatus,
   calculateVisitsReportKpis,
-  calculateVisitsReportStatusCounts,
+  calculateVisitsReportTrendWithStatus,
+  calculateVisitsTrendYAxis,
   filterVisitsForReport,
-  findVisitsReportBusiestDay,
+  formatVisitsReportDelta,
   getReportPageCount,
+  getReportPageRange,
   getVisibleReportPageNumbers,
   getVisitDelayMinutes,
   getVisitDurationMinutes,
@@ -32,44 +32,45 @@ import {
   paginateReportVisits,
   VISITS_REPORT_STATUS_COLORS,
   VISITS_REPORT_STATUS_LABELS,
+  type VisitsReportDailyTrendGroupedPoint,
   type VisitsReportPeriodSummaryInput,
+  type VisitsReportTrendGranularity,
 } from "@/features/reports/visits-report-utils"
-import { VisitsTrendChart } from "@/features/reports/VisitsTrendChart"
+import { VisitsTrendChart, VisitsTrendLegend } from "@/features/reports/VisitsTrendChart"
+import { VisitDetailsDialog } from "@/features/visits/VisitDetailsDialog"
 import { formatTr } from "@/lib/date"
 
-// Comparison mode halves each chart's width (side by side), so thin the x-axis further than the
-// single-chart default to avoid crowding.
-const COMPARISON_MAX_X_AXIS_TICKS = 5
+export type VisitsWorkspaceMode = "analysis" | "records"
+export type VisitsReportGranularity = Exclude<VisitsReportTrendGranularity, "hourly">
 
-// Estimates used to size the records table to whatever height the 60/40 split actually leaves it,
-// without ever producing an internal scrollbar. Deliberately generous (a two-line "+X dk" late
-// row is closer to 46px than a single-line row's ~33px) so the computed row count undershoots
-// rather than clips a partially-visible last row.
-const RECORD_ROW_HEIGHT_PX = 40
-const RECORD_TABLE_HEADER_HEIGHT_PX = 32
-const MIN_RECORDS_PAGE_SIZE = 3
-const DEFAULT_RECORDS_PAGE_SIZE = 6
+interface VisitsReportTabProps {
+  visits: Visit[]
+  filters: ReportsScopeFilters
+  dateRangeInvalid: boolean
+  workspaceMode: VisitsWorkspaceMode
+  selectedGranularity: VisitsReportGranularity
+  recordsPage: number
+  onRecordsPageChange(page: number): void
+  comparisonEnabled?: boolean
+  comparisonFilters?: ReportsScopeFilters | null
+  comparisonLabel?: string
+  onExportAvailabilityChange?(canExport: boolean): void
+}
 
-// Direction is purely descriptive (which way the number moved), not a value judgment — an
-// increase in "Geç Giriş" is not rendered as positive, so no color is attached to either
-// direction, only a neutral arrow.
 interface MetricDelta {
-  direction: "up" | "down" | "flat"
   label: string
 }
 
-function percentDelta(changePercent: number | null): MetricDelta | null {
-  if (changePercent === null) return null
-  if (changePercent === 0) return { direction: "flat", label: "Değişim yok" }
-  return { direction: changePercent > 0 ? "up" : "down", label: `%${Math.abs(changePercent)}` }
+function countDelta(current: number, previous: number): MetricDelta {
+  const delta = formatVisitsReportDelta(current, previous)
+  return { label: delta.difference === 0 ? "değişmedi" : delta.label }
 }
 
 function durationDelta(currentMinutes: number | null, previousMinutes: number | null): MetricDelta | null {
   if (currentMinutes === null || previousMinutes === null) return null
-  const diff = currentMinutes - previousMinutes
-  if (diff === 0) return { direction: "flat", label: "Değişim yok" }
-  // Magnitude only — the arrow already conveys direction, so the label shouldn't repeat it as a sign.
-  return { direction: diff > 0 ? "up" : "down", label: formatDurationMinutes(Math.abs(diff)) }
+  const difference = currentMinutes - previousMinutes
+  if (difference === 0) return { label: "değişmedi" }
+  return { label: `${difference > 0 ? "+" : "−"}${formatDurationMinutes(Math.abs(difference))}` }
 }
 
 function formatRangeLabel(filters: ReportsScopeFilters) {
@@ -79,82 +80,51 @@ function formatRangeLabel(filters: ReportsScopeFilters) {
   return `${formatTr(start, "d MMM yyyy")} – ${formatTr(end, "d MMM yyyy")}`
 }
 
-export const VisitsReportTab = forwardRef<ReportExportHandle, { visits: Visit[]; filters: ReportsScopeFilters; dateRangeInvalid: boolean; comparisonEnabled?: boolean; onExportAvailabilityChange?(canExport: boolean): void }>(function VisitsReportTab({ visits, filters, dateRangeInvalid, comparisonEnabled = false, onExportAvailabilityChange }, ref) {
+export const VisitsReportTab = forwardRef<ReportExportHandle, VisitsReportTabProps>(function VisitsReportTab({ visits, filters, dateRangeInvalid, workspaceMode, selectedGranularity, recordsPage, onRecordsPageChange, comparisonEnabled = false, comparisonFilters = null, comparisonLabel = "Önceki dönem", onExportAvailabilityChange }, ref) {
+  const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null)
+  const isTodayRange = filters.startDate !== "" && filters.startDate === filters.endDate && filters.endDate === formatTr(new Date(), "yyyy-MM-dd")
+  const trendGranularity: VisitsReportTrendGranularity = isTodayRange ? "hourly" : selectedGranularity
   const reportVisits = useMemo(() => filterVisitsForReport(visits, filters), [filters, visits])
   const kpis = useMemo(() => calculateVisitsReportKpis(reportVisits), [reportVisits])
-  const statusCounts = useMemo(() => calculateVisitsReportStatusCounts(reportVisits), [reportVisits])
-  const busiestDay = useMemo(() => findVisitsReportBusiestDay(reportVisits), [reportVisits])
-  const dailyTrendWithStatus = useMemo(() => calculateVisitsReportDailyTrendWithStatus(reportVisits, filters), [reportVisits, filters])
+  const dailyTrendWithStatus = useMemo(() => calculateVisitsReportTrendWithStatus(reportVisits, filters, trendGranularity), [reportVisits, filters, trendGranularity])
   const dailyTrendGrouped = useMemo(() => groupVisitsReportDailyTrendByOutcome(dailyTrendWithStatus), [dailyTrendWithStatus])
   const headers = useMemo(() => VISITS_REPORT_COLUMNS.map((column) => column.header), [])
   const exportFilenameBase = `ziyaretler-raporu_${filters.startDate || "tumu"}_${filters.endDate || "tumu"}`
 
-  const previousFilters = useMemo(() => {
-    if (!comparisonEnabled) return null
-    const previousRange = getPreviousPeriod(filters)
-    return previousRange ? { ...filters, ...previousRange } : null
-  }, [comparisonEnabled, filters])
+  const previousFilters = comparisonEnabled ? comparisonFilters : null
   const previousReportVisits = useMemo(() => previousFilters ? filterVisitsForReport(visits, previousFilters) : null, [previousFilters, visits])
   const previousSummary = useMemo<VisitsReportPeriodSummaryInput | null>(() => {
     if (!previousReportVisits) return null
-    return {
-      kpis: calculateVisitsReportKpis(previousReportVisits),
-      statusCounts: calculateVisitsReportStatusCounts(previousReportVisits),
-      busiestDay: findVisitsReportBusiestDay(previousReportVisits),
-    }
+    return { kpis: calculateVisitsReportKpis(previousReportVisits) }
   }, [previousReportVisits])
   const previousDailyTrendGrouped = useMemo(() => {
     if (!previousFilters || !previousReportVisits) return null
-    return groupVisitsReportDailyTrendByOutcome(calculateVisitsReportDailyTrendWithStatus(previousReportVisits, previousFilters))
-  }, [previousFilters, previousReportVisits])
+    return groupVisitsReportDailyTrendByOutcome(calculateVisitsReportTrendWithStatus(previousReportVisits, previousFilters, trendGranularity))
+  }, [previousFilters, previousReportVisits, trendGranularity])
   const showComparisonCharts = comparisonEnabled && previousFilters !== null && previousDailyTrendGrouped !== null
   const sharedYAxisMax = useMemo(
     () => showComparisonCharts && previousDailyTrendGrouped ? calculateSharedTrendYAxisMax(dailyTrendGrouped, previousDailyTrendGrouped) : undefined,
     [showComparisonCharts, dailyTrendGrouped, previousDailyTrendGrouped],
   )
+  const sharedYAxisTicks = useMemo(() => sharedYAxisMax === undefined ? undefined : calculateVisitsTrendYAxis(sharedYAxisMax).ticks, [sharedYAxisMax])
 
-  const totalDelta = previousSummary ? percentDelta(calculateVisitsReportChangePercent(kpis.total, previousSummary.kpis.total)) : null
-  const checkedInDelta = previousSummary ? percentDelta(calculateVisitsReportChangePercent(kpis.actuallyCheckedIn, previousSummary.kpis.actuallyCheckedIn)) : null
-  const avgDurationDelta = previousSummary ? durationDelta(kpis.averageDurationMinutes, previousSummary.kpis.averageDurationMinutes) : null
-  const lateDelta = previousSummary ? percentDelta(calculateVisitsReportChangePercent(kpis.lateArrivals, previousSummary.kpis.lateArrivals)) : null
-
+  const totalDelta = previousSummary ? countDelta(kpis.total, previousSummary.kpis.total) : null
+  const checkedInDelta = previousSummary ? countDelta(kpis.actuallyCheckedIn, previousSummary.kpis.actuallyCheckedIn) : null
+  const averageDurationDelta = previousSummary ? durationDelta(kpis.averageDurationMinutes, previousSummary.kpis.averageDurationMinutes) : null
+  const lateDelta = previousSummary ? countDelta(kpis.lateArrivals, previousSummary.kpis.lateArrivals) : null
   const summaryText = useMemo(
-    () => buildVisitsReportSummarySentences({ kpis, statusCounts, busiestDay }, previousSummary).join(" "),
-    [kpis, statusCounts, busiestDay, previousSummary],
+    () => buildVisitsReportSummarySentences({ kpis, trend: dailyTrendGrouped }, previousSummary).join(" "),
+    [kpis, dailyTrendGrouped, previousSummary],
   )
 
-  const recordsWrapperRef = useRef<HTMLDivElement>(null)
-  const [recordsPageSize, setRecordsPageSize] = useState(DEFAULT_RECORDS_PAGE_SIZE)
-  const [recordsPage, setRecordsPage] = useState(1)
-  const recordsPageCount = getReportPageCount(reportVisits.length, recordsPageSize)
-  const paginatedVisits = useMemo(() => paginateReportVisits(reportVisits, recordsPage, recordsPageSize), [reportVisits, recordsPage, recordsPageSize])
-  const recordsVisibleStart = reportVisits.length === 0 ? 0 : (recordsPage - 1) * recordsPageSize + 1
-  const recordsVisibleEnd = Math.min(recordsPage * recordsPageSize, reportVisits.length)
-
-  // The wrapper's own box is fixed by the section's flex layout (flex-1 min-h-0), independent of
-  // how many rows it holds, so measuring it here can't create a resize feedback loop.
-  useLayoutEffect(() => {
-    const wrapper = recordsWrapperRef.current
-    if (!wrapper) return
-
-    const measure = () => {
-      const available = wrapper.clientHeight - RECORD_TABLE_HEADER_HEIGHT_PX
-      setRecordsPageSize(Math.max(MIN_RECORDS_PAGE_SIZE, Math.floor(available / RECORD_ROW_HEIGHT_PX)))
-    }
-
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(wrapper)
-    return () => observer.disconnect()
-  }, [])
+  const recordsPageCount = getReportPageCount(reportVisits.length)
+  const normalizedRecordsPage = Math.min(Math.max(1, recordsPage), recordsPageCount)
+  const paginatedVisits = useMemo(() => paginateReportVisits(reportVisits, normalizedRecordsPage), [reportVisits, normalizedRecordsPage])
+  const recordsRange = getReportPageRange(reportVisits.length, normalizedRecordsPage)
 
   useEffect(() => {
-    setRecordsPage(1)
-  }, [filters])
-
-  useEffect(() => {
-    if (recordsPage > recordsPageCount) setRecordsPage(Math.max(1, recordsPageCount))
-  }, [recordsPage, recordsPageCount])
+    if (recordsPage !== normalizedRecordsPage) onRecordsPageChange(normalizedRecordsPage)
+  }, [normalizedRecordsPage, onRecordsPageChange, recordsPage])
 
   useEffect(() => {
     onExportAvailabilityChange?.(reportVisits.length > 0)
@@ -168,146 +138,165 @@ export const VisitsReportTab = forwardRef<ReportExportHandle, { visits: Visit[];
     exportPdf: () => { void downloadReportPdf("Ziyaretler Raporu", headers, exportRows(), `${exportFilenameBase}.pdf`) },
   }))
 
-  return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
-      <section className="flex min-h-0 flex-[3] flex-col overflow-hidden rounded-lg border bg-card p-3 shadow-panel" aria-labelledby="visits-analysis-title">
-        <div className="flex shrink-0 flex-wrap items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h2 id="visits-analysis-title" className="text-xs font-semibold uppercase tracking-wider text-slate-900">Ziyaret Analizi</h2>
-            <p className="mt-0.5 text-[11px] text-slate-500">{formatRangeLabel(filters)}</p>
-          </div>
-          <button
-            type="button"
-            disabled
-            title="Yakında: periyot seçimi"
-            className="flex shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 shadow-none disabled:cursor-not-allowed disabled:opacity-100"
-          >
-            Günlük
-            <ChevronDown className="size-3 text-slate-400" />
-          </button>
-        </div>
-
-        <div className="mt-2 min-h-0 flex-1">
-          {dateRangeInvalid ? (
-            <div className="flex h-full flex-col items-center justify-center px-4 text-center">
-              <p className="text-sm font-semibold text-slate-900">Geçersiz tarih aralığı</p>
-              <p className="mt-1 text-xs text-slate-600">Başlangıç tarihi bitiş tarihinden sonra olamaz.</p>
-            </div>
-          ) : comparisonEnabled && previousFilters && previousDailyTrendGrouped ? (
-            <div className="grid h-full grid-cols-2 gap-3">
-              <div className="flex h-full min-h-0 flex-col">
-                <p className="mb-1 shrink-0 truncate text-[10px] font-medium uppercase tracking-wide text-slate-500">Seçili dönem · {formatRangeLabel(filters)}</p>
-                <div className="min-h-0 flex-1">
-                  <VisitsTrendChart points={dailyTrendGrouped} yAxisMax={sharedYAxisMax} maxXAxisTicks={COMPARISON_MAX_X_AXIS_TICKS} />
-                </div>
-              </div>
-              <div className="flex h-full min-h-0 flex-col">
-                <p className="mb-1 shrink-0 truncate text-[10px] font-medium uppercase tracking-wide text-slate-500">Önceki dönem · {formatRangeLabel(previousFilters)}</p>
-                <div className="min-h-0 flex-1">
-                  <VisitsTrendChart points={previousDailyTrendGrouped} yAxisMax={sharedYAxisMax} showLegend={false} maxXAxisTicks={COMPARISON_MAX_X_AXIS_TICKS} />
-                </div>
-              </div>
-            </div>
-          ) : (
-            <VisitsTrendChart points={dailyTrendGrouped} />
-          )}
-        </div>
-
-        {!dateRangeInvalid && (
-          <p className="mt-2 shrink-0 text-xs leading-snug text-slate-700">{summaryText}</p>
-        )}
-
-        <dl className="mt-2 shrink-0 grid grid-cols-2 gap-y-2 border-t border-slate-100 pt-2 sm:grid-cols-4 sm:divide-x sm:divide-slate-100" aria-label="Ziyaret analiz metrikleri">
-          <ReportMetric label="Toplam Ziyaret" value={String(kpis.total)} delta={comparisonEnabled ? totalDelta : null} />
-          <ReportMetric label="Gerçekleşen Ziyaret" value={String(kpis.actuallyCheckedIn)} delta={comparisonEnabled ? checkedInDelta : null} />
-          <ReportMetric label="Ort. Ziyaret Süresi" value={formatDurationMinutes(kpis.averageDurationMinutes)} delta={comparisonEnabled ? avgDurationDelta : null} />
-          <ReportMetric label="Geç Giriş" value={String(kpis.lateArrivals)} delta={comparisonEnabled ? lateDelta : null} />
-        </dl>
-      </section>
-
-      <section className="flex min-h-0 flex-[2] flex-col overflow-hidden rounded-lg border bg-card shadow-panel" aria-labelledby="visits-records-title">
-        <div className="flex shrink-0 items-center gap-1.5 border-b px-3 py-2">
-          <h2 id="visits-records-title" className="text-xs font-semibold uppercase tracking-wider text-slate-500">Ziyaret Kayıtları</h2>
-          <span className="text-[11px] tabular-nums text-slate-400">· {reportVisits.length} kayıt</span>
-        </div>
-
+  if (workspaceMode === "records") {
+    return (
+      <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border bg-card shadow-panel" aria-labelledby="visits-records-title">
+        <h2 id="visits-records-title" className="sr-only">Ziyaret kayıtları</h2>
         {dateRangeInvalid ? (
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-4 text-center">
-            <p className="text-sm font-semibold text-slate-900">Geçersiz tarih aralığı</p>
-            <p className="mt-1 text-xs text-slate-600">Başlangıç tarihi bitiş tarihinden sonra olamaz.</p>
-          </div>
+          <EmptyRecordsState invalid />
         ) : reportVisits.length === 0 ? (
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-4 text-center">
-            <Search className="mx-auto size-6 text-slate-400" />
-            <h3 className="mt-2 text-xs font-semibold text-slate-900">Eşleşen ziyaret bulunamadı</h3>
-            <p className="mt-0.5 text-[11px] text-slate-600">Filtre ölçütlerini değiştirerek yeniden deneyin.</p>
-          </div>
+          <EmptyRecordsState />
         ) : (
           <>
-            <div ref={recordsWrapperRef} className="min-h-0 flex-1 overflow-hidden">
+            <div className="min-h-0 flex-1 overflow-hidden">
               <div className="h-full overflow-x-auto overflow-y-hidden scrollbar-thin">
-                <table className="w-full min-w-[980px] table-fixed text-left text-xs">
+                <table className="h-full w-full min-w-[980px] table-fixed text-left text-xs">
                   <thead className="border-b bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                     <tr>
-                      <th className="w-[10%] px-3 py-2">Tarih</th>
-                      <th className="w-[15%] px-3 py-2">Ziyaretçi</th>
-                      <th className="w-[14%] px-3 py-2">Firma</th>
-                      <th className="w-[14%] px-3 py-2">Ziyaret Edilen</th>
-                      <th className="w-[12%] px-3 py-2">Planlanan</th>
-                      <th className="w-[13%] px-3 py-2">Gerçekleşen</th>
-                      <th className="w-[9%] px-3 py-2">Süre</th>
-                      <th className="w-[13%] px-3 py-2">Durum</th>
+                      <th className="w-[10%] px-3 py-1.5">Tarih</th>
+                      <th className="w-[15%] px-3 py-1.5">Ziyaretçi</th>
+                      <th className="w-[14%] px-3 py-1.5">Firma</th>
+                      <th className="w-[14%] px-3 py-1.5">Ziyaret Edilen</th>
+                      <th className="w-[12%] px-3 py-1.5">Planlanan</th>
+                      <th className="w-[13%] px-3 py-1.5">Gerçekleşen</th>
+                      <th className="w-[9%] px-3 py-1.5">Süre</th>
+                      <th className="w-[13%] px-3 py-1.5">Durum</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
+                  <tbody>
                     {paginatedVisits.map((visit) => (
-                      <tr key={visit.id} className="transition-colors hover:bg-slate-50">
-                        <td className="px-3 py-2 tabular-nums">{formatTr(new Date(visit.plannedStart), "d MMM yyyy")}</td>
-                        <td className="px-3 py-2">
-                          <p className="truncate font-medium text-slate-900" title={`${visit.visitor.firstName} ${visit.visitor.lastName}`}>{visit.visitor.firstName} {visit.visitor.lastName}</p>
-                        </td>
-                        <td className="px-3 py-2"><p className="truncate" title={visit.visitor.company}>{visit.visitor.company}</p></td>
-                        <td className="px-3 py-2"><p className="truncate" title={visit.hostEmployeeName}>{visit.hostEmployeeName}</p></td>
-                        <td className="px-3 py-2 tabular-nums">{formatTr(new Date(visit.plannedStart), "HH:mm")}–{formatTr(new Date(visit.plannedEnd), "HH:mm")}</td>
-                        <td className="px-3 py-2"><ActualTimesCell visit={visit} /></td>
-                        <td className="px-3 py-2 tabular-nums">{formatDurationMinutes(getVisitDurationMinutes(visit))}</td>
-                        <td className="px-3 py-2"><VisitsReportStatusPill status={visit.status} /></td>
+                      <tr key={visit.id} role="button" tabIndex={0} aria-label={`${visit.visitor.firstName} ${visit.visitor.lastName} ziyaret detaylarını görüntüle`} className="record-row-hover h-[3.125rem] cursor-pointer border-b last:border-b-0 transition-colors hover:bg-slate-50 focus-visible:bg-blue-50 focus-visible:outline-none" onClick={() => setSelectedVisit(visit)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedVisit(visit) } }}>
+                        <td className="px-3 py-1 tabular-nums">{formatTr(new Date(visit.plannedStart), "d MMM yyyy")}</td>
+                        <td className="px-3 py-1"><p className="truncate font-medium text-slate-900" title={`${visit.visitor.firstName} ${visit.visitor.lastName}`}>{visit.visitor.firstName} {visit.visitor.lastName}</p></td>
+                        <td className="px-3 py-1"><p className="truncate" title={visit.visitor.company}>{visit.visitor.company}</p></td>
+                        <td className="px-3 py-1"><p className="truncate" title={visit.hostEmployeeName}>{visit.hostEmployeeName}</p></td>
+                        <td className="px-3 py-1 tabular-nums">{formatTr(new Date(visit.plannedStart), "HH:mm")}–{formatTr(new Date(visit.plannedEnd), "HH:mm")}</td>
+                        <td className="px-3 py-1"><ActualTimesCell visit={visit} /></td>
+                        <td className="px-3 py-1 tabular-nums">{formatDurationMinutes(getVisitDurationMinutes(visit))}</td>
+                        <td className="px-3 py-1"><VisitsReportStatusPill status={visit.status} /></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             </div>
-
             <div className="shrink-0">
               <ReportPagination
-                page={recordsPage}
+                page={normalizedRecordsPage}
                 pageCount={recordsPageCount}
-                visibleStart={recordsVisibleStart}
-                visibleEnd={recordsVisibleEnd}
+                visibleStart={recordsRange.start}
+                visibleEnd={recordsRange.end}
                 total={reportVisits.length}
-                visiblePageNumbers={getVisibleReportPageNumbers(recordsPage, Math.max(1, recordsPageCount))}
-                onPageChange={setRecordsPage}
+                visiblePageNumbers={getVisibleReportPageNumbers(normalizedRecordsPage, Math.max(1, recordsPageCount))}
+                onPageChange={onRecordsPageChange}
                 ariaLabel="Ziyaret kayıtları sayfaları"
               />
             </div>
+            <VisitDetailsDialog
+              visit={selectedVisit}
+              open={selectedVisit !== null}
+              onOpenChange={(open) => { if (!open) setSelectedVisit(null) }}
+              onEdit={() => undefined}
+              onReschedule={() => undefined}
+              onCancel={() => undefined}
+              readOnly
+              viewerRole="MANAGER"
+            />
           </>
         )}
       </section>
-    </div>
+    )
+  }
+
+  return (
+    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border bg-card p-3 shadow-panel" aria-labelledby="visits-analysis-title">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        <h2 id="visits-analysis-title" className="shrink-0 text-xs font-semibold uppercase tracking-wider text-slate-900">Ziyaret Analizi</h2>
+        {!dateRangeInvalid && (
+          <p className="ml-auto flex min-w-0 flex-wrap justify-end gap-x-1.5 gap-y-0.5 text-[12px] font-medium text-slate-700" aria-label="Ziyaret analiz metrikleri">
+            <MetadataMetric value={`${kpis.total} ziyaret`} delta={comparisonEnabled ? totalDelta : null} />
+            <MetadataMetric value={`${kpis.actuallyCheckedIn} gerçekleşen`} delta={comparisonEnabled ? checkedInDelta : null} />
+            <MetadataMetric value={`Ort. süre ${formatDurationMinutes(kpis.averageDurationMinutes)}`} delta={comparisonEnabled ? averageDurationDelta : null} />
+            <MetadataMetric value={`${kpis.lateArrivals} geç giriş`} delta={comparisonEnabled ? lateDelta : null} last />
+          </p>
+        )}
+      </div>
+
+      <div className="mt-2 min-h-0 flex-1">
+        {dateRangeInvalid ? (
+          <div className="flex h-full flex-col items-center justify-center px-4 text-center">
+            <p className="text-sm font-semibold text-slate-900">Geçersiz tarih aralığı</p>
+            <p className="mt-1 text-xs text-slate-600">Başlangıç tarihi bitiş tarihinden sonra olamaz.</p>
+          </div>
+        ) : showComparisonCharts && previousFilters && previousDailyTrendGrouped ? (
+          <div className="flex h-full min-h-0 flex-col gap-1.5">
+            <ComparisonTrendPanel points={dailyTrendGrouped} yAxisMax={sharedYAxisMax} yAxisTicks={sharedYAxisTicks} />
+            <ComparisonTrendPanel label={`${comparisonLabel} · ${formatRangeLabel(previousFilters)}`} points={previousDailyTrendGrouped} yAxisMax={sharedYAxisMax} yAxisTicks={sharedYAxisTicks} />
+          </div>
+        ) : (
+          <VisitsTrendChart points={dailyTrendGrouped} />
+        )}
+      </div>
+
+      {!dateRangeInvalid && (
+        <div className="mt-1.5 flex shrink-0 items-start justify-between gap-4 border-t border-slate-100 pt-1.5">
+          <p className="min-w-0 text-xs leading-snug text-slate-700">{summaryText}</p>
+          <VisitsTrendLegend />
+        </div>
+      )}
+    </section>
   )
 })
 
+function ComparisonTrendPanel({ label, points, yAxisMax, yAxisTicks }: { label?: string; points: VisitsReportDailyTrendGroupedPoint[]; yAxisMax?: number; yAxisTicks?: number[] }) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      {label && <p className="mb-0.5 shrink-0 truncate text-[11px] font-medium uppercase tracking-[0.02em] text-slate-500">{label}</p>}
+      <div className="min-h-0 flex-1"><VisitsTrendChart points={points} yAxisMax={yAxisMax} yAxisTicks={yAxisTicks} /></div>
+    </div>
+  )
+}
+
+function MetadataMetric({ value, delta, last = false }: { value: string; delta: MetricDelta | null; last?: boolean }) {
+  return <span className="inline-flex items-baseline"><span className="text-slate-700">{value}</span>{delta && <span className="ml-1 text-[10px] font-normal text-slate-400">{delta.label}</span>}{!last && <span className="ml-1.5 text-slate-300">·</span>}</span>
+}
+
+function EmptyRecordsState({ invalid = false }: { invalid?: boolean }) {
+  if (invalid) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-4 text-center">
+        <p className="text-sm font-semibold text-slate-900">Geçersiz tarih aralığı</p>
+        <p className="mt-1 text-xs text-slate-600">Başlangıç tarihi bitiş tarihinden sonra olamaz.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-4 text-center">
+      <Search className="mx-auto size-6 text-slate-400" />
+      <h3 className="mt-2 text-xs font-semibold text-slate-900">Eşleşen ziyaret bulunamadı</h3>
+      <p className="mt-0.5 text-[11px] text-slate-600">Filtre ölçütlerini değiştirerek yeniden deneyin.</p>
+    </div>
+  )
+}
+
 function ActualTimesCell({ visit }: { visit: Visit }) {
-  if (!visit.actualCheckIn) return <span className="text-slate-400">—</span>
+  if (!visit.actualCheckIn) {
+    return (
+      <div className="grid min-h-9 grid-rows-[1rem_0.75rem] leading-tight">
+        <span className="text-slate-400">—</span>
+        <span aria-hidden="true" className="block h-3" />
+      </div>
+    )
+  }
 
   const delay = getVisitDelayMinutes(visit)
   return (
-    <div>
-      <p className="tabular-nums">
-        {formatTr(new Date(visit.actualCheckIn), "HH:mm")}–{visit.actualCheckOut ? formatTr(new Date(visit.actualCheckOut), "HH:mm") : "—"}
-      </p>
-      {delay !== null && delay > 0 && <p className="text-[10px] font-medium text-amber-600">+{delay} dk</p>}
+    <div className="grid min-h-9 grid-rows-[1rem_0.75rem] leading-tight">
+      <p className="tabular-nums">{formatTr(new Date(visit.actualCheckIn), "HH:mm")}–{visit.actualCheckOut ? formatTr(new Date(visit.actualCheckOut), "HH:mm") : "—"}</p>
+      {delay !== null && delay > 0
+        ? <p className="text-[10px] font-medium text-amber-600">+{delay} dk</p>
+        : <span aria-hidden="true" className="block h-3" />}
     </div>
   )
 }
@@ -316,28 +305,9 @@ function VisitsReportStatusPill({ status }: { status: Visit["status"] }) {
   const group = getVisitReportStatusGroup(status)
   const color = VISITS_REPORT_STATUS_COLORS[group]
   return (
-    <span
-      className="inline-flex w-fit items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium"
-      style={{ borderColor: `${color}40`, backgroundColor: `${color}14`, color }}
-    >
+    <span className="inline-flex w-fit items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium" style={{ borderColor: `${color}40`, backgroundColor: `${color}14`, color }}>
       <span className="size-1.5 rounded-full" style={{ backgroundColor: color }} />
       {VISITS_REPORT_STATUS_LABELS[group]}
     </span>
-  )
-}
-
-function ReportMetric({ label, value, delta }: { label: string; value: string; delta?: MetricDelta | null }) {
-  return (
-    <div className="sm:px-3 sm:first:pl-0">
-      <dt className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="mt-0.5 text-lg font-semibold tabular-nums text-slate-900">{value}</dd>
-      {delta && (
-        <p className="mt-0.5 flex items-center gap-0.5 text-[10px] font-medium text-slate-500">
-          {delta.direction === "up" && <ArrowUp className="size-3" />}
-          {delta.direction === "down" && <ArrowDown className="size-3" />}
-          {delta.label}
-        </p>
-      )}
-    </div>
   )
 }

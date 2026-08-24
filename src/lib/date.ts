@@ -20,21 +20,23 @@ const istanbulWallClockFormatter = new Intl.DateTimeFormat("en-US", {
 /**
  * Reads a wall-clock hour/minute for a given ISO timestamp string or a
  * moment in time, independent of the runtime's own system timezone.
- * - A string is read literally out of its ISO digits (e.g. stored
- *   "plannedStart" values already encode the intended wall-clock time).
- * - A Date represents an absolute instant, so it's converted to the
- *   Europe/Istanbul wall clock via Intl.DateTimeFormat, instead of
- *   Date#getHours()/toISOString() (both of which depend on/produce a
- *   timezone other than Istanbul depending on the runtime).
+ * A string keeps its stored wall-clock digits for legacy planned-visit data. A Date represents
+ * an absolute instant and is converted through Europe/Istanbul rather than the runtime timezone.
  */
 export function getIsoWallClockTime(value: Date | string): IsoWallClockTime | null {
   if (typeof value === "string") {
     const match = value.match(/T(\d{2}):(\d{2})/)
     return match ? { hour: parseInt(match[1], 10), minute: parseInt(match[2], 10) } : null
   }
+  return getIstanbulWallClockTime(value)
+}
 
-  if (Number.isNaN(value.getTime())) return null
-  const parts = istanbulWallClockFormatter.formatToParts(value)
+// Use this for a timestamp that represents an absolute instant (including UTC-normalized mock
+// seeds). Unlike getIsoWallClockTime it never reads ISO digits literally.
+export function getIstanbulWallClockTime(value: Date | string): IsoWallClockTime | null {
+  const instant = typeof value === "string" ? new Date(value) : value
+  if (Number.isNaN(instant.getTime())) return null
+  const parts = istanbulWallClockFormatter.formatToParts(instant)
   const hour = parts.find((part) => part.type === "hour")?.value
   const minute = parts.find((part) => part.type === "minute")?.value
   return hour && minute ? { hour: parseInt(hour, 10), minute: parseInt(minute, 10) } : null
@@ -42,6 +44,10 @@ export function getIsoWallClockTime(value: Date | string): IsoWallClockTime | nu
 
 export function getIsoHour(value: Date | string): number | null {
   return getIsoWallClockTime(value)?.hour ?? null
+}
+
+export function getIstanbulHour(value: Date | string): number | null {
+  return getIstanbulWallClockTime(value)?.hour ?? null
 }
 
 export function getIsoWallClockMinutes(value: Date | string): number | null {

@@ -1,8 +1,9 @@
-import { addHours, setHours, setMinutes, startOfDay } from "date-fns"
+import { addHours } from "date-fns"
 import { describe, expect, it } from "vitest"
 
 import { MockResourceAssignmentService } from "@/services/mock-resource-assignment-service"
 import { MockResourceCatalogService } from "@/services/mock-resource-catalog-service"
+import { scenarioAt } from "@/services/mock-scenario"
 import { MockVisitService } from "@/services/mock-visit-service"
 
 // ---------------------------------------------------------------------------
@@ -28,13 +29,14 @@ async function createMeeting(
     companyId?: string
   } = {},
 ) {
-  const day = options.day ?? new Date()
   const startHour = options.startHour ?? 9
   const durationHours = options.durationHours ?? 2
   const facilityId = options.facilityId ?? "bplas-merkez"
   const companyId = options.companyId ?? "bplas"
 
-  const plannedStart = setMinutes(setHours(startOfDay(day), startHour), 0).toISOString()
+  const plannedStart = options.day
+    ? new Date(options.day.getFullYear(), options.day.getMonth(), options.day.getDate(), startHour).toISOString()
+    : scenarioAt(0, startHour)
   const plannedEnd = addHours(new Date(plannedStart), durationHours).toISOString()
 
   const result = await visitService.createMeeting({

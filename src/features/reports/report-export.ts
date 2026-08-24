@@ -1,11 +1,10 @@
 import { getGoodsDirectionLabel, getGoodsMovementDisplayStatus, type GoodsMovement } from "@/domain/goods-movements"
 import type { PlannedTransportAssignment } from "@/domain/transport-assignments"
 import type { Meeting, Visit } from "@/domain/visits"
-import { visitStatusLabels } from "@/domain/visits"
 import { formatTransportAssignmentSchedule } from "@/features/transport/transport-assignment-time"
 import { getRelatedRecordLabel } from "@/features/reports/fleet-report-utils"
 import { GOODS_REPORT_STATUS_LABELS } from "@/features/reports/goods-report-utils"
-import { getVisitDelayMinutes } from "@/features/reports/visits-report-utils"
+import { getVisitDelayMinutes, getVisitReportStatusGroup, VISITS_REPORT_STATUS_LABELS } from "@/features/reports/visits-report-utils"
 import { formatTr } from "@/lib/date"
 
 export interface ReportColumn {
@@ -48,7 +47,7 @@ export function buildVisitsReportRows(visits: Visit[]): string[][] {
       formatTr(new Date(visit.plannedEnd), "HH:mm"),
       visit.actualCheckIn ? formatTr(new Date(visit.actualCheckIn), "HH:mm") : "—",
       visit.actualCheckOut ? formatTr(new Date(visit.actualCheckOut), "HH:mm") : "—",
-      visitStatusLabels[visit.status],
+      VISITS_REPORT_STATUS_LABELS[getVisitReportStatusGroup(visit.status)],
       delay === null ? "—" : String(delay),
     ]
   })

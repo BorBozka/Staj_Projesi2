@@ -4,50 +4,154 @@ import type { PlannedTransportAssignment } from "@/domain/transport-assignments"
 import type { Meeting, Visit } from "@/domain/visits"
 import type { ReportsScopeFilters } from "@/features/reports/reports-filters"
 import {
-  calculateFleetReportKpis,
+  aggregateFleetResourceLoad,
+  buildFleetInsight,
+  buildFleetMetadata,
+  calculateFleetReportMetrics,
   filterAssignmentsForReport,
+  FLEET_CATEGORY_AXIS_WIDTH,
+  FLEET_CONCENTRATION_THRESHOLDS,
   FLEET_REPORT_PAGE_SIZE,
+  getFleetCategoryAxisWidth,
   getFleetReportPageCount,
+  getNiceFleetDurationScale,
   getRelatedRecordLabel,
+  isFleetRecordActivationKey,
+  mergeFleetLoadComparison,
   paginateFleetReport,
+  parseFleetReportWorkspace,
+  setFleetReportPage,
+  setFleetReportWorkspace,
+  sortFleetLoadResources,
 } from "@/features/reports/fleet-report-utils"
 
 const baseFilters: ReportsScopeFilters = { startDate: "", endDate: "", companyId: "all", facilityId: "all" }
 
-const assignments = [
-  assignment("1", "2026-08-10T08:00:00+03:00", "2026-08-10T09:00:00+03:00", { companyId: "bplas", facilityId: "bplas-merkez" }),
-  assignment("2", "2026-08-11T10:00:00+03:00", "2026-08-11T10:30:00+03:00", { companyId: "bplas", facilityId: "bplas-arge" }),
-  assignment("3", "2026-08-12T12:00:00+03:00", "2026-08-12T13:00:00+03:00", { companyId: "bplas-otomotiv", facilityId: "otomotiv-uretim", status: "CANCELLED" }),
+const reportAssignments = [
+  assignment("a1", { plannedStart: "2026-08-10T08:00:00+03:00", plannedEnd: "2026-08-10T10:00:00+03:00", vehicleResourceId: "vehicle-transit", vehicleName: "Ford Transit", driverResourceId: "driver-ayse", driverName: "Ayşe Demir" }),
+  assignment("a2", { plannedStart: "2026-08-10T11:00:00+03:00", plannedEnd: "2026-08-10T12:30:00+03:00", vehicleResourceId: "vehicle-transit", vehicleName: "Ford Transit", driverResourceId: "driver-ayse", driverName: "Ayşe Demir" }),
+  assignment("a3", { plannedStart: "2026-08-11T08:00:00+03:00", plannedEnd: "2026-08-11T09:00:00+03:00", vehicleResourceId: "vehicle-sprinter", vehicleName: "Mercedes Sprinter", driverResourceId: "driver-zeynep", driverName: "Zeynep Arslan" }),
+  assignment("a4", { plannedStart: "2026-08-12T08:00:00+03:00", plannedEnd: "2026-08-12T12:00:00+03:00", vehicleResourceId: "vehicle-cancelled", vehicleName: "İptal Araç", driverResourceId: "driver-cancelled", driverName: "İptal Şoför", status: "CANCELLED", companyId: "bplas-otomotiv", facilityId: "otomotiv-uretim" }),
 ]
 
-describe("filterAssignmentsForReport", () => {
-  it("applies the date-range and company/facility scope filters", () => {
-    expect(ids(filterAssignmentsForReport(assignments, baseFilters))).toEqual(["3", "2", "1"])
-    expect(ids(filterAssignmentsForReport(assignments, { ...baseFilters, startDate: "2026-08-11", endDate: "2026-08-12" }))).toEqual(["3", "2"])
-    expect(ids(filterAssignmentsForReport(assignments, { ...baseFilters, companyId: "bplas-otomotiv" }))).toEqual(["3"])
-    expect(ids(filterAssignmentsForReport(assignments, { ...baseFilters, facilityId: "bplas-arge" }))).toEqual(["2"])
+describe("fleet report filtering and metrics", () => {
+  it("applies date/company/facility filters and keeps records newest-first", () => {
+    expect(ids(filterAssignmentsForReport(reportAssignments, baseFilters))).toEqual(["a4", "a3", "a2", "a1"])
+    expect(ids(filterAssignmentsForReport(reportAssignments, { ...baseFilters, startDate: "2026-08-10", endDate: "2026-08-11" }))).toEqual(["a3", "a2", "a1"])
+    expect(ids(filterAssignmentsForReport(reportAssignments, { ...baseFilters, companyId: "bplas-otomotiv" }))).toEqual(["a4"])
+    expect(filterAssignmentsForReport(reportAssignments, { ...baseFilters, startDate: "2026-08-13", endDate: "2026-08-10" })).toEqual([])
   })
 
-  it("returns an empty set for an inverted date range", () => {
-    expect(filterAssignmentsForReport(assignments, { ...baseFilters, startDate: "2026-08-13", endDate: "2026-08-10" })).toEqual([])
+  it("counts cancelled assignments in metadata but excludes them from planned load", () => {
+    expect(calculateFleetReportMetrics(reportAssignments)).toEqual({ totalAssignments: 4, cancelledAssignments: 1, plannedLoadMinutes: 270, usedVehicleCount: 2, usedDriverCount: 2 })
   })
 
-  it("sorts by planned start descending, most recent first", () => {
-    expect(ids(filterAssignmentsForReport(assignments, baseFilters))).toEqual(["3", "2", "1"])
+  it("keeps an empty dataset safe", () => {
+    expect(calculateFleetReportMetrics([])).toEqual({ totalAssignments: 0, cancelledAssignments: 0, plannedLoadMinutes: 0, usedVehicleCount: 0, usedDriverCount: 0 })
   })
 })
 
-describe("calculateFleetReportKpis", () => {
-  it("computes totals, cancellation count/rate and average planned duration", () => {
-    const kpis = calculateFleetReportKpis(assignments)
-    expect(kpis.total).toBe(3)
-    expect(kpis.cancelled).toBe(1)
-    expect(kpis.cancelRate).toBeCloseTo(33.333, 2)
-    expect(kpis.averagePlannedDurationMinutes).toBe(50)
+describe("fleet resource load aggregation", () => {
+  it("groups vehicle load by immutable vehicle resource ID", () => {
+    expect(aggregateFleetResourceLoad(reportAssignments, "vehicles")).toEqual([
+      { resourceId: "vehicle-transit", resourceName: "Ford Transit", plannedMinutes: 210, assignmentCount: 2 },
+      { resourceId: "vehicle-sprinter", resourceName: "Mercedes Sprinter", plannedMinutes: 60, assignmentCount: 1 },
+    ])
   })
 
-  it("reports zero rate and null average duration when there is no data", () => {
-    expect(calculateFleetReportKpis([])).toEqual({ total: 0, cancelled: 0, cancelRate: 0, averagePlannedDurationMinutes: null })
+  it("groups driver load separately and excludes cancelled resource load", () => {
+    expect(aggregateFleetResourceLoad(reportAssignments, "drivers")).toEqual([
+      { resourceId: "driver-ayse", resourceName: "Ayşe Demir", plannedMinutes: 210, assignmentCount: 2 },
+      { resourceId: "driver-zeynep", resourceName: "Zeynep Arslan", plannedMinutes: 60, assignmentCount: 1 },
+    ])
+  })
+
+  it("sorts deterministically by duration, assignment count, then resource name", () => {
+    expect(sortFleetLoadResources([
+      { resourceId: "z", resourceName: "Zeynep", plannedMinutes: 60, assignmentCount: 1 },
+      { resourceId: "a", resourceName: "Ayşe", plannedMinutes: 60, assignmentCount: 1 },
+      { resourceId: "many", resourceName: "Mert", plannedMinutes: 60, assignmentCount: 2 },
+    ]).map((resource) => resource.resourceId)).toEqual(["many", "a", "z"])
+  })
+
+  it("merges current and previous resource sets with zero counterparts", () => {
+    const current = aggregateFleetResourceLoad(reportAssignments.slice(0, 2), "vehicles")
+    const previous = aggregateFleetResourceLoad(reportAssignments.slice(2, 3), "vehicles")
+    expect(mergeFleetLoadComparison(current, previous)).toEqual([
+      { resourceId: "vehicle-transit", resourceName: "Ford Transit", plannedMinutes: 210, assignmentCount: 2, previousPlannedMinutes: 0, previousAssignmentCount: 0 },
+      { resourceId: "vehicle-sprinter", resourceName: "Mercedes Sprinter", plannedMinutes: 0, assignmentCount: 0, previousPlannedMinutes: 60, previousAssignmentCount: 1 },
+    ])
+  })
+})
+
+describe("fleet metadata and insight", () => {
+  const current = calculateFleetReportMetrics(reportAssignments)
+  const previous = calculateFleetReportMetrics(reportAssignments.slice(0, 2))
+
+  it("formats absolute, non-percentage metadata deltas", () => {
+    expect(buildFleetMetadata(current, previous)).toBe("4 görev +2 · 1 iptal +1 · 4 sa 30 dk planlama yükü +1 sa · 2 araç +1 · 2 şoför +1")
+  })
+
+  it("builds a deterministic comparison insight without zero-duration or NaN text", () => {
+    const text = buildFleetInsight({ current, previous, dimension: "vehicles", currentResources: aggregateFleetResourceLoad(reportAssignments, "vehicles"), previousResources: aggregateFleetResourceLoad(reportAssignments.slice(0, 2), "vehicles") })
+    expect(text).toContain("Ford Transit üzerinde belirgin biçimde yoğunlaşıyor")
+    expect(text).not.toMatch(/NaN|\b0 saat/i)
+  })
+
+  it("does not force a normal-load insight for cancelled-only records", () => {
+    expect(buildFleetInsight({ current: calculateFleetReportMetrics(reportAssignments.slice(3)), previous: null, dimension: "drivers", currentResources: [] })).toBe("Seçili dönemde yalnızca iptal edilmiş görevler bulunuyor.")
+  })
+
+  it("uses explicit dominant, moderate, and balanced concentration thresholds", () => {
+    expect(FLEET_CONCENTRATION_THRESHOLDS).toEqual({ dominant: 0.55, moderate: 0.25 })
+    expect(insightFor([60, 40])).toBe("Planlama yükü Kaynak 1 üzerinde belirgin biçimde yoğunlaşıyor.")
+    expect(insightFor([40, 30, 30])).toBe("Kaynak 1 en yüksek planlama yükünü taşıyor ancak yük diğer araçlara da dağılıyor.")
+    expect(insightFor([34, 33, 33])).toBe("Planlama yükü araçlar arasında görece dengeli dağılıyor.")
+    expect(insightFor([50, 50])).toBe("Planlama yükü araçlar arasında görece dengeli dağılıyor.")
+  })
+
+  it("handles single-resource, empty, and zero-duration edge cases naturally", () => {
+    expect(insightFor([100])).toBe("Planlama yükü yalnızca Kaynak 1 üzerinde bulunuyor.")
+    expect(buildFleetInsight({ current: { totalAssignments: 0, cancelledAssignments: 0, plannedLoadMinutes: 0, usedVehicleCount: 0, usedDriverCount: 0 }, previous: null, dimension: "vehicles", currentResources: [] })).toBe("Seçili dönemde kayıtlı araç / şoför görevi bulunmuyor.")
+    expect(buildFleetInsight({ current: { totalAssignments: 1, cancelledAssignments: 0, plannedLoadMinutes: 0, usedVehicleCount: 1, usedDriverCount: 1 }, previous: null, dimension: "vehicles", currentResources: [{ resourceId: "r", resourceName: "Sıfır", plannedMinutes: 0, assignmentCount: 1 }] })).toBe("Seçili dönemde aktif görevler için planlanan süre bulunmuyor.")
+  })
+})
+
+describe("fleet chart scale and interaction helpers", () => {
+  it("uses the same fixed category-axis width for vehicle and driver dimensions", () => {
+    expect(getFleetCategoryAxisWidth("vehicles")).toBe(FLEET_CATEGORY_AXIS_WIDTH)
+    expect(getFleetCategoryAxisWidth("drivers")).toBe(FLEET_CATEGORY_AXIS_WIDTH)
+  })
+
+  it("builds human-readable duration ticks and pads the domain for bar-end labels", () => {
+    expect(getNiceFleetDurationScale(45, 1)).toEqual({ domainMax: 90, stepMinutes: 30, ticks: [0, 30, 60, 90] })
+    expect(getNiceFleetDurationScale(180, 1)).toEqual({ domainMax: 240, stepMinutes: 60, ticks: [0, 60, 120, 180, 240] })
+    const longLabelScale = getNiceFleetDurationScale(720, 14)
+    expect(longLabelScale.domainMax).toBeGreaterThan(720)
+    expect(longLabelScale.ticks).toContain(120)
+    expect(longLabelScale.ticks).not.toContain(45)
+  })
+
+  it("accepts Enter and Space as row activation keys", () => {
+    expect(isFleetRecordActivationKey("Enter")).toBe(true)
+    expect(isFleetRecordActivationKey(" ")).toBe(true)
+    expect(isFleetRecordActivationKey("Escape")).toBe(false)
+  })
+})
+
+describe("fleet report URL state and pagination", () => {
+  it("defaults invalid workspace parameters and persists non-default state", () => {
+    expect(parseFleetReportWorkspace(new URLSearchParams("view=wrong&dimension=wrong&page=0"))).toEqual({ view: "analysis", dimension: "vehicles", page: 1 })
+    const records = setFleetReportWorkspace(new URLSearchParams("tab=vehicle&granularity=daily&page=3"), { view: "records", dimension: "drivers" })
+    expect(records.toString()).toBe("tab=vehicle&granularity=daily&view=records&dimension=drivers")
+    expect(setFleetReportPage(records, 2).toString()).toBe("tab=vehicle&granularity=daily&view=records&dimension=drivers&page=2")
+  })
+
+  it("uses the fixed nine-row records page size", () => {
+    const records = Array.from({ length: 25 }, (_, index) => ({ id: String(index) }))
+    expect(FLEET_REPORT_PAGE_SIZE).toBe(9)
+    expect(getFleetReportPageCount(records.length)).toBe(3)
+    expect(paginateFleetReport(records as PlannedTransportAssignment[], 3)).toHaveLength(7)
   })
 })
 
@@ -55,107 +159,32 @@ describe("getRelatedRecordLabel", () => {
   const meetings = [meeting("meeting-1", "Maya Kara")]
   const visits = [visit("visit-1", "Ayşe", "Test")]
 
-  it("resolves a related meeting to a label with the host's name", () => {
-    const withMeeting = assignment("x", "2026-08-10T08:00:00+03:00", "2026-08-10T09:00:00+03:00", { companyId: "bplas", facilityId: "bplas-merkez", relatedMeetingId: "meeting-1" })
-    expect(getRelatedRecordLabel(withMeeting, meetings, visits)).toBe("Toplantı · Maya Kara")
-  })
-
-  it("resolves a related visit to a label with the visitor's name", () => {
-    const withVisit = assignment("x", "2026-08-10T08:00:00+03:00", "2026-08-10T09:00:00+03:00", { companyId: "bplas", facilityId: "bplas-merkez", relatedVisitId: "visit-1" })
-    expect(getRelatedRecordLabel(withVisit, meetings, visits)).toBe("Ziyaret · Ayşe Test")
-  })
-
-  it("returns an em dash when there is no related record or it cannot be found", () => {
-    const none = assignment("x", "2026-08-10T08:00:00+03:00", "2026-08-10T09:00:00+03:00", { companyId: "bplas", facilityId: "bplas-merkez" })
-    expect(getRelatedRecordLabel(none, meetings, visits)).toBe("—")
-
-    const dangling = assignment("x", "2026-08-10T08:00:00+03:00", "2026-08-10T09:00:00+03:00", { companyId: "bplas", facilityId: "bplas-merkez", relatedMeetingId: "missing" })
-    expect(getRelatedRecordLabel(dangling, meetings, visits)).toBe("—")
+  it("resolves related meeting and visit labels without adding a record dialog", () => {
+    expect(getRelatedRecordLabel(assignment("meeting", { relatedMeetingId: "meeting-1" }), meetings, visits)).toBe("Toplantı · Maya Kara")
+    expect(getRelatedRecordLabel(assignment("visit", { relatedVisitId: "visit-1" }), meetings, visits)).toBe("Ziyaret · Ayşe Test")
+    expect(getRelatedRecordLabel(assignment("none"), meetings, visits)).toBe("—")
   })
 })
 
-describe("fleet report pagination", () => {
-  it("paginates using the shared pagination helpers", () => {
-    const records = Array.from({ length: 25 }, (_, index) => ({ id: String(index) }))
-    expect(FLEET_REPORT_PAGE_SIZE).toBe(10)
-    expect(getFleetReportPageCount(records.length)).toBe(3)
-    expect(paginateFleetReport(records as PlannedTransportAssignment[], 1)).toHaveLength(10)
-    expect(paginateFleetReport(records as PlannedTransportAssignment[], 3)).toHaveLength(5)
-  })
-})
+function ids(records: PlannedTransportAssignment[]) { return records.map((record) => record.id) }
 
-function ids(records: PlannedTransportAssignment[]) {
-  return records.map((record) => record.id)
+function insightFor(loads: number[]) {
+  return buildFleetInsight({
+    current: { totalAssignments: loads.length, cancelledAssignments: 0, plannedLoadMinutes: loads.reduce((sum, value) => sum + value, 0), usedVehicleCount: loads.length, usedDriverCount: loads.length },
+    previous: null,
+    dimension: "vehicles",
+    currentResources: loads.map((plannedMinutes, index) => ({ resourceId: String(index), resourceName: `Kaynak ${index + 1}`, plannedMinutes, assignmentCount: 1 })),
+  })
 }
 
-function assignment(id: string, plannedStart: string, plannedEnd: string, overrides: {
-  companyId: string
-  facilityId: string
-  status?: PlannedTransportAssignment["status"]
-  relatedMeetingId?: string
-  relatedVisitId?: string
-}): PlannedTransportAssignment {
-  return {
-    id,
-    companyId: overrides.companyId,
-    companyName: overrides.companyId,
-    facilityId: overrides.facilityId,
-    facilityName: overrides.facilityId,
-    plannedStart,
-    plannedEnd,
-    purpose: "Test görevi",
-    vehicleResourceId: "vehicle-1",
-    vehicleName: "Transit",
-    vehicleLicensePlate: "16 BPL 101",
-    driverResourceId: "driver-1",
-    driverName: "Ayşe Demir",
-    relatedMeetingId: overrides.relatedMeetingId,
-    relatedVisitId: overrides.relatedVisitId,
-    status: overrides.status ?? "ACTIVE",
-    createdAt: plannedStart,
-  }
+function assignment(id: string, overrides: Partial<PlannedTransportAssignment> = {}): PlannedTransportAssignment {
+  return { id, companyId: "bplas", companyName: "BPLAS A.Ş.", facilityId: "bplas-merkez", facilityName: "Merkez Tesis", plannedStart: "2026-08-10T08:00:00+03:00", plannedEnd: "2026-08-10T09:00:00+03:00", purpose: "Test görevi", vehicleResourceId: "vehicle-1", vehicleName: "Transit", vehicleLicensePlate: "16 BPL 101", driverResourceId: "driver-1", driverName: "Ayşe Demir", status: "ACTIVE", createdAt: "2026-08-10T08:00:00+03:00", ...overrides }
 }
 
 function meeting(id: string, hostEmployeeName: string): Meeting {
-  return {
-    id,
-    creatorEmployeeId: "creator-1",
-    visitTypeId: "meeting",
-    visitTypeName: "Toplantı",
-    hostEmployeeId: "host-1",
-    hostEmployeeName,
-    hostCompanyId: "bplas",
-    hostCompanyName: "BPLAS A.Ş.",
-    facilityId: "bplas-merkez",
-    facilityName: "Merkez Tesis",
-    plannedStart: "2026-08-10T08:00:00+03:00",
-    plannedEnd: "2026-08-10T09:00:00+03:00",
-    hasAdditionalRequirements: false,
-    createdAt: "2026-08-10T08:00:00+03:00",
-    updatedAt: "2026-08-10T08:00:00+03:00",
-  }
+  return { id, creatorEmployeeId: "creator-1", visitTypeId: "meeting", visitTypeName: "Toplantı", hostEmployeeId: "host-1", hostEmployeeName, hostCompanyId: "bplas", hostCompanyName: "BPLAS A.Ş.", facilityId: "bplas-merkez", facilityName: "Merkez Tesis", plannedStart: "2026-08-10T08:00:00+03:00", plannedEnd: "2026-08-10T09:00:00+03:00", hasAdditionalRequirements: false, createdAt: "2026-08-10T08:00:00+03:00", updatedAt: "2026-08-10T08:00:00+03:00" }
 }
 
 function visit(id: string, firstName: string, lastName: string): Visit {
-  return {
-    id,
-    meetingId: `meeting-for-${id}`,
-    creatorEmployeeId: "creator-1",
-    visitor: { id: `visitor-${id}`, firstName, lastName, email: `${id}@example.com`, company: "Test A.Ş." },
-    visitTypeId: "meeting",
-    visitTypeName: "Toplantı",
-    hostEmployeeId: "host-1",
-    hostEmployeeName: "Maya Kara",
-    hostCompanyId: "bplas",
-    hostCompanyName: "BPLAS A.Ş.",
-    facilityId: "bplas-merkez",
-    facilityName: "Merkez Tesis",
-    plannedStart: "2026-08-10T08:00:00+03:00",
-    plannedEnd: "2026-08-10T09:00:00+03:00",
-    status: "PLANNED",
-    invitationStatus: "SENT",
-    hasAdditionalRequirements: false,
-    createdAt: "2026-08-10T08:00:00+03:00",
-    updatedAt: "2026-08-10T08:00:00+03:00",
-  }
+  return { id, meetingId: `meeting-for-${id}`, creatorEmployeeId: "creator-1", visitor: { id: `visitor-${id}`, firstName, lastName, email: `${id}@example.com`, company: "Test A.Ş." }, visitTypeId: "meeting", visitTypeName: "Toplantı", hostEmployeeId: "host-1", hostEmployeeName: "Maya Kara", hostCompanyId: "bplas", hostCompanyName: "BPLAS A.Ş.", facilityId: "bplas-merkez", facilityName: "Merkez Tesis", plannedStart: "2026-08-10T08:00:00+03:00", plannedEnd: "2026-08-10T09:00:00+03:00", status: "PLANNED", invitationStatus: "SENT", hasAdditionalRequirements: false, createdAt: "2026-08-10T08:00:00+03:00", updatedAt: "2026-08-10T08:00:00+03:00" }
 }

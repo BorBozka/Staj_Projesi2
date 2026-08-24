@@ -2,7 +2,7 @@ import type { FacilityResource, ResourceType } from "@/domain/resources"
 import { getPageCount, paginate } from "@/lib/pagination"
 import { toggleSort } from "@/lib/sort"
 
-export const RESOURCE_PAGE_SIZE = 8
+export const RESOURCE_PAGE_SIZE = 9
 
 export type ResourceSortField = "name" | "type" | "location" | "quantity" | "status"
 export type SortDirection = "asc" | "desc"
