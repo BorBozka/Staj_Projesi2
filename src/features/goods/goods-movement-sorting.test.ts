@@ -66,13 +66,13 @@ describe("goods movement sorting", () => {
     ]).map((item) => item.id)).toEqual(["valve", "hose", "bearing-2", "bearing-10"])
   })
 
-  it("paginates nine movements and keeps compact page controls", () => {
+  it("paginates ten movements and keeps compact page controls", () => {
     const movements = Array.from({ length: 21 }, (_, index) => movement(`movement-${index}`, `Firma ${index}`, "Parça"))
 
-    expect(GOODS_PAGE_SIZE).toBe(9)
+    expect(GOODS_PAGE_SIZE).toBe(10)
     expect(getGoodsPageCount(movements.length)).toBe(3)
-    expect(paginateGoodsMovements(movements, 1)).toHaveLength(9)
-    expect(paginateGoodsMovements(movements, 3).map((item) => item.id)).toEqual(["movement-18", "movement-19", "movement-20"])
+    expect(paginateGoodsMovements(movements, 1)).toHaveLength(10)
+    expect(paginateGoodsMovements(movements, 3).map((item) => item.id)).toEqual(["movement-20"])
     expect(getVisibleGoodsPageNumbers(3, 5)).toEqual([2, 3, 4])
   })
 })

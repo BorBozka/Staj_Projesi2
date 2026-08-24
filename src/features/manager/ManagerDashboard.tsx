@@ -15,7 +15,7 @@ import { useManagerRefresh } from "@/features/manager/manager-refresh-context"
 import { VisitDetailsDialog } from "@/features/visits/VisitDetailsDialog"
 import { VisitStatusBadge } from "@/features/visits/VisitStatusBadge"
 import { useVisits } from "@/features/visits/visit-context"
-import { formatTr, getIsoHour } from "@/lib/date"
+import { formatTr, getIstanbulHour } from "@/lib/date"
 import { useFillViewportHeight } from "@/lib/use-fill-viewport-height"
 import { cn } from "@/lib/utils"
 import { goodsMovementService, transportAssignmentService } from "@/services"
@@ -79,7 +79,7 @@ export function ManagerDashboard() {
   // Only the top row + Operations need to fit the remaining viewport without page scroll;
   // re-measures once the skeleton is replaced by real content, since that's a ref attach the
   // effect wouldn't otherwise notice.
-  const { ref: fillRef, height: fillHeight } = useFillViewportHeight(16, [isLoading])
+  const { ref: fillRef, height: fillHeight } = useFillViewportHeight(14, [isLoading])
 
   const scopedVisits = useMemo(() => getScopedVisits(visits, { companyId, facilityId }), [companyId, facilityId, visits])
   const todayVisits = getTodayVisits(scopedVisits, now)
@@ -102,7 +102,7 @@ export function ManagerDashboard() {
     if (!selection) return
     const statusIsGone = selection.kind === "status" && !counts.some((count) => count.status === selection.status)
     const deliveryIsGone = selection.kind === "delivery" && !scopedDeliveries.some((delivery) => delivery.plannedTime?.startsWith(String(selection.hour).padStart(2, "0")))
-    const fleetIsGone = selection.kind === "fleet" && !scopedTransportAssignments.some((assignment) => getIsoHour(assignment.plannedStart) === selection.hour)
+    const fleetIsGone = selection.kind === "fleet" && !scopedTransportAssignments.some((assignment) => getIstanbulHour(assignment.plannedStart) === selection.hour)
     if (statusIsGone || deliveryIsGone || fleetIsGone) setSelection(null)
   }, [counts, scopedDeliveries, scopedTransportAssignments, selection])
 
@@ -226,7 +226,7 @@ export function InsideVisits({ visits, transportAssignments = [], now, controls,
               the body — `position: sticky` on <thead> doesn't hold under this shell's zoom:0.9. */}
           <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
             <table className="w-full min-w-[760px] table-fixed text-left text-[13px]">
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-200 border-b border-slate-200">
                 {visits.map((visit) => {
                   const delay = getDelayMinutes(visit, now)
                   return (
@@ -234,7 +234,7 @@ export function InsideVisits({ visits, transportAssignments = [], now, controls,
                       key={visit.id}
                       role="button"
                       tabIndex={0}
-                      className="cursor-pointer transition-colors hover:bg-emerald-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600"
+                      className="record-row-hover cursor-pointer transition-colors hover:bg-emerald-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600"
                       onClick={() => onVisitOpen(visit)}
                       onKeyDown={(event) => {
                         if (event.key === "Enter" || event.key === " ") {
@@ -297,13 +297,13 @@ function ActiveTransportAssignments({ assignments, onOpen }: { assignments: Plan
           body — `position: sticky` on <thead> doesn't hold under this shell's zoom:0.9. */}
       <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
         <table className="w-full min-w-[680px] table-fixed text-left text-xs">
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-slate-200 border-b border-slate-200">
             {assignments.map((assignment) => (
               <tr
                 key={assignment.id}
                 role="button"
                 tabIndex={0}
-                className="cursor-pointer transition-colors hover:bg-emerald-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600"
+                className="record-row-hover cursor-pointer transition-colors hover:bg-emerald-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600"
                 onClick={() => onOpen(assignment)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
@@ -625,7 +625,7 @@ function resolveSelection(selection: SelectionDescriptor, visits: Visit[], deliv
 
   const hourLabel = String(selection.hour).padStart(2, "0")
   const selectedDeliveries = deliveries.filter((delivery) => delivery.plannedTime?.startsWith(String(selection.hour).padStart(2, "0")))
-  const selectedTransportAssignments = transportAssignments.filter((assignment) => getIsoHour(assignment.plannedStart) === selection.hour)
+  const selectedTransportAssignments = transportAssignments.filter((assignment) => getIstanbulHour(assignment.plannedStart) === selection.hour)
   if (selection.kind === "delivery") {
     return { title: `${hourLabel}.00 · ${selectedDeliveries.length} kayıt`, visits: [], deliveries: selectedDeliveries, transportAssignments: [] }
   }
@@ -643,7 +643,7 @@ function resolveSelection(selection: SelectionDescriptor, visits: Visit[], deliv
 }
 
 function visitMatchesHour(visit: Visit, hour: number) {
-  return getIsoHour(visit.plannedStart) === hour || Boolean(visit.actualCheckIn && getIsoHour(visit.actualCheckIn) === hour)
+  return getIstanbulHour(visit.plannedStart) === hour || Boolean(visit.actualCheckIn && getIstanbulHour(visit.actualCheckIn) === hour)
 }
 
 function Bar({ value, max, color }: { value: number; max: number; color: string }) {

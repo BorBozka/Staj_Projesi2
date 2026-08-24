@@ -21,6 +21,7 @@ import {
 import { ResourceFormDialog } from "@/features/resources/ResourceFormDialog"
 import { useResources } from "@/features/resources/resource-context"
 import { useVisits } from "@/features/visits/visit-context"
+import { useFillViewportHeight } from "@/lib/use-fill-viewport-height"
 import { cn } from "@/lib/utils"
 
 export function ResourceCatalogPage() {
@@ -50,6 +51,12 @@ export function ResourceCatalogPage() {
   const activeFilters = hasActiveResourceFilters(filters)
   const visibleStart = filteredResources.length === 0 ? 0 : (page - 1) * RESOURCE_PAGE_SIZE + 1
   const visibleEnd = Math.min(page * RESOURCE_PAGE_SIZE, filteredResources.length)
+  const { ref: tableViewportRef, height: tableViewportHeight } = useFillViewportHeight<HTMLElement>(14, [filteredResources.length])
+
+  const setTableSectionRefs = (node: HTMLElement | null) => {
+    tableSectionRef.current = node
+    tableViewportRef.current = node
+  }
 
   useEffect(() => {
     if (page > pageCount) setPage(pageCount)
@@ -218,7 +225,7 @@ export function ResourceCatalogPage() {
         </div>
       )}
 
-      <section ref={tableSectionRef} className="scroll-mt-3 flex flex-col justify-between overflow-hidden rounded-lg border bg-card shadow-panel" aria-label="Kaynak kataloğu">
+      <section ref={setTableSectionRefs} className="scroll-mt-3 flex h-full min-h-[35.5rem] flex-col justify-between overflow-hidden rounded-lg border bg-card shadow-panel" style={tableViewportHeight !== undefined ? { height: tableViewportHeight } : undefined} aria-label="Kaynak kataloğu">
         {filteredResources.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center px-4 py-24 text-center">
             <Boxes className="mx-auto size-8 text-slate-400" />
@@ -227,16 +234,16 @@ export function ResourceCatalogPage() {
             {activeFilters && <Button variant="outline" size="sm" className="mt-4" onClick={clearFilters}>Filtreleri temizle</Button>}
           </div>
         ) : (
-          <div className="flex-1">
-            <div className="hidden md:block overflow-x-auto scrollbar-thin">
-              <table className="w-full min-w-[920px] table-fixed text-left text-xs">
+          <div className="min-h-0 flex-1">
+            <div className="hidden h-full min-h-0 overflow-x-auto overflow-y-hidden scrollbar-thin md:block">
+              <table className="h-full w-full min-w-[920px] table-fixed text-left text-xs">
                 <thead className="sticky top-0 z-10 border-b bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                   <tr>
-                    <th className="w-[30%] px-3 py-2.5"><SortButton label="KAYNAK" field="name" sorts={sorts} onToggle={(field) => setSorts((current) => toggleResourceSort(current, field))} /></th>
-                    <th className="w-[18%] px-3 py-2.5"><SortButton label="TÜR" field="type" sorts={sorts} onToggle={(field) => setSorts((current) => toggleResourceSort(current, field))} /></th>
-                    <th className="w-[24%] px-3 py-2.5"><SortButton label="ŞİRKET / TESİS" field="location" sorts={sorts} onToggle={(field) => setSorts((current) => toggleResourceSort(current, field))} /></th>
-                    <th className="w-[14%] px-3 py-2.5"><SortButton label="MİKTAR / DETAY" field="quantity" sorts={sorts} onToggle={(field) => setSorts((current) => toggleResourceSort(current, field))} /></th>
-                    <th className="w-[14%] px-3 py-2.5"><SortButton label="DURUM" field="status" sorts={sorts} onToggle={(field) => setSorts((current) => toggleResourceSort(current, field))} /></th>
+                    <th className="w-[32%] px-3 py-2"><SortButton label="KAYNAK" field="name" sorts={sorts} onToggle={(field) => setSorts((current) => toggleResourceSort(current, field))} /></th>
+                    <th className="w-[20%] px-3 py-2"><SortButton label="TÜR" field="type" sorts={sorts} onToggle={(field) => setSorts((current) => toggleResourceSort(current, field))} /></th>
+                    <th className="w-[20%] px-3 py-2"><SortButton label="ŞİRKET" field="location" sorts={sorts} onToggle={(field) => setSorts((current) => toggleResourceSort(current, field))} /></th>
+                    <th className="w-[14%] px-3 py-2"><SortButton label="MİKTAR / DETAY" field="quantity" sorts={sorts} onToggle={(field) => setSorts((current) => toggleResourceSort(current, field))} /></th>
+                    <th className="w-[14%] px-3 py-2"><SortButton label="DURUM" field="status" sorts={sorts} onToggle={(field) => setSorts((current) => toggleResourceSort(current, field))} /></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -244,7 +251,7 @@ export function ResourceCatalogPage() {
                     <tr
                       key={resource.id}
                       tabIndex={0}
-                      className={cn("cursor-pointer select-none transition-colors hover:bg-slate-50 focus-visible:bg-blue-50/60 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-blue-500", !resource.isActive && "bg-slate-50/70 hover:bg-slate-100/70")}
+                      className={cn("record-row-hover cursor-pointer select-none transition-colors hover:bg-slate-50 focus-visible:bg-blue-50/60 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-blue-500", !resource.isActive && "bg-slate-50/70 hover:bg-slate-100/70")}
                       onClick={(event) => openEditDialog(resource, event.currentTarget)}
                       onKeyDown={(event) => {
                         if (event.key === "Enter" || event.key === " ") {
@@ -253,26 +260,25 @@ export function ResourceCatalogPage() {
                         }
                       }}
                     >
-                      <td className="px-3 py-2.5 sm:py-3"><ResourceIdentity resource={resource} /></td>
-                      <td className="px-3 py-2.5 sm:py-3">{resourceTypeLabels[resource.type]}</td>
-                      <td className="px-3 py-2.5 sm:py-3">
+                      <td className="px-3 py-1.5 sm:py-2"><ResourceIdentity resource={resource} /></td>
+                      <td className="px-3 py-1.5 sm:py-2">{resourceTypeLabels[resource.type]}</td>
+                      <td className="px-3 py-1.5 sm:py-2">
                         <p className="truncate font-normal text-slate-900">{resource.companyName}</p>
-                        <p className="mt-0.5 truncate text-[11px] text-slate-500">{resource.facilityName}</p>
                       </td>
-                      <td className="px-3 py-2.5 sm:py-3 tabular-nums">{formatQuantity(resource)}</td>
-                      <td className="px-3 py-2.5 sm:py-3"><ResourceStatus active={resource.isActive} /></td>
+                      <td className="px-3 py-1.5 sm:py-2 tabular-nums">{formatQuantity(resource)}</td>
+                      <td className="px-3 py-1.5 sm:py-2"><ResourceStatus active={resource.isActive} /></td>
                     </tr>
                   ))}
                   {Array.from({ length: Math.max(0, RESOURCE_PAGE_SIZE - paginatedResources.length) }).map((_, index) => (
                     <tr key={`filler-${index}`} aria-hidden="true" className={cn("pointer-events-none select-none", index > 0 && "border-transparent")}>
-                      <td className="px-3 py-2.5 sm:py-3">
+                      <td className="px-3 py-1.5 sm:py-2">
                         <p className="truncate font-semibold text-transparent">&nbsp;</p>
                         <p className="mt-0.5 truncate text-[11px] text-transparent">&nbsp;</p>
                       </td>
-                      <td className="px-3 py-2.5 sm:py-3 text-transparent">&nbsp;</td>
-                      <td className="px-3 py-2.5 sm:py-3 text-transparent">&nbsp;</td>
-                      <td className="px-3 py-2.5 sm:py-3 text-transparent">&nbsp;</td>
-                      <td className="px-3 py-2.5 sm:py-3 text-transparent">&nbsp;</td>
+                      <td className="px-3 py-1.5 sm:py-2 text-transparent">&nbsp;</td>
+                      <td className="px-3 py-1.5 sm:py-2 text-transparent">&nbsp;</td>
+                      <td className="px-3 py-1.5 sm:py-2 text-transparent">&nbsp;</td>
+                      <td className="px-3 py-1.5 sm:py-2 text-transparent">&nbsp;</td>
                     </tr>
                   ))}
                 </tbody>
@@ -303,7 +309,6 @@ export function ResourceCatalogPage() {
                   </div>
                   <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
                     <div><dt className="text-slate-500">Şirket</dt><dd className="mt-0.5 font-medium text-slate-800">{resource.companyName}</dd></div>
-                    <div><dt className="text-slate-500">Tesis</dt><dd className="mt-0.5 font-medium text-slate-800">{resource.facilityName}</dd></div>
                     <div><dt className="text-slate-500">Miktar</dt><dd className="mt-0.5 font-medium tabular-nums text-slate-800">{formatQuantity(resource)}</dd></div>
                   </dl>
                 </article>

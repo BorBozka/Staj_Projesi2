@@ -3,10 +3,6 @@ import {
   ArrowDown,
   ArrowUp,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   ChevronUp,
   ClipboardList,
   FilterX,
@@ -17,6 +13,8 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
+import { PaginationFooter } from "@/components/common/PaginationFooter"
+import { QuickDateRangeSelect } from "@/components/common/QuickDateRangeSelect"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import type { Visit, VisitStatus } from "@/domain/visits"
@@ -33,6 +31,7 @@ import {
   paginateVisits,
   parseAllVisitsQuery,
   toggleVisitSort,
+  setAllVisitsRange,
   updateAllVisitsSearchParams,
   type VisitSort,
   type VisitSortField,
@@ -41,7 +40,9 @@ import { ManagerVisitDetailsDialog } from "@/features/manager/ManagerVisitDetail
 import { VisitStatusBadge } from "@/features/visits/VisitStatusBadge"
 import { useVisits } from "@/features/visits/visit-context"
 import { formatTr } from "@/lib/date"
+import { useFillViewportHeight } from "@/lib/use-fill-viewport-height"
 import { cn } from "@/lib/utils"
+import { getQuickDateRangeOptions } from "@/lib/quick-date-range"
 
 const statusOptions: { value: "all" | VisitStatus; label: string }[] = [
   { value: "all", label: "Tüm durumlar" },
@@ -56,6 +57,7 @@ export function AllVisitsPage() {
   const { visits, referenceData, isLoading, error, reload } = useVisits()
   const [searchParams, setSearchParams] = useSearchParams()
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null)
+  const [now] = useState(() => new Date())
   const [sorts, setSorts] = useState<VisitSort[]>([])
   const tableSectionRef = useRef<HTMLElement>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
@@ -75,6 +77,11 @@ export function AllVisitsPage() {
     () => filters ? filterAndSortVisits(visits, filters, sorts) : [],
     [filters, visits, sorts],
   )
+  const { ref: tableViewportRef, height: tableViewportHeight } = useFillViewportHeight<HTMLElement>(14, [filteredVisits.length])
+  const setTableSectionRefs = (node: HTMLElement | null) => {
+    tableSectionRef.current = node
+    tableViewportRef.current = node
+  }
   const pageCount = getPageCount(filteredVisits.length)
   const page = queryState?.page ?? 1
   const paginatedVisits = paginateVisits(filteredVisits, page)
@@ -102,6 +109,7 @@ export function AllVisitsPage() {
   }
 
   const facilities = getFacilitiesForCompany(referenceData, filters.companyId)
+  const quickRanges = getQuickDateRangeOptions(now)
   const activeFilters = hasActiveAllVisitsFilters(filters) || sorts.length > 0
   const visibleStart = filteredVisits.length === 0 ? 0 : (page - 1) * ALL_VISITS_PAGE_SIZE + 1
   const visibleEnd = Math.min(page * ALL_VISITS_PAGE_SIZE, filteredVisits.length)
@@ -113,6 +121,10 @@ export function AllVisitsPage() {
   const clearFilters = () => {
     setSearchParams(clearAllVisitsSearchParams(searchParams))
     setSorts([])
+  }
+
+  const setRange = (startDate: string, endDate: string) => {
+    setSearchParams(setAllVisitsRange(searchParams, startDate, endDate))
   }
 
   const setPage = (nextPage: number) => {
@@ -145,11 +157,11 @@ export function AllVisitsPage() {
           </Button>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(200px,1.5fr)_repeat(5,minmax(120px,1fr))_auto_auto]">
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(180px,1.35fr)_repeat(6,minmax(110px,1fr))_auto_auto]">
           <FilterField label="Arama" htmlFor="all-visits-search" className="sm:col-span-2 xl:col-span-1">
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input id="all-visits-search" value={filters.search} onChange={(event) => setFilter("q", event.target.value, true)} placeholder="Ziyaretçi, ev sahibi, şirket veya tesis ara" className="pl-8 h-9 text-xs" />
+              <Input id="all-visits-search" value={filters.search} onChange={(event) => setFilter("q", event.target.value, true)} placeholder="Ziyaretçi veya şirket ara" className="pl-8 h-9 text-xs" />
             </div>
           </FilterField>
           <FilterField label="Başlangıç" htmlFor="all-visits-from">
@@ -157,6 +169,9 @@ export function AllVisitsPage() {
           </FilterField>
           <FilterField label="Bitiş" htmlFor="all-visits-to">
             <Input id="all-visits-to" type="date" value={filters.endDate} aria-invalid={dateRangeInvalid} onChange={(event) => setFilter("to", event.target.value)} className="h-9 text-xs" />
+          </FilterField>
+          <FilterField label="Hızlı tarih" htmlFor="all-visits-quick-range">
+            <QuickDateRangeSelect id="all-visits-quick-range" options={quickRanges} startDate={filters.startDate} endDate={filters.endDate} onSelect={setRange} ariaLabel="Hızlı tarih aralığı" className="h-9" />
           </FilterField>
           <FilterField label="Şirket" htmlFor="all-visits-company">
             <FilterSelect id="all-visits-company" value={filters.companyId} emptyLabel="Tüm şirketler" options={referenceData.companies.map((company) => ({ value: company.id, label: company.name }))} onValueChange={(value) => setFilter("company", value)} />
@@ -233,7 +248,7 @@ export function AllVisitsPage() {
         )}
       </section>
 
-      <section ref={tableSectionRef} className="scroll-mt-3 flex flex-col overflow-hidden rounded-lg border bg-card shadow-panel" aria-label="Ziyaret listesi">
+      <section ref={setTableSectionRefs} className="scroll-mt-3 flex h-full min-h-[35.5rem] flex-col overflow-hidden rounded-lg border bg-card shadow-panel" style={tableViewportHeight !== undefined ? { height: tableViewportHeight } : undefined} aria-label="Ziyaret listesi">
         {filteredVisits.length === 0 ? (
           <div className="flex h-[35.5rem] flex-col items-center justify-center px-4 py-24 text-center">
             <Search className="mx-auto size-8 text-slate-400" />
@@ -242,29 +257,29 @@ export function AllVisitsPage() {
             {activeFilters && <Button variant="outline" size="sm" className="mt-4" onClick={clearFilters}>Filtreleri temizle</Button>}
           </div>
         ) : (
-          <div className="overflow-x-auto scrollbar-thin">
-            <table className="w-full min-w-[1220px] table-fixed text-left text-xs">
+          <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden scrollbar-thin">
+            <table className="h-full w-full min-w-[1220px] table-fixed text-left text-xs">
               <thead className="sticky top-0 z-10 border-b bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 <tr>
-                  <th className="w-[14%] px-3 py-2.5">
+                  <th className="w-[14%] px-3 py-2">
                     <SortButton label="ZİYARETÇİ" field="visitor" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
                   </th>
-                  <th className="w-[14%] px-3 py-2.5">
+                  <th className="w-[14%] px-3 py-2">
                     <SortButton label="ZİYARETÇİ ŞİRKETİ" field="visitorCompany" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
                   </th>
-                  <th className="w-[12%] px-3 py-2.5">
+                  <th className="w-[12%] px-3 py-2">
                     <SortButton label="ZİYARET TÜRÜ" field="visitType" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
                   </th>
-                  <th className="w-[12%] px-3 py-2.5">
+                  <th className="w-[12%] px-3 py-2">
                     <SortButton label="EV SAHİBİ" field="host" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
                   </th>
-                  <th className="w-[16%] px-3 py-2.5">
-                    <SortButton label="ŞİRKET / TESİS" field="companyFacility" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
+                  <th className="w-[16%] px-3 py-2">
+                    <SortButton label="ŞİRKET" field="companyFacility" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
                   </th>
-                  <th className="w-[20%] px-3 py-2.5">
+                  <th className="w-[20%] px-3 py-2">
                     <SortButton label="PLANLANAN ZAMAN" field="plannedStart" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
                   </th>
-                  <th className="w-[12%] px-3 py-2.5">
+                  <th className="w-[12%] px-3 py-2">
                     <SortButton label="DURUM" field="status" sorts={sorts} onToggle={(field) => setSorts((current) => toggleVisitSort(current, field))} />
                   </th>
                 </tr>
@@ -274,7 +289,7 @@ export function AllVisitsPage() {
                   <tr
                     key={visit.id}
                     tabIndex={0}
-                    className="cursor-pointer select-none transition-colors hover:bg-slate-50 focus:bg-blue-50/60 focus:outline focus:outline-1 focus:-outline-offset-1 focus:outline-blue-500"
+                    className="record-row-hover cursor-pointer select-none transition-colors hover:bg-slate-50 focus-visible:bg-blue-50/60 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-blue-500"
                     onClick={(event) => openVisit(visit, event.currentTarget)}
                     onKeyDown={(event) => {
                       if (event.key === "Enter" || event.key === " ") {
@@ -283,31 +298,30 @@ export function AllVisitsPage() {
                       }
                     }}
                   >
-                    <td className="px-3 py-2.5 sm:py-3">
+                    <td className="px-3 py-1.5 sm:py-2">
                       <p className="truncate font-semibold text-slate-900" title={`${visit.visitor.firstName} ${visit.visitor.lastName}`}>{visit.visitor.firstName} {visit.visitor.lastName}</p>
                     </td>
-                    <td className="px-3 py-2.5 sm:py-3"><p className="truncate" title={visit.visitor.company}>{visit.visitor.company}</p></td>
-                    <td className="px-3 py-2.5 sm:py-3"><p className="truncate" title={visit.visitTypeName}>{visit.visitTypeName}</p></td>
-                    <td className="px-3 py-2.5 sm:py-3"><p className="truncate" title={visit.hostEmployeeName}>{visit.hostEmployeeName}</p></td>
-                    <td className="px-3 py-2.5 sm:py-3">
+                    <td className="px-3 py-1.5 sm:py-2"><p className="truncate" title={visit.visitor.company}>{visit.visitor.company}</p></td>
+                    <td className="px-3 py-1.5 sm:py-2"><p className="truncate" title={visit.visitTypeName}>{visit.visitTypeName}</p></td>
+                    <td className="px-3 py-1.5 sm:py-2"><p className="truncate" title={visit.hostEmployeeName}>{visit.hostEmployeeName}</p></td>
+                    <td className="px-3 py-1.5 sm:py-2">
                       <p className="truncate" title={visit.hostCompanyName}>{visit.hostCompanyName}</p>
-                      <p className="mt-0.5 truncate text-[11px] text-slate-500" title={visit.facilityName}>{visit.facilityName}</p>
                     </td>
-                    <td className="px-3 py-2.5 sm:py-3 tabular-nums">{formatTr(new Date(visit.plannedStart), "d MMM yyyy · HH:mm")}–{formatTr(new Date(visit.plannedEnd), "HH:mm")}</td>
-                    <td className="px-3 py-2.5 sm:py-3"><VisitStatusBadge status={visit.status} compact /></td>
+                    <td className="px-3 py-1.5 sm:py-2 tabular-nums">{formatTr(new Date(visit.plannedStart), "d MMM yyyy · HH:mm")}–{formatTr(new Date(visit.plannedEnd), "HH:mm")}</td>
+                    <td className="px-3 py-1.5 sm:py-2"><VisitStatusBadge status={visit.status} compact /></td>
                   </tr>
                 ))}
                 {Array.from({ length: Math.max(0, ALL_VISITS_PAGE_SIZE - paginatedVisits.length) }).map((_, index) => (
                   <tr key={`filler-${index}`} aria-hidden="true" className={cn("pointer-events-none select-none", index > 0 && "border-transparent")}>
-                    <td className="px-3 py-2.5 sm:py-3">
+                    <td className="px-3 py-1.5 sm:py-2">
                       <p className="truncate font-semibold text-transparent">&nbsp;</p>
                     </td>
-                    <td className="px-3 py-2.5 sm:py-3 text-transparent">&nbsp;</td>
-                    <td className="px-3 py-2.5 sm:py-3 text-transparent">&nbsp;</td>
-                    <td className="px-3 py-2.5 sm:py-3 text-transparent">&nbsp;</td>
-                    <td className="px-3 py-2.5 sm:py-3 text-transparent">&nbsp;</td>
-                    <td className="px-3 py-2.5 sm:py-3 text-transparent">&nbsp;</td>
-                    <td className="px-3 py-2.5 sm:py-3 text-transparent">&nbsp;</td>
+                    <td className="px-3 py-1.5 sm:py-2 text-transparent">&nbsp;</td>
+                    <td className="px-3 py-1.5 sm:py-2 text-transparent">&nbsp;</td>
+                    <td className="px-3 py-1.5 sm:py-2 text-transparent">&nbsp;</td>
+                    <td className="px-3 py-1.5 sm:py-2 text-transparent">&nbsp;</td>
+                    <td className="px-3 py-1.5 sm:py-2 text-transparent">&nbsp;</td>
+                    <td className="px-3 py-1.5 sm:py-2 text-transparent">&nbsp;</td>
                   </tr>
                 ))}
               </tbody>
@@ -315,119 +329,16 @@ export function AllVisitsPage() {
           </div>
         )}
 
-        <div className="flex flex-col gap-2 border-t bg-slate-50/50 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs tabular-nums text-slate-600">{visibleStart}–{visibleEnd} / {filteredVisits.length} kayıt</p>
-          <nav className="flex items-center gap-1" aria-label="Ziyaret sayfaları">
-            {page > 1 && (
-              <>
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  className="h-8 w-8 text-xs"
-                  onClick={() => setPage(1)}
-                  title="İlk sayfa"
-                  aria-label="İlk sayfa"
-                >
-                  <ChevronsLeft className="size-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  className="h-8 w-8 text-xs"
-                  onClick={() => setPage(page - 1)}
-                  title="Önceki sayfa"
-                  aria-label="Önceki sayfa"
-                >
-                  <ChevronLeft className="size-4" />
-                </Button>
-              </>
-            )}
-            {(() => {
-              const visible = getVisiblePageNumbers(page, Math.max(1, pageCount))
-              const num1 = visible[0] ?? null
-              const num2 = visible[1] ?? null
-              const num3 = visible[2] ?? null
-              return (
-                <>
-                  {num1 !== null ? (
-                    <Button
-                      key={num1}
-                      variant={num1 === page ? "default" : "outline"}
-                      size="icon-sm"
-                      className="h-8 w-8 text-xs"
-                      aria-current={num1 === page ? "page" : undefined}
-                      aria-label={`${num1}. sayfa`}
-                      onClick={() => setPage(num1)}
-                    >
-                      {num1}
-                    </Button>
-                  ) : (
-                    <span key="slot-num-1" className="h-8 w-8 invisible" aria-hidden="true" />
-                  )}
-                  {num2 !== null ? (
-                    <Button
-                      key={num2}
-                      variant={num2 === page ? "default" : "outline"}
-                      size="icon-sm"
-                      className="h-8 w-8 text-xs"
-                      aria-current={num2 === page ? "page" : undefined}
-                      aria-label={`${num2}. sayfa`}
-                      onClick={() => setPage(num2)}
-                    >
-                      {num2}
-                    </Button>
-                  ) : (
-                    <span key="slot-num-2" className="h-8 w-8 invisible" aria-hidden="true" />
-                  )}
-                  {num3 !== null ? (
-                    <Button
-                      key={num3}
-                      variant={num3 === page ? "default" : "outline"}
-                      size="icon-sm"
-                      className="h-8 w-8 text-xs"
-                      aria-current={num3 === page ? "page" : undefined}
-                      aria-label={`${num3}. sayfa`}
-                      onClick={() => setPage(num3)}
-                    >
-                      {num3}
-                    </Button>
-                  ) : (
-                    <span key="slot-num-3" className="h-8 w-8 invisible" aria-hidden="true" />
-                  )}
-                </>
-              )
-            })()}
-            {page < pageCount ? (
-              <>
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  className="h-8 w-8 text-xs"
-                  onClick={() => setPage(page + 1)}
-                  title="Sonraki sayfa"
-                  aria-label="Sonraki sayfa"
-                >
-                  <ChevronRight className="size-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  className="h-8 w-8 text-xs"
-                  onClick={() => setPage(pageCount)}
-                  title="Son sayfa"
-                  aria-label="Son sayfa"
-                >
-                  <ChevronsRight className="size-4" />
-                </Button>
-              </>
-            ) : (
-              <>
-                <span key="slot-next" className="h-8 w-8 invisible" aria-hidden="true" />
-                <span key="slot-last" className="h-8 w-8 invisible" aria-hidden="true" />
-              </>
-            )}
-          </nav>
-        </div>
+        <PaginationFooter
+          page={page}
+          pageCount={Math.max(1, pageCount)}
+          visibleStart={visibleStart}
+          visibleEnd={visibleEnd}
+          total={filteredVisits.length}
+          visiblePageNumbers={getVisiblePageNumbers(page, Math.max(1, pageCount))}
+          onPageChange={setPage}
+          ariaLabel="Ziyaret sayfaları"
+        />
       </section>
 
       <ManagerVisitDetailsDialog

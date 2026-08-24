@@ -3,7 +3,7 @@ import { differenceInMinutes, format, isAfter, isBefore, isSameDay } from "date-
 import type { GoodsMovement } from "@/domain/goods-movements"
 import type { PlannedTransportAssignment } from "@/domain/transport-assignments"
 import type { Visit, VisitStatus } from "@/domain/visits"
-import { getIsoHour } from "@/lib/date"
+import { getIstanbulHour } from "@/lib/date"
 
 export type DashboardScope = { companyId: string; facilityId: string }
 export const dashboardVisitStatuses = ["PLANNED", "LATE", "CHECKED_IN", "OVERDUE", "CHECKED_OUT", "CANCELLED"] as const
@@ -56,10 +56,10 @@ export function getOperationBins(visits: Visit[], deliveries: GoodsMovement[], t
     const hour = startHour + index
     return {
       hour,
-      planned: visits.filter((visit) => getIsoHour(visit.plannedStart) === hour).length,
-      actual: visits.filter((visit) => visit.actualCheckIn && getIsoHour(visit.actualCheckIn) === hour).length,
+      planned: visits.filter((visit) => getIstanbulHour(visit.plannedStart) === hour).length,
+      actual: visits.filter((visit) => visit.actualCheckIn && getIstanbulHour(visit.actualCheckIn) === hour).length,
       deliveries: deliveries.filter((delivery) => delivery.plannedTime?.startsWith(String(hour).padStart(2, "0"))),
-      transportAssignments: transportAssignments.filter((assignment) => getIsoHour(assignment.plannedStart) === hour),
+      transportAssignments: transportAssignments.filter((assignment) => getIstanbulHour(assignment.plannedStart) === hour),
     }
   })
 }

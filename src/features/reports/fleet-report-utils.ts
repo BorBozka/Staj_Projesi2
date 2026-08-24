@@ -2,13 +2,94 @@ import { differenceInMinutes, endOfDay, parse, startOfDay } from "date-fns"
 
 import type { PlannedTransportAssignment } from "@/domain/transport-assignments"
 import type { Meeting, Visit } from "@/domain/visits"
+import { formatDurationMinutes } from "@/features/reports/report-format"
 import type { ReportsScopeFilters } from "@/features/reports/reports-filters"
 import { getPageCount as getPageCountShared, paginate } from "@/lib/pagination"
 
-export const FLEET_REPORT_PAGE_SIZE = 10
+// The records workspace has a deliberately fixed page size. Nine compact, two-line rows fit
+// the viewport-filling report card at the manager shell's normal desktop height without giving
+// the table body its own vertical scrollbar.
+export const FLEET_REPORT_PAGE_SIZE = 9
+export const MAX_FLEET_LOAD_RESOURCES = 10
+export const FLEET_CATEGORY_AXIS_WIDTH = 164
+
+export const FLEET_CONCENTRATION_THRESHOLDS = {
+  dominant: 0.55,
+  moderate: 0.25,
+} as const
+
+const NICE_DURATION_STEPS = [30, 60, 120, 180, 240, 360, 480, 720, 1_440] as const
+
+export type FleetReportDimension = "vehicles" | "drivers"
+export type FleetReportView = "analysis" | "records"
+
+export interface FleetReportWorkspaceState {
+  view: FleetReportView
+  dimension: FleetReportDimension
+  page: number
+}
+
+export interface FleetReportMetrics {
+  totalAssignments: number
+  cancelledAssignments: number
+  plannedLoadMinutes: number
+  usedVehicleCount: number
+  usedDriverCount: number
+}
+
+export interface FleetLoadResource {
+  resourceId: string
+  resourceName: string
+  plannedMinutes: number
+  assignmentCount: number
+}
+
+export interface FleetLoadComparisonResource extends FleetLoadResource {
+  previousPlannedMinutes: number
+  previousAssignmentCount: number
+}
+
+export interface FleetDurationScale {
+  domainMax: number
+  stepMinutes: number
+  ticks: number[]
+}
 
 function toLocalDate(value: string) {
   return parse(value, "yyyy-MM-dd", new Date())
+}
+
+function getAssignmentDurationMinutes(assignment: PlannedTransportAssignment) {
+  return Math.max(0, differenceInMinutes(new Date(assignment.plannedEnd), new Date(assignment.plannedStart)))
+}
+
+// Both dimensions deliberately share one category-axis width. Resource names are truncated by
+// the chart tick renderer, so a longer driver or vehicle name can never move the plot origin.
+export function getFleetCategoryAxisWidth(dimension: FleetReportDimension) {
+  return { vehicles: FLEET_CATEGORY_AXIS_WIDTH, drivers: FLEET_CATEGORY_AXIS_WIDTH }[dimension]
+}
+
+export function truncateFleetCategoryLabel(label: string, maxCharacters = 22) {
+  return label.length <= maxCharacters ? label : `${label.slice(0, maxCharacters - 1).trimEnd()}…`
+}
+
+// Fleet load is a duration domain, so a compact fixed family of minute/hour steps is more useful
+// than generic decimal ticks. Padding is part of the domain (in addition to the SVG margin) to
+// protect labels such as "12 sa · 14 görev" when the longest bar reaches the data maximum.
+export function getNiceFleetDurationScale(maxMinutes: number, maxAssignmentCount = 0): FleetDurationScale {
+  const safeMax = Math.max(0, Math.ceil(maxMinutes))
+  if (safeMax === 0) return { domainMax: 60, stepMinutes: 30, ticks: [0, 30, 60] }
+
+  const countDigits = String(Math.max(0, Math.floor(maxAssignmentCount))).length
+  const paddingRatio = Math.min(0.32, 0.18 + Math.max(0, countDigits - 1) * 0.03)
+  const paddedMax = safeMax + Math.max(30, Math.ceil(safeMax * paddingRatio))
+  const minimumStep = safeMax <= 120 ? 30 : safeMax <= 360 ? 60 : safeMax <= 900 ? 120 : safeMax <= 1_440 ? 180 : 240
+  const stepMinutes = NICE_DURATION_STEPS.find((step) => step >= minimumStep && Math.ceil(paddedMax / step) <= 8)
+    ?? Math.ceil(paddedMax / (8 * 1_440)) * 1_440
+  const domainMax = Math.max(stepMinutes, Math.ceil(paddedMax / stepMinutes) * stepMinutes)
+  const ticks = Array.from({ length: domainMax / stepMinutes + 1 }, (_, index) => index * stepMinutes)
+
+  return { domainMax, stepMinutes, ticks }
 }
 
 export function filterAssignmentsForReport(assignments: PlannedTransportAssignment[], filters: ReportsScopeFilters): PlannedTransportAssignment[] {
@@ -26,24 +107,192 @@ export function filterAssignmentsForReport(assignments: PlannedTransportAssignme
   return [...filtered].sort((left, right) => new Date(right.plannedStart).getTime() - new Date(left.plannedStart).getTime())
 }
 
-export interface FleetReportKpis {
-  total: number
-  cancelled: number
-  cancelRate: number
-  averagePlannedDurationMinutes: number | null
+// Metadata deliberately counts every filtered assignment, including cancelled records. The
+// planned-load duration and resource counts are different on purpose: a cancelled assignment is
+// historical report evidence, but it must not look like active load on a vehicle or driver.
+export function calculateFleetReportMetrics(assignments: PlannedTransportAssignment[]): FleetReportMetrics {
+  const activeAssignments = assignments.filter((assignment) => assignment.status !== "CANCELLED")
+  return {
+    totalAssignments: assignments.length,
+    cancelledAssignments: assignments.length - activeAssignments.length,
+    plannedLoadMinutes: activeAssignments.reduce((sum, assignment) => sum + getAssignmentDurationMinutes(assignment), 0),
+    usedVehicleCount: new Set(activeAssignments.map((assignment) => assignment.vehicleResourceId)).size,
+    usedDriverCount: new Set(activeAssignments.map((assignment) => assignment.driverResourceId)).size,
+  }
 }
 
-export function calculateFleetReportKpis(assignments: PlannedTransportAssignment[]): FleetReportKpis {
+// Retained for existing consumers while the report UI uses calculateFleetReportMetrics. This is
+// deliberately a presentation-agnostic historical calculation; it does not reintroduce the old
+// four-card KPI layout or change the active-load semantics used by the analysis workspace.
+export function calculateFleetReportKpis(assignments: PlannedTransportAssignment[]) {
   const total = assignments.length
   const cancelled = assignments.filter((assignment) => assignment.status === "CANCELLED").length
-  const cancelRate = total === 0 ? 0 : (cancelled / total) * 100
+  const durations = assignments.map(getAssignmentDurationMinutes)
+  return {
+    total,
+    cancelled,
+    cancelRate: total === 0 ? 0 : (cancelled / total) * 100,
+    averagePlannedDurationMinutes: durations.length === 0 ? null : Math.round(durations.reduce((sum, value) => sum + value, 0) / durations.length),
+  }
+}
 
-  const durations = assignments.map((assignment) => differenceInMinutes(new Date(assignment.plannedEnd), new Date(assignment.plannedStart)))
-  const averagePlannedDurationMinutes = durations.length === 0
-    ? null
-    : Math.round(durations.reduce((sum, value) => sum + value, 0) / durations.length)
+export function aggregateFleetResourceLoad(assignments: PlannedTransportAssignment[], dimension: FleetReportDimension): FleetLoadResource[] {
+  const grouped = new Map<string, FleetLoadResource>()
 
-  return { total, cancelled, cancelRate, averagePlannedDurationMinutes }
+  for (const assignment of assignments) {
+    if (assignment.status === "CANCELLED") continue
+    const resourceId = dimension === "vehicles" ? assignment.vehicleResourceId : assignment.driverResourceId
+    const resourceName = dimension === "vehicles" ? assignment.vehicleName : assignment.driverName
+    const current = grouped.get(resourceId)
+    const plannedMinutes = getAssignmentDurationMinutes(assignment)
+    grouped.set(resourceId, current
+      ? { ...current, plannedMinutes: current.plannedMinutes + plannedMinutes, assignmentCount: current.assignmentCount + 1 }
+      : { resourceId, resourceName, plannedMinutes, assignmentCount: 1 })
+  }
+
+  return sortFleetLoadResources([...grouped.values()])
+}
+
+export function sortFleetLoadResources(resources: FleetLoadResource[]): FleetLoadResource[] {
+  return [...resources].sort((left, right) => right.plannedMinutes - left.plannedMinutes
+    || right.assignmentCount - left.assignmentCount
+    || left.resourceName.localeCompare(right.resourceName, "tr")
+    || left.resourceId.localeCompare(right.resourceId, "tr"))
+}
+
+// Merges the two periods by immutable resource ID. A resource that is only present in one period
+// remains visible with a zero counterpart so bar comparisons cannot silently omit a changed load.
+export function mergeFleetLoadComparison(current: FleetLoadResource[], previous: FleetLoadResource[]): FleetLoadComparisonResource[] {
+  const previousById = new Map(previous.map((resource) => [resource.resourceId, resource]))
+  const currentById = new Map(current.map((resource) => [resource.resourceId, resource]))
+  const resourceIds = new Set([...currentById.keys(), ...previousById.keys()])
+
+  return [...resourceIds].map((resourceId) => {
+    const currentResource = currentById.get(resourceId)
+    const previousResource = previousById.get(resourceId)
+    const preferred = currentResource ?? previousResource!
+    return {
+      resourceId,
+      resourceName: preferred.resourceName,
+      plannedMinutes: currentResource?.plannedMinutes ?? 0,
+      assignmentCount: currentResource?.assignmentCount ?? 0,
+      previousPlannedMinutes: previousResource?.plannedMinutes ?? 0,
+      previousAssignmentCount: previousResource?.assignmentCount ?? 0,
+    }
+  }).sort((left, right) => right.plannedMinutes - left.plannedMinutes
+    || right.previousPlannedMinutes - left.previousPlannedMinutes
+    || right.assignmentCount - left.assignmentCount
+    || right.previousAssignmentCount - left.previousAssignmentCount
+    || left.resourceName.localeCompare(right.resourceName, "tr")
+    || left.resourceId.localeCompare(right.resourceId, "tr"))
+}
+
+export function getFleetLoadChartResources<T extends FleetLoadResource>(resources: T[]): T[] {
+  return resources.slice(0, MAX_FLEET_LOAD_RESOURCES)
+}
+
+function formatCountDelta(current: number, previous: number) {
+  const delta = current - previous
+  return delta === 0 ? "değişmedi" : `${delta > 0 ? "+" : ""}${delta}`
+}
+
+function formatDurationDelta(current: number, previous: number) {
+  const delta = current - previous
+  return delta === 0 ? "değişmedi" : `${delta > 0 ? "+" : "-"}${formatDurationMinutes(Math.abs(delta))}`
+}
+
+export function buildFleetMetadata(current: FleetReportMetrics, previous: FleetReportMetrics | null): string {
+  const values = [
+    `${current.totalAssignments} görev`,
+    `${current.cancelledAssignments} iptal`,
+    `${formatDurationMinutes(current.plannedLoadMinutes)} planlama yükü`,
+    `${current.usedVehicleCount} araç`,
+    `${current.usedDriverCount} şoför`,
+  ]
+  if (!previous) return values.join(" · ")
+
+  return [
+    `${values[0]} ${formatCountDelta(current.totalAssignments, previous.totalAssignments)}`,
+    `${values[1]} ${formatCountDelta(current.cancelledAssignments, previous.cancelledAssignments)}`,
+    `${values[2]} ${formatDurationDelta(current.plannedLoadMinutes, previous.plannedLoadMinutes)}`,
+    `${values[3]} ${formatCountDelta(current.usedVehicleCount, previous.usedVehicleCount)}`,
+    `${values[4]} ${formatCountDelta(current.usedDriverCount, previous.usedDriverCount)}`,
+  ].join(" · ")
+}
+
+export function buildFleetInsight({ current, dimension, currentResources }: {
+  current: FleetReportMetrics
+  previous: FleetReportMetrics | null
+  dimension: FleetReportDimension
+  currentResources: FleetLoadResource[]
+  previousResources?: FleetLoadResource[]
+}): string {
+  const dimensionLabel = dimension === "vehicles" ? "araç" : "şoför"
+  const pluralDimensionLabel = dimension === "vehicles" ? "araçlar" : "şoförler"
+  if (current.totalAssignments === 0) return "Seçili dönemde kayıtlı araç / şoför görevi bulunmuyor."
+  if (current.plannedLoadMinutes === 0) {
+    return current.cancelledAssignments === current.totalAssignments
+      ? "Seçili dönemde yalnızca iptal edilmiş görevler bulunuyor."
+      : "Seçili dönemde aktif görevler için planlanan süre bulunmuyor."
+  }
+
+  const busiest = currentResources[0]
+  if (!busiest) return "Seçili dönemde aktif planlama yükü bulunmuyor."
+
+  const concentration = busiest.plannedMinutes / current.plannedLoadMinutes
+  const secondBusiest = currentResources[1]
+  const relativelyEvenLeaders = secondBusiest !== undefined && busiest.plannedMinutes <= secondBusiest.plannedMinutes * 1.15
+  let insight: string
+
+  if (currentResources.length === 1) {
+    insight = `Planlama yükü yalnızca ${busiest.resourceName} üzerinde bulunuyor.`
+  } else if (!relativelyEvenLeaders && concentration >= FLEET_CONCENTRATION_THRESHOLDS.dominant) {
+    insight = `Planlama yükü ${busiest.resourceName} üzerinde belirgin biçimde yoğunlaşıyor.`
+  } else if (!relativelyEvenLeaders && concentration >= FLEET_CONCENTRATION_THRESHOLDS.moderate) {
+    insight = `${busiest.resourceName} en yüksek planlama yükünü taşıyor ancak yük diğer ${dimensionLabel}lara da dağılıyor.`
+  } else {
+    insight = `Planlama yükü ${pluralDimensionLabel} arasında görece dengeli dağılıyor.`
+  }
+
+  const cancellationRate = current.cancelledAssignments / current.totalAssignments
+  const meaningfulCancellation = current.cancelledAssignments >= 3 && cancellationRate >= 0.15
+  return meaningfulCancellation ? `${insight} ${current.cancelledAssignments} görev iptal edildi.` : insight
+}
+
+export function isFleetRecordActivationKey(key: string) {
+  return key === "Enter" || key === " "
+}
+
+export function parseFleetReportWorkspace(searchParams: URLSearchParams): FleetReportWorkspaceState {
+  const rawView = searchParams.get("view")
+  const rawDimension = searchParams.get("dimension")
+  const rawPage = Number(searchParams.get("page"))
+  return {
+    view: rawView === "records" ? "records" : "analysis",
+    dimension: rawDimension === "drivers" ? "drivers" : "vehicles",
+    page: Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1,
+  }
+}
+
+export function setFleetReportWorkspace(current: URLSearchParams, nextState: Partial<Pick<FleetReportWorkspaceState, "view" | "dimension">>) {
+  const next = new URLSearchParams(current)
+  if (nextState.view) {
+    if (nextState.view === "analysis") next.delete("view")
+    else next.set("view", nextState.view)
+  }
+  if (nextState.dimension) {
+    if (nextState.dimension === "vehicles") next.delete("dimension")
+    else next.set("dimension", nextState.dimension)
+  }
+  next.delete("page")
+  return next
+}
+
+export function setFleetReportPage(current: URLSearchParams, page: number) {
+  const next = new URLSearchParams(current)
+  if (page <= 1) next.delete("page")
+  else next.set("page", String(page))
+  return next
 }
 
 export function getRelatedRecordLabel(assignment: PlannedTransportAssignment, meetings: Meeting[], visits: Visit[]): string {

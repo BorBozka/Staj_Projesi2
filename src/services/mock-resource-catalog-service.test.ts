@@ -34,11 +34,11 @@ describe("MockResourceCatalogService", () => {
   it("lists all four resource types in the deterministic catalog", async () => {
     const resources = await new MockResourceCatalogService().listResources()
 
-    expect(resources).toHaveLength(17)
+    expect(resources).toHaveLength(25)
     expect(resources.filter((resource) => resource.type === "ROOM")).toHaveLength(2)
     expect(resources.filter((resource) => resource.type === "POOLED_EQUIPMENT")).toHaveLength(3)
-    expect(resources.filter((resource) => resource.type === "VEHICLE")).toHaveLength(6)
-    expect(resources.filter((resource) => resource.type === "DRIVER")).toHaveLength(6)
+    expect(resources.filter((resource) => resource.type === "VEHICLE")).toHaveLength(10)
+    expect(resources.filter((resource) => resource.type === "DRIVER")).toHaveLength(10)
   })
 
   it("creates a room without a quantity", async () => {

@@ -10,13 +10,13 @@ import {
 import { initialMockTransportAssignments } from "@/services/mock-transport-assignment-data"
 
 describe("planned transport assignment pagination", () => {
-  it("shows four assignments per page", () => {
-    expect(TRANSPORT_PAGE_SIZE).toBe(4)
-    expect(initialMockTransportAssignments).toHaveLength(11)
-    expect(paginateTransportAssignments(initialMockTransportAssignments, 1)).toHaveLength(4)
-    expect(paginateTransportAssignments(initialMockTransportAssignments, 2)).toHaveLength(4)
-    expect(paginateTransportAssignments(initialMockTransportAssignments, 3)).toHaveLength(3)
-    expect(getTransportPageCount(initialMockTransportAssignments.length)).toBe(3)
+  it("shows five assignments per page", () => {
+    expect(TRANSPORT_PAGE_SIZE).toBe(5)
+    expect(initialMockTransportAssignments).toHaveLength(137)
+    expect(paginateTransportAssignments(initialMockTransportAssignments, 1)).toHaveLength(5)
+    expect(paginateTransportAssignments(initialMockTransportAssignments, 2)).toHaveLength(5)
+    expect(paginateTransportAssignments(initialMockTransportAssignments, 28)).toHaveLength(2)
+    expect(getTransportPageCount(initialMockTransportAssignments.length)).toBe(28)
   })
 
   it("returns only real page-number controls", () => {

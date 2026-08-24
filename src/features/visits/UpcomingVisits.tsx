@@ -33,12 +33,12 @@ export function UpcomingVisits({ visits, onView, currentFacilityId }: Props) {
         <p className="px-4 py-8 text-center text-[13px] text-muted-foreground">Yaklaşan ziyaret bulunmuyor.</p>
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
-          {upcoming.map((visit, index) => (
+          {upcoming.map((visit) => (
             <button
               key={visit.id}
               type="button"
               onClick={() => onView(visit)}
-              className={`group block w-full px-3 py-2.5 text-left transition-colors hover:bg-blue-50 hover:shadow-[inset_3px_0_0_hsl(var(--primary))] focus-visible:relative focus-visible:z-10 focus-visible:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${index === upcoming.length - 1 ? "border-b" : ""}`}
+              className="group block w-full border-b border-slate-200 px-3 py-2.5 text-left transition-colors hover:bg-blue-50 hover:shadow-[inset_3px_0_0_hsl(var(--primary))] focus-visible:relative focus-visible:z-10 focus-visible:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
               aria-label={`${visit.visitor.firstName} ${visit.visitor.lastName} ziyaret detaylarını aç`}
             >
               <div className="flex items-start gap-3">

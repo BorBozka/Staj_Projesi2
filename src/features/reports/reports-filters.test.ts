@@ -2,13 +2,20 @@ import { describe, expect, it } from "vitest"
 
 import {
   getDefaultReportsRange,
+  getComparisonPeriod,
   getMaxEndDate,
   getPreviousPeriod,
   getQuickRangeOptions,
   matchesQuickRange,
   parseReportsQuery,
+  resetReportsFilters,
+  setReportsComparison,
+  setReportsCustomComparison,
+  setReportsGranularity,
+  setReportsPage,
   setReportsRange,
   setReportsTab,
+  setReportsView,
   updateReportsSearchParams,
 } from "@/features/reports/reports-filters"
 import { mockVisitReferenceData } from "@/services/mock-visit-data"
@@ -67,6 +74,7 @@ describe("parseReportsQuery", () => {
   it("defaults to the visits tab, last-30-days range and unscoped company/facility", () => {
     const state = parseReportsQuery(new URLSearchParams(""), mockVisitReferenceData, now)
     expect(state.tab).toBe("visits")
+    expect(state).toMatchObject({ view: "analysis", page: 1, comparison: "none", granularity: "daily" })
     expect(state.filters).toEqual({ startDate: "2026-07-19", endDate: "2026-08-17", companyId: "all", facilityId: "all" })
   })
 
@@ -100,6 +108,41 @@ describe("parseReportsQuery", () => {
     const unknownCompany = parseReportsQuery(new URLSearchParams("company=missing"), mockVisitReferenceData, now)
     expect(unknownCompany.filters.companyId).toBe("all")
   })
+
+  it("parses records state from the URL and safely falls back for invalid values", () => {
+    expect(parseReportsQuery(new URLSearchParams("view=records&page=2&comparison=previous&granularity=weekly"), mockVisitReferenceData, now)).toMatchObject({
+      view: "records",
+      page: 2,
+      comparison: "previous",
+      granularity: "weekly",
+    })
+    expect(parseReportsQuery(new URLSearchParams("view=unknown&page=0&comparison=other&granularity=monthly"), mockVisitReferenceData, now)).toMatchObject({
+      view: "analysis",
+      page: 1,
+      comparison: "none",
+      granularity: "daily",
+    })
+    expect(parseReportsQuery(new URLSearchParams("tab=vehicle&view=records"), mockVisitReferenceData, now).view).toBe("analysis")
+  })
+})
+
+describe("shared comparison periods", () => {
+  const filters = { startDate: "2026-06-01", endDate: "2026-08-31" }
+
+  it("supports previous, previous-year and equal-length custom periods", () => {
+    expect(getComparisonPeriod(filters, "previous")).toEqual({ startDate: "2026-03-01", endDate: "2026-05-31" })
+    expect(getComparisonPeriod(filters, "previous-year")).toEqual({ startDate: "2025-06-01", endDate: "2025-08-31" })
+    expect(getComparisonPeriod(filters, "custom", "2025-06-01")).toEqual({ startDate: "2025-06-01", endDate: "2025-08-31" })
+  })
+
+  it("handles leap-day ranges without producing an invalid date", () => {
+    expect(getComparisonPeriod({ startDate: "2024-02-29", endDate: "2024-03-02" }, "previous-year")).toEqual({ startDate: "2023-02-28", endDate: "2023-03-02" })
+  })
+
+  it("cleans stale custom parameters when comparison changes", () => {
+    expect(setReportsComparison(new URLSearchParams("comparison=custom&compareFrom=2025-06-01&compareTo=2025-08-31"), "previous").toString()).toBe("comparison=previous")
+    expect(setReportsCustomComparison(new URLSearchParams(""), filters, "2025-06-01").toString()).toBe("comparison=custom&compareFrom=2025-06-01&compareTo=2025-08-31")
+  })
 })
 
 describe("reports search param helpers", () => {
@@ -129,5 +172,25 @@ describe("reports search param helpers", () => {
     const cleared = setReportsRange(withRange, "", "")
     expect(cleared.get("from")).toBeNull()
     expect(cleared.get("to")).toBeNull()
+    expect(cleared.get("page")).toBeNull()
+  })
+
+  it("keeps records state in URL helpers and resets only page when filters change", () => {
+    const records = setReportsView(new URLSearchParams("page=2"), "records")
+    expect(records.get("view")).toBe("records")
+    expect(records.get("page")).toBeNull()
+
+    const secondPage = setReportsPage(records, 2)
+    expect(secondPage.get("page")).toBe("2")
+    expect(setReportsPage(secondPage, 1).get("page")).toBeNull()
+    expect(updateReportsSearchParams(secondPage, "company", "bplas").get("page")).toBeNull()
+
+    expect(setReportsComparison(new URLSearchParams("page=2"), "previous").get("page")).toBe("2")
+    expect(setReportsGranularity(new URLSearchParams("page=2"), "weekly").get("page")).toBe("2")
+  })
+
+  it("resets filters but preserves the selected report workspace", () => {
+    const reset = resetReportsFilters(new URLSearchParams("tab=vehicle&view=records&page=2&from=2026-08-01&to=2026-08-05&company=bplas&facility=bplas-merkez&comparison=previous&granularity=weekly"))
+    expect(reset.toString()).toBe("tab=vehicle&view=records")
   })
 })

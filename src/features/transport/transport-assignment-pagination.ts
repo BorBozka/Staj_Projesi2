@@ -1,6 +1,6 @@
 import type { PlannedTransportAssignment } from "@/domain/transport-assignments"
 
-export const TRANSPORT_PAGE_SIZE = 4
+export const TRANSPORT_PAGE_SIZE = 5
 
 export function paginateTransportAssignments(assignments: PlannedTransportAssignment[], page: number) {
   const start = (page - 1) * TRANSPORT_PAGE_SIZE

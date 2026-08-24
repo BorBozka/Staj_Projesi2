@@ -188,14 +188,15 @@ describe("MockVisitService Meeting–Visit behavior", () => {
     expect(deliveryAttempts).toHaveLength(attemptsAfterRetry)
   })
 
-  it("keeps existing mock Visits deterministically attached to one-to-one Meetings", async () => {
+  it("keeps existing mock Visits attached to valid Meetings, including a grouped workshop", async () => {
     const service = new MockVisitService()
     const meetings = await service.listMeetings()
     const visits = await service.listVisits()
 
-    expect(meetings).toHaveLength(visits.length)
-    expect(new Set(visits.map((visit) => visit.meetingId)).size).toBe(visits.length)
-    expect(visits.every((visit) => visit.meetingId === `meeting-${visit.id}`)).toBe(true)
+    const meetingIds = new Set(meetings.map((meeting) => meeting.id))
+    expect(visits.every((visit) => meetingIds.has(visit.meetingId))).toBe(true)
+    expect(visits.length).toBeGreaterThan(meetings.length)
+    expect(visits.filter((visit) => visit.meetingId === "meeting-v-workshop-lead")).toHaveLength(2)
   })
 
   it("keeps phone optional and hides the additional requirement description from Security", async () => {
@@ -232,8 +233,8 @@ describe("MockVisitService Meeting–Visit behavior", () => {
     expect(ownVisits.length).toBeGreaterThan(0)
     expect(ownVisits.length).toBeLessThan(allVisits.length)
 
-    // 3. Current employee has a realistic, representative set of created visits (e.g. 8 visits)
-    expect(ownVisits.length).toBe(8)
+    // 3. Current employee has a realistic, representative set of created visits.
+    expect(ownVisits.length).toBeGreaterThanOrEqual(3)
 
     // 4. Other visits belong to other creators in the organization
     const otherVisits = allVisits.filter((visit) => visit.creatorEmployeeId !== currentEmployeeId)

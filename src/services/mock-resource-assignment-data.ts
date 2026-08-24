@@ -1,6 +1,7 @@
 import type { EquipmentAssignment, ResourceAssignment, RoomAssignment } from "@/domain/resources"
+import { scenarioCreatedAt } from "@/services/mock-scenario"
 
-const timestamp = "2026-08-01T09:00:00.000Z"
+const timestamp = scenarioCreatedAt(-5)
 
 /**
  * Deterministic seed assignments used by MockResourceAssignmentService.
@@ -9,12 +10,8 @@ const timestamp = "2026-08-01T09:00:00.000Z"
  * remain readable if the corresponding catalog record is later deleted.
  *
  * Chosen meetings and resources are from existing mock data:
- *   meeting-v-102  → bplas-merkez  → resource-room-merkez-atlas (ROOM)
- *   meeting-v-103  → bplas-merkez  → resource-notebook-merkez qty 2 (POOLED_EQUIPMENT)
- *   meeting-v-120  → bplas-merkez  → resource-room-merkez-atlas (ROOM)  ← intentionally overlapping to verify conflict
- *
- * Note: v-102 and v-120 overlap on today's schedule. The seed intentionally does NOT
- * assign the same room to both — the test suite exercises that conflict scenario.
+ *   meeting-v-102 → bplas-merkez → resource-room-merkez-atlas (ROOM)
+ *   meeting-v-103 → bplas-merkez → resource-notebook-merkez qty 2 (POOLED_EQUIPMENT)
  */
 export const initialMockAssignments: ResourceAssignment[] = [
   {

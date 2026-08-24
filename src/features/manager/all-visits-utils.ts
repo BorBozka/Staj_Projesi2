@@ -11,7 +11,7 @@ import { getPageCount as getPageCountShared, paginate } from "@/lib/pagination"
 import { toggleSort } from "@/lib/sort"
 
 // Keeps the complete list, filters and pagination controls within a standard laptop viewport.
-export const ALL_VISITS_PAGE_SIZE = 8
+export const ALL_VISITS_PAGE_SIZE = 9
 
 export type AdditionalRequirementFilter = "all" | "with" | "without"
 export type VisitSortField = "visitor" | "visitorCompany" | "visitType" | "host" | "companyFacility" | "plannedStart" | "status"
@@ -110,6 +110,17 @@ export function updateAllVisitsSearchParams(current: URLSearchParams, key: strin
   else next.set(key, value)
   if (key === "company") next.delete("facility")
   if (key === "from" || key === "to") next.delete("date")
+  next.delete("page")
+  return next
+}
+
+export function setAllVisitsRange(current: URLSearchParams, startDate: string, endDate: string) {
+  const next = new URLSearchParams(current)
+  next.delete("date")
+  if (startDate) next.set("from", startDate)
+  else next.delete("from")
+  if (endDate) next.set("to", endDate)
+  else next.delete("to")
   next.delete("page")
   return next
 }
