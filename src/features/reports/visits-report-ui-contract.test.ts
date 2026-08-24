@@ -91,9 +91,9 @@ describe("Visits report UI contracts", () => {
     expect(`${tabSource}${chartSource}${reportUtilsSource}`).not.toContain("Gelişmedi")
   })
 
-  it("uses a container-level separator for every adjacent upcoming visit row", () => {
-    expect(upcomingSource).toContain('className="min-h-0 flex-1 divide-y overflow-y-auto scrollbar-thin"')
-    expect(upcomingSource).not.toContain("index === upcoming.length - 1")
+  it("keeps a separator beneath every upcoming visit row, including the last one", () => {
+    expect(upcomingSource).toContain('className="min-h-0 flex-1 overflow-y-auto scrollbar-thin"')
+    expect(upcomingSource).toContain('className="group block w-full border-b border-slate-200')
   })
 
   it("does not render unfinished saved-report and create-report controls", () => {
