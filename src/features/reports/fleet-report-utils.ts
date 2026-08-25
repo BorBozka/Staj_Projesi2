@@ -264,9 +264,9 @@ export function isFleetRecordActivationKey(key: string) {
 }
 
 export function parseFleetReportWorkspace(searchParams: URLSearchParams): FleetReportWorkspaceState {
-  const rawView = searchParams.get("view")
-  const rawDimension = searchParams.get("dimension")
-  const rawPage = Number(searchParams.get("page"))
+  const rawView = searchParams.get("fleetView")
+  const rawDimension = searchParams.get("fleetDimension")
+  const rawPage = Number(searchParams.get("fleetPage"))
   return {
     view: rawView === "records" ? "records" : "analysis",
     dimension: rawDimension === "drivers" ? "drivers" : "vehicles",
@@ -277,21 +277,21 @@ export function parseFleetReportWorkspace(searchParams: URLSearchParams): FleetR
 export function setFleetReportWorkspace(current: URLSearchParams, nextState: Partial<Pick<FleetReportWorkspaceState, "view" | "dimension">>) {
   const next = new URLSearchParams(current)
   if (nextState.view) {
-    if (nextState.view === "analysis") next.delete("view")
-    else next.set("view", nextState.view)
+    if (nextState.view === "analysis") next.delete("fleetView")
+    else next.set("fleetView", nextState.view)
   }
   if (nextState.dimension) {
-    if (nextState.dimension === "vehicles") next.delete("dimension")
-    else next.set("dimension", nextState.dimension)
+    if (nextState.dimension === "vehicles") next.delete("fleetDimension")
+    else next.set("fleetDimension", nextState.dimension)
   }
-  next.delete("page")
+  next.delete("fleetPage")
   return next
 }
 
 export function setFleetReportPage(current: URLSearchParams, page: number) {
   const next = new URLSearchParams(current)
-  if (page <= 1) next.delete("page")
-  else next.set("page", String(page))
+  if (page <= 1) next.delete("fleetPage")
+  else next.set("fleetPage", String(page))
   return next
 }
 

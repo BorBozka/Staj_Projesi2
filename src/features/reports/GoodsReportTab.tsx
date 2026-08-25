@@ -1,17 +1,27 @@
 import { Search } from "lucide-react"
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react"
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react"
+import { useSearchParams } from "react-router-dom"
 
 import { getGoodsDirectionLabel, getGoodsMovementDisplayStatus, type GoodsMovement } from "@/domain/goods-movements"
+import { GoodsMovementDetailDialog } from "@/features/reports/GoodsMovementDetailDialog"
+import { GoodsMovementTrendChart, GoodsMovementTrendLegend } from "@/features/reports/GoodsMovementTrendChart"
 import {
+  buildGoodsInsight,
+  buildGoodsMetadata,
+  calculateGoodsMovementTrend,
   calculateGoodsReportKpis,
+  calculateSharedGoodsTrendYAxis,
   filterGoodsMovementsForReport,
   getGoodsReportPageCount,
   getVisibleGoodsReportPageNumbers,
   GOODS_REPORT_PAGE_SIZE,
   GOODS_REPORT_STATUS_LABELS,
+  isGoodsRecordActivationKey,
   paginateGoodsReport,
+  parseGoodsReportWorkspace,
+  setGoodsReportPage,
+  type GoodsReportGranularity,
 } from "@/features/reports/goods-report-utils"
-import { ReportKpiCard } from "@/features/reports/ReportKpiCard"
 import { ReportPagination } from "@/features/reports/ReportPagination"
 import {
   buildGoodsReportRows,
@@ -26,128 +36,79 @@ import { formatTr } from "@/lib/date"
 import { goodsMovementService } from "@/services"
 
 const statusBadgeClass: Record<ReturnType<typeof getGoodsMovementDisplayStatus>, string> = {
-  PLANNED: "bg-blue-50 text-blue-700",
-  COMPLETED: "bg-emerald-50 text-emerald-700",
-  CANCELLED: "bg-slate-200 text-slate-600",
-  LATE: "bg-amber-50 text-amber-700",
+  PLANNED: "border-blue-200 bg-blue-50 text-blue-700", COMPLETED: "border-emerald-200 bg-emerald-50 text-emerald-700", CANCELLED: "border-slate-200 bg-slate-100 text-slate-600", LATE: "border-amber-200 bg-amber-50 text-amber-700",
 }
 
-export const GoodsReportTab = forwardRef<ReportExportHandle, { filters: ReportsScopeFilters; dateRangeInvalid: boolean; onExportAvailabilityChange?(canExport: boolean): void }>(function GoodsReportTab({ filters, dateRangeInvalid, onExportAvailabilityChange }, ref) {
+interface GoodsReportTabProps {
+  filters: ReportsScopeFilters
+  dateRangeInvalid: boolean
+  selectedGranularity: GoodsReportGranularity
+  comparisonFilters?: ReportsScopeFilters | null
+  comparisonLabel?: string
+  onExportAvailabilityChange?(canExport: boolean): void
+}
+
+export const GoodsReportTab = forwardRef<ReportExportHandle, GoodsReportTabProps>(function GoodsReportTab({ filters, dateRangeInvalid, selectedGranularity, comparisonFilters = null, comparisonLabel = "Önceki dönem", onExportAvailabilityChange }, ref) {
   const [movements, setMovements] = useState<GoodsMovement[]>([])
-  const [page, setPage] = useState(1)
+  const [movementsLoaded, setMovementsLoaded] = useState(false)
+  const [selectedMovement, setSelectedMovement] = useState<GoodsMovement | null>(null)
+  const detailTriggerRef = useRef<HTMLTableRowElement | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const workspace = useMemo(() => parseGoodsReportWorkspace(searchParams), [searchParams])
 
   useEffect(() => {
     let cancelled = false
-    void goodsMovementService.listGoodsMovements().then((next) => { if (!cancelled) setMovements(next) })
+    void goodsMovementService.listGoodsMovements().then((next) => {
+      if (!cancelled) {
+        setMovements(next)
+        setMovementsLoaded(true)
+      }
+    })
     return () => { cancelled = true }
   }, [])
 
   const reportMovements = useMemo(() => filterGoodsMovementsForReport(movements, filters), [movements, filters])
+  const isSingleDay = filters.startDate !== "" && filters.startDate === filters.endDate
+  const trendGranularity = isSingleDay ? "hourly" : selectedGranularity
   const kpis = useMemo(() => calculateGoodsReportKpis(reportMovements), [reportMovements])
+  const trend = useMemo(() => calculateGoodsMovementTrend(reportMovements, filters, trendGranularity), [filters, reportMovements, trendGranularity])
+  const previousMovements = useMemo(() => comparisonFilters ? filterGoodsMovementsForReport(movements, comparisonFilters) : null, [comparisonFilters, movements])
+  const hasComparisonData = previousMovements !== null && previousMovements.length > 0
+  const previousKpis = useMemo(() => previousMovements ? calculateGoodsReportKpis(previousMovements) : null, [previousMovements])
+  const previousTrend = useMemo(() => previousMovements && comparisonFilters ? calculateGoodsMovementTrend(previousMovements, comparisonFilters, trendGranularity) : null, [comparisonFilters, previousMovements, trendGranularity])
+  const sharedAxis = useMemo(() => hasComparisonData && previousTrend ? calculateSharedGoodsTrendYAxis(trend, previousTrend) : undefined, [hasComparisonData, previousTrend, trend])
+  const metadata = useMemo(() => buildGoodsMetadata(kpis, hasComparisonData ? previousKpis : null), [hasComparisonData, kpis, previousKpis])
+  const insight = useMemo(() => {
+    const base = buildGoodsInsight({ kpis, trend }, hasComparisonData ? previousKpis : null)
+    return comparisonFilters && !hasComparisonData ? `${base} Karşılaştırma döneminde mal hareketi kaydı yok.` : base
+  }, [comparisonFilters, hasComparisonData, kpis, previousKpis, trend])
   const pageCount = getGoodsReportPageCount(reportMovements.length)
-  const paginatedMovements = paginateGoodsReport(reportMovements, page)
+  const page = Math.min(workspace.page, pageCount)
+  const paginatedMovements = useMemo(() => paginateGoodsReport(reportMovements, page), [page, reportMovements])
   const visibleStart = reportMovements.length === 0 ? 0 : (page - 1) * GOODS_REPORT_PAGE_SIZE + 1
   const visibleEnd = Math.min(page * GOODS_REPORT_PAGE_SIZE, reportMovements.length)
   const headers = useMemo(() => GOODS_REPORT_COLUMNS.map((column) => column.header), [])
   const exportFilenameBase = `mal-hareketi-raporu_${filters.startDate || "tumu"}_${filters.endDate || "tumu"}`
 
   useEffect(() => {
-    setPage(1)
-  }, [filters])
-
-  useEffect(() => {
-    if (page > pageCount) setPage(pageCount)
-  }, [page, pageCount])
-
-  useEffect(() => {
-    onExportAvailabilityChange?.(reportMovements.length > 0)
-  }, [onExportAvailabilityChange, reportMovements.length])
+    if (workspace.view !== "records" || !movementsLoaded) return
+    const rawPage = searchParams.get("goodsPage")
+    if (page !== workspace.page || (rawPage !== null && rawPage !== String(workspace.page))) setSearchParams(setGoodsReportPage(searchParams, page), { replace: true })
+  }, [movementsLoaded, page, searchParams, setSearchParams, workspace.page, workspace.view])
+  useEffect(() => { onExportAvailabilityChange?.(reportMovements.length > 0) }, [onExportAvailabilityChange, reportMovements.length])
 
   const exportRows = () => buildGoodsReportRows(reportMovements)
-
   useImperativeHandle(ref, () => ({
     exportCsv: () => downloadReportCsv(headers, exportRows(), `${exportFilenameBase}.csv`),
     exportExcel: () => { void downloadReportExcel("Mal Hareketi", headers, exportRows(), `${exportFilenameBase}.xlsx`) },
     exportPdf: () => { void downloadReportPdf("Mal Hareketi Raporu", headers, exportRows(), `${exportFilenameBase}.pdf`) },
   }))
 
-  return (
-    <div className="space-y-3">
-      <section aria-label="Mal Hareketi Analizi başlığı">
-        <h2 className="text-lg font-semibold text-slate-900">MAL HAREKETİ ANALİZİ</h2>
-      </section>
+  if (workspace.view === "records") return <><section className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border bg-card shadow-panel" aria-label="Mal hareketi kayıtları">{dateRangeInvalid ? <EmptyState title="Geçersiz tarih aralığı" description="Başlangıç tarihi bitiş tarihinden sonra olamaz." /> : reportMovements.length === 0 ? <EmptyState title="Eşleşen mal hareketi bulunamadı" description="Filtre ölçütlerini değiştirerek yeniden deneyin." showSearch /> : <><div className="min-h-0 flex-1 overflow-hidden"><div className="h-full overflow-x-auto overflow-y-hidden scrollbar-thin"><table className="w-full min-w-[1100px] table-fixed text-left text-xs"><thead className="border-b bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"><tr><th className="w-[9%] px-3 py-1.5">Yön</th><th className="w-[16%] px-3 py-1.5">Şirket / Tesis</th><th className="w-[15%] px-3 py-1.5">Karşı Taraf</th><th className="w-[14%] px-3 py-1.5">Planlanan Tarih / Saat</th><th className="w-[14%] px-3 py-1.5">Gerçek Zaman</th><th className="w-[10%] px-3 py-1.5">Durum</th><th className="w-[11%] px-3 py-1.5">Referans No</th><th className="w-[11%] px-3 py-1.5">Plaka / Şoför</th></tr></thead><tbody>{paginatedMovements.map((movement) => <GoodsRecordRow key={movement.id} movement={movement} onOpen={(row) => { detailTriggerRef.current = row; setSelectedMovement(movement) }} />)}</tbody></table></div></div><div className="shrink-0"><ReportPagination page={page} pageCount={pageCount} visibleStart={visibleStart} visibleEnd={visibleEnd} total={reportMovements.length} visiblePageNumbers={getVisibleGoodsReportPageNumbers(page, pageCount)} onPageChange={(nextPage) => setSearchParams(setGoodsReportPage(searchParams, nextPage))} ariaLabel="Mal hareketi rapor sayfaları" /></div></>}</section><GoodsMovementDetailDialog movement={selectedMovement} open={selectedMovement !== null} onOpenChange={(open) => { if (!open) setSelectedMovement(null) }} returnFocusRef={detailTriggerRef} /></>
 
-      <section className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4" aria-label="Mal hareketi rapor özeti">
-        <ReportKpiCard label="Toplam Hareket" value={String(kpis.total)} />
-        <ReportKpiCard label="Gelen" value={String(kpis.inbound)} />
-        <ReportKpiCard label="Giden" value={String(kpis.outbound)} />
-        <ReportKpiCard label="Geciken Oranı" value={`%${kpis.lateRate.toFixed(1)}`} />
-      </section>
-
-      <section className="flex min-h-[26rem] flex-col justify-between overflow-hidden rounded-lg border bg-card shadow-panel" aria-label="Mal hareketi rapor tablosu">
-        {dateRangeInvalid ? (
-          <div className="flex flex-1 flex-col items-center justify-center px-4 py-24 text-center">
-            <p className="text-sm font-semibold text-slate-900">Geçersiz tarih aralığı</p>
-            <p className="mt-1 text-xs text-slate-600">Başlangıç tarihi bitiş tarihinden sonra olamaz.</p>
-          </div>
-        ) : reportMovements.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center px-4 py-24 text-center">
-            <Search className="mx-auto size-8 text-slate-400" />
-            <h3 className="mt-3 text-sm font-semibold text-slate-900">Eşleşen mal hareketi bulunamadı</h3>
-            <p className="mt-1 text-xs text-slate-600">Filtre ölçütlerini değiştirerek yeniden deneyin.</p>
-          </div>
-        ) : (
-          <div className="flex-1 overflow-x-auto scrollbar-thin">
-            <table className="w-full min-w-[1180px] table-fixed text-left text-xs">
-              <thead className="sticky top-0 z-10 border-b bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                <tr>
-                  <th className="w-[9%] px-3 py-2.5">Yön</th>
-                  <th className="w-[15%] px-3 py-2.5">Şirket / Tesis</th>
-                  <th className="w-[15%] px-3 py-2.5">Karşı Taraf</th>
-                  <th className="w-[13%] px-3 py-2.5">Planlanan Tarih / Saat</th>
-                  <th className="w-[13%] px-3 py-2.5">Gerçek Zaman</th>
-                  <th className="w-[10%] px-3 py-2.5">Durum</th>
-                  <th className="w-[12%] px-3 py-2.5">Referans No</th>
-                  <th className="w-[13%] px-3 py-2.5">Plaka / Şoför</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {paginatedMovements.map((movement) => {
-                  const status = getGoodsMovementDisplayStatus(movement)
-                  return (
-                    <tr key={movement.id}>
-                      <td className="px-3 py-2.5 font-medium sm:py-3">{getGoodsDirectionLabel(movement.direction)}</td>
-                      <td className="px-3 py-2.5 sm:py-3">
-                        <p className="truncate" title={movement.companyName}>{movement.companyName}</p>
-                        <p className="mt-0.5 truncate text-[11px] text-slate-500" title={movement.facilityName}>{movement.facilityName}</p>
-                      </td>
-                      <td className="px-3 py-2.5 sm:py-3"><p className="truncate" title={movement.counterpartyName}>{movement.counterpartyName}</p></td>
-                      <td className="px-3 py-2.5 tabular-nums sm:py-3">
-                        {formatTr(new Date(`${movement.plannedDate}T12:00:00`), "d MMM yyyy")}{movement.plannedTime ? ` · ${movement.plannedTime}` : ""}
-                      </td>
-                      <td className="px-3 py-2.5 tabular-nums sm:py-3">{movement.actualAt ? formatTr(new Date(movement.actualAt), "d MMM HH:mm") : "—"}</td>
-                      <td className="px-3 py-2.5 sm:py-3"><span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${statusBadgeClass[status]}`}>{GOODS_REPORT_STATUS_LABELS[status]}</span></td>
-                      <td className="px-3 py-2.5 sm:py-3">{movement.referenceNumber ?? "—"}</td>
-                      <td className="px-3 py-2.5 sm:py-3">{movement.actualPlate || movement.actualDriverName ? `${movement.actualPlate ?? "—"} / ${movement.actualDriverName ?? "—"}` : "—"}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        <ReportPagination
-          page={page}
-          pageCount={pageCount}
-          visibleStart={visibleStart}
-          visibleEnd={visibleEnd}
-          total={reportMovements.length}
-          visiblePageNumbers={getVisibleGoodsReportPageNumbers(page, Math.max(1, pageCount))}
-          onPageChange={setPage}
-          ariaLabel="Mal hareketi rapor sayfaları"
-        />
-      </section>
-    </div>
-  )
+  return <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border bg-card p-3 shadow-panel" aria-labelledby="goods-analysis-title"><div className="flex shrink-0 flex-wrap items-start justify-between gap-2"><h2 id="goods-analysis-title" className="min-w-0 text-xs font-semibold uppercase tracking-wider text-slate-900">Mal Hareketi Analizi</h2>{!dateRangeInvalid && <p className="max-w-full text-right text-[11px] tabular-nums text-slate-500">{metadata}</p>}</div><div className="mt-2 min-h-0 flex-1">{dateRangeInvalid ? <EmptyState title="Geçersiz tarih aralığı" description="Başlangıç tarihi bitiş tarihinden sonra olamaz." /> : hasComparisonData && previousTrend ? <div className="flex h-full min-h-0 flex-col gap-1.5"><TrendPanel points={trend} yAxisMax={sharedAxis?.max} yAxisTicks={sharedAxis?.ticks} /><TrendPanel label={comparisonLabel} points={previousTrend} yAxisMax={sharedAxis?.max} yAxisTicks={sharedAxis?.ticks} /></div> : <GoodsMovementTrendChart points={trend} />}</div>{!dateRangeInvalid && <div className="mt-1.5 flex shrink-0 items-start justify-between gap-4 border-t border-slate-100 pt-1.5"><p className="min-w-0 text-xs leading-snug text-slate-700">{insight}</p><GoodsMovementTrendLegend /></div>}</section>
 })
+
+function TrendPanel({ label, points, yAxisMax, yAxisTicks }: { label?: string; points: import("@/features/reports/goods-report-utils").GoodsMovementTrendPoint[]; yAxisMax?: number; yAxisTicks?: number[] }) { return <div className="flex min-h-0 flex-1 flex-col">{label && <p className="mb-0.5 shrink-0 truncate text-[11px] font-medium uppercase tracking-[0.02em] text-slate-500">{label}</p>}<div className="min-h-0 flex-1"><GoodsMovementTrendChart points={points} yAxisMax={yAxisMax} yAxisTicks={yAxisTicks} /></div></div> }
+function GoodsRecordRow({ movement, onOpen }: { movement: GoodsMovement; onOpen(row: HTMLTableRowElement): void }) { const status = getGoodsMovementDisplayStatus(movement); return <tr tabIndex={0} aria-haspopup="dialog" aria-label={`${movement.counterpartyName} mal hareketi detayını aç`} className="record-row-hover h-[3.125rem] cursor-pointer border-b transition-colors hover:bg-slate-50/80 focus-visible:bg-blue-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500" onClick={(event) => onOpen(event.currentTarget)} onKeyDown={(event) => { if (!isGoodsRecordActivationKey(event.key)) return; event.preventDefault(); onOpen(event.currentTarget) }}><td className="px-3 py-1 font-medium">{getGoodsDirectionLabel(movement.direction)}</td><td className="px-3 py-1"><p className="truncate" title={movement.companyName}>{movement.companyName}</p><p className="mt-0.5 truncate text-[10px] text-slate-500" title={movement.facilityName}>{movement.facilityName}</p></td><td className="px-3 py-1"><p className="truncate" title={movement.counterpartyName}>{movement.counterpartyName}</p></td><td className="px-3 py-1 tabular-nums">{formatTr(new Date(`${movement.plannedDate}T12:00:00`), "d MMM yyyy")}{movement.plannedTime ? ` · ${movement.plannedTime}` : ""}</td><td className="px-3 py-1 tabular-nums">{movement.actualAt ? formatTr(new Date(movement.actualAt), "d MMM HH:mm") : "—"}</td><td className="px-3 py-1"><span className={`inline-flex rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${statusBadgeClass[status]}`}>{GOODS_REPORT_STATUS_LABELS[status]}</span></td><td className="px-3 py-1"><p className="truncate" title={movement.referenceNumber}>{movement.referenceNumber ?? "—"}</p></td><td className="px-3 py-1"><p className="truncate" title={`${movement.actualPlate ?? "—"} / ${movement.actualDriverName ?? "—"}`}>{movement.actualPlate || movement.actualDriverName ? `${movement.actualPlate ?? "—"} / ${movement.actualDriverName ?? "—"}` : "—"}</p></td></tr> }
+function EmptyState({ title, description, showSearch = false }: { title: string; description: string; showSearch?: boolean }) { return <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-4 text-center">{showSearch && <Search className="size-6 text-slate-400" />}<p className={`${showSearch ? "mt-2" : ""} text-xs font-semibold text-slate-900`}>{title}</p><p className="mt-0.5 text-[11px] text-slate-600">{description}</p></div> }

@@ -38,6 +38,7 @@ import { transportAssignmentService } from "@/services"
 
 export const FleetReportTab = forwardRef<ReportExportHandle, { meetings: Meeting[]; visits: Visit[]; filters: ReportsScopeFilters; dateRangeInvalid: boolean; comparisonFilters?: ReportsScopeFilters | null; comparisonLabel?: string; onExportAvailabilityChange?(canExport: boolean): void }>(function FleetReportTab({ meetings, visits, filters, dateRangeInvalid, comparisonFilters = null, comparisonLabel = "Önceki dönem", onExportAvailabilityChange }, ref) {
   const [assignments, setAssignments] = useState<PlannedTransportAssignment[]>([])
+  const [assignmentsLoaded, setAssignmentsLoaded] = useState(false)
   const [selectedAssignment, setSelectedAssignment] = useState<PlannedTransportAssignment | null>(null)
   const detailTriggerRef = useRef<HTMLTableRowElement | null>(null)
   const [searchParams, setSearchParams] = useSearchParams()
@@ -45,7 +46,12 @@ export const FleetReportTab = forwardRef<ReportExportHandle, { meetings: Meeting
 
   useEffect(() => {
     let cancelled = false
-    void transportAssignmentService.listAssignments().then((next) => { if (!cancelled) setAssignments(next) })
+    void transportAssignmentService.listAssignments().then((next) => {
+      if (!cancelled) {
+        setAssignments(next)
+        setAssignmentsLoaded(true)
+      }
+    })
     return () => { cancelled = true }
   }, [])
 
@@ -78,12 +84,12 @@ export const FleetReportTab = forwardRef<ReportExportHandle, { meetings: Meeting
 
   useEffect(() => {
     // URL pagination remains valid after a direct URL edit, filter change, or a shrinking result.
-    if (workspace.view !== "records") return
-    const rawPage = searchParams.get("page")
+    if (workspace.view !== "records" || !assignmentsLoaded) return
+    const rawPage = searchParams.get("fleetPage")
     if (page !== workspace.page || (rawPage !== null && rawPage !== String(workspace.page))) {
       setSearchParams(setFleetReportPage(searchParams, page), { replace: true })
     }
-  }, [page, searchParams, setSearchParams, workspace.page, workspace.view])
+  }, [assignmentsLoaded, page, searchParams, setSearchParams, workspace.page, workspace.view])
 
   useEffect(() => {
     onExportAvailabilityChange?.(reportAssignments.length > 0)
@@ -110,16 +116,16 @@ export const FleetReportTab = forwardRef<ReportExportHandle, { meetings: Meeting
           <>
             <div className="min-h-0 flex-1 overflow-hidden">
               <div className="h-full overflow-x-auto overflow-y-hidden scrollbar-thin">
-                <table className="h-full w-full min-w-[900px] table-fixed text-left text-xs">
+                <table className="w-full min-w-[900px] table-fixed text-left text-xs">
                   <thead className="border-b bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                     <tr>
-                      <th className="w-[11%] px-3 py-2">Tarih</th>
-                      <th className="w-[22%] px-3 py-2">Amaç</th>
-                      <th className="w-[15%] px-3 py-2">Araç</th>
-                      <th className="w-[14%] px-3 py-2">Şoför</th>
-                      <th className="w-[16%] px-3 py-2">Planlanan</th>
-                      <th className="w-[16%] px-3 py-2">İlişkili Kayıt</th>
-                      <th className="w-[10%] px-3 py-2">Durum</th>
+                      <th className="w-[11%] px-3 py-1.5">Tarih</th>
+                      <th className="w-[22%] px-3 py-1.5">Amaç</th>
+                      <th className="w-[15%] px-3 py-1.5">Araç</th>
+                      <th className="w-[14%] px-3 py-1.5">Şoför</th>
+                      <th className="w-[16%] px-3 py-1.5">Planlanan</th>
+                      <th className="w-[16%] px-3 py-1.5">İlişkili Kayıt</th>
+                      <th className="w-[10%] px-3 py-1.5">Durum</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -163,7 +169,7 @@ function FleetRecordRow({ assignment, meetings, visits, onOpen }: { assignment: 
       tabIndex={0}
       aria-haspopup="dialog"
       aria-label={`${assignment.purpose} görev detayını aç`}
-      className="record-row-hover h-[46px] cursor-pointer border-b last:border-b-0 transition-colors hover:bg-slate-50/80 focus-visible:bg-blue-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
+      className="record-row-hover h-[3.125rem] cursor-pointer border-b transition-colors hover:bg-slate-50/80 focus-visible:bg-blue-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
       onClick={(event) => openDetails(event.currentTarget)}
       onKeyDown={(event) => {
         if (!isFleetRecordActivationKey(event.key)) return
@@ -171,13 +177,13 @@ function FleetRecordRow({ assignment, meetings, visits, onOpen }: { assignment: 
         openDetails(event.currentTarget)
       }}
     >
-      <td className="px-3 py-2 tabular-nums">{formatTr(new Date(assignment.plannedStart), "d MMM yyyy")}</td>
-      <td className="px-3 py-2"><p className="truncate" title={assignment.purpose}>{assignment.purpose}</p></td>
-      <td className="px-3 py-2"><p className="truncate font-medium text-slate-900" title={assignment.vehicleName}>{assignment.vehicleName}</p><p className="mt-0.5 truncate text-[10px] text-slate-500">{assignment.vehicleLicensePlate}</p></td>
-      <td className="px-3 py-2"><p className="truncate" title={assignment.driverName}>{assignment.driverName}</p></td>
-      <td className="px-3 py-2 tabular-nums">{formatTr(new Date(assignment.plannedStart), "HH:mm")}–{formatTr(new Date(assignment.plannedEnd), "HH:mm")}</td>
-      <td className="px-3 py-2"><p className="truncate" title={relatedLabel}>{relatedLabel}</p></td>
-      <td className="px-3 py-2"><FleetStatusPill status={assignment.status} /></td>
+      <td className="px-3 py-1 tabular-nums">{formatTr(new Date(assignment.plannedStart), "d MMM yyyy")}</td>
+      <td className="px-3 py-1"><p className="truncate" title={assignment.purpose}>{assignment.purpose}</p></td>
+      <td className="px-3 py-1"><p className="truncate font-medium text-slate-900" title={assignment.vehicleName}>{assignment.vehicleName}</p><p className="mt-0.5 truncate text-[10px] text-slate-500">{assignment.vehicleLicensePlate}</p></td>
+      <td className="px-3 py-1"><p className="truncate" title={assignment.driverName}>{assignment.driverName}</p></td>
+      <td className="px-3 py-1 tabular-nums">{formatTr(new Date(assignment.plannedStart), "HH:mm")}–{formatTr(new Date(assignment.plannedEnd), "HH:mm")}</td>
+      <td className="px-3 py-1"><p className="truncate" title={relatedLabel}>{relatedLabel}</p></td>
+      <td className="px-3 py-1"><FleetStatusPill status={assignment.status} /></td>
     </tr>
   )
 }

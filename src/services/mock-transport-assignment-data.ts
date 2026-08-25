@@ -21,6 +21,7 @@ interface LoadProfile {
   snapshot: AssignmentSnapshot
   count: number
   durations: readonly number[]
+  startHour?: number
 }
 
 const purposes = [
@@ -136,7 +137,7 @@ function buildPeriodAssignments({ prefix, startDayOffset, profiles, cancellation
   return profiles.flatMap((profile, profileIndex) => Array.from({ length: profile.count }, (_, profileAssignmentIndex) => {
     const currentSequence = sequence++
     const dayOffset = startDayOffset + (profile.count === 1 ? 0 : Math.floor(profileAssignmentIndex * 29 / (profile.count - 1)))
-    const hour = 7 + (profileIndex % 4) * 2
+    const hour = profile.startHour ?? 7 + (profileIndex % 4) * 2
     const minute = profileAssignmentIndex % 2 === 0 ? 30 : 0
     const duration = profile.durations[profileAssignmentIndex % profile.durations.length]
     const isLiveCurrentAssignment = prefix === "current" && profileIndex === 0 && profileAssignmentIndex === profile.count - 1
@@ -159,6 +160,22 @@ function buildPeriodAssignments({ prefix, startDayOffset, profiles, cancellation
 const currentAssignments = buildPeriodAssignments({ prefix: "current", startDayOffset: -29, profiles: currentProfiles, cancellationOffset: 1 })
 const previousAssignments = buildPeriodAssignments({ prefix: "previous", startDayOffset: -59, profiles: previousProfiles, cancellationOffset: 2 })
 const previousYearAssignments = buildPeriodAssignments({ prefix: "previous-year", startDayOffset: -29, profiles: previousYearProfiles, cancellationOffset: 3, previousYears: 1 })
+
+// The dense period profiles deliberately cover the last 30 days, but their evenly spread
+// dates leave the one-day "Bugün" comparison empty. Keep a small deterministic bridge for
+// that compact view so both vehicle and driver comparison bars can be reviewed directly.
+const todayComparisonProfiles: LoadProfile[] = [
+  { snapshot: pairs.transitZeynep, count: 1, durations: [90], startHour: 17 },
+  { snapshot: pairs.sprinterAyse, count: 1, durations: [180], startHour: 17 },
+  { snapshot: pairs.courierBurak, count: 1, durations: [45], startHour: 17 },
+  { snapshot: pairs.dailySelin, count: 1, durations: [120], startHour: 17 },
+  { snapshot: pairs.kangooEmre, count: 1, durations: [60], startHour: 17 },
+  { snapshot: pairs.dobloHakan, count: 1, durations: [150], startHour: 17 },
+  { snapshot: pairs.transporterCan, count: 1, durations: [240], startHour: 17 },
+]
+
+const previousDayAssignments = buildPeriodAssignments({ prefix: "previous-day", startDayOffset: -1, profiles: todayComparisonProfiles, cancellationOffset: 99 })
+const previousYearTodayAssignments = buildPeriodAssignments({ prefix: "previous-year-today", startDayOffset: 0, profiles: todayComparisonProfiles, cancellationOffset: 100, previousYears: 1 })
 
 const upcomingAssignments: PlannedTransportAssignment[] = [
   {
@@ -187,5 +204,7 @@ export const initialMockTransportAssignments: PlannedTransportAssignment[] = [
   ...currentAssignments,
   ...previousAssignments,
   ...previousYearAssignments,
+  ...previousDayAssignments,
+  ...previousYearTodayAssignments,
   ...upcomingAssignments,
 ]

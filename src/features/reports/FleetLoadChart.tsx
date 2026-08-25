@@ -1,6 +1,7 @@
-import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
+import { Bar, BarChart, CartesianGrid, LabelList, Tooltip, XAxis, YAxis } from "recharts"
 
 import { formatDurationMinutes } from "@/features/reports/report-format"
+import { ReportChartContainer } from "@/features/reports/ReportChartContainer"
 import {
   getFleetCategoryAxisWidth,
   getNiceFleetDurationScale,
@@ -46,19 +47,19 @@ export function FleetLoadChart({ resources, dimension, comparison = false, compa
           )}
         </div>
       )}
-      <div className="min-h-0 flex-1">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} layout="vertical" margin={{ top: 2, right: 124, left: 0, bottom: 2 }} barCategoryGap="30%" barGap={3}>
+      <div className="report-chart min-h-0 flex-1 cursor-default [contain:paint]" aria-label="Araç / şoför planlama yükü grafiği" onPointerDown={(event) => event.preventDefault()}>
+        <ReportChartContainer>
+          {({ width, height }) => <BarChart width={width} height={height} accessibilityLayer={false} tabIndex={-1} data={data} layout="vertical" margin={{ top: 2, right: 124, left: 0, bottom: 2 }} barCategoryGap="30%" barGap={3}>
             <CartesianGrid horizontal={false} stroke="#e2e8f0" strokeDasharray="3 3" />
             <XAxis type="number" domain={[0, durationScale.domainMax]} ticks={durationScale.ticks} tick={{ fontSize: 10 }} tickFormatter={(value) => formatDurationMinutes(Number(value))} tickLine={false} axisLine={false} allowDecimals={false} />
             <YAxis dataKey="label" type="category" width={axisWidth} tick={<FleetCategoryTick />} tickLine={false} axisLine={false} />
-            <Tooltip cursor={{ fill: "#f8fafc" }} contentStyle={{ fontSize: 11 }} formatter={(value, name) => [formatDurationMinutes(Number(value)), name === "previousPlannedMinutes" ? "Önceki dönem" : "Seçili dönem"]} labelFormatter={(label) => `${resourceLabel}: ${label}`} />
+            <Tooltip cursor={false} contentStyle={{ fontSize: 11 }} formatter={(value, name) => [formatDurationMinutes(Number(value)), name === "previousPlannedMinutes" ? "Önceki dönem" : "Seçili dönem"]} labelFormatter={(label) => `${resourceLabel}: ${label}`} />
             {comparison && <Bar dataKey="previousPlannedMinutes" name="previousPlannedMinutes" fill="#cbd5e1" radius={[0, 3, 3, 0]} barSize={16} isAnimationActive={false} />}
             <Bar dataKey="plannedMinutes" name="plannedMinutes" fill="#2563eb" radius={[0, 3, 3, 0]} barSize={16} isAnimationActive={false}>
               <LabelList dataKey="secondary" position="right" offset={8} className="fill-slate-600" style={{ fontSize: 10 }} />
             </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+          </BarChart>}
+        </ReportChartContainer>
       </div>
     </div>
   )

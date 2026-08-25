@@ -150,7 +150,7 @@ export const VisitsReportTab = forwardRef<ReportExportHandle, VisitsReportTabPro
           <>
             <div className="min-h-0 flex-1 overflow-hidden">
               <div className="h-full overflow-x-auto overflow-y-hidden scrollbar-thin">
-                <table className="h-full w-full min-w-[980px] table-fixed text-left text-xs">
+                <table className="w-full min-w-[980px] table-fixed text-left text-xs">
                   <thead className="border-b bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                     <tr>
                       <th className="w-[10%] px-3 py-1.5">Tarih</th>
@@ -165,7 +165,7 @@ export const VisitsReportTab = forwardRef<ReportExportHandle, VisitsReportTabPro
                   </thead>
                   <tbody>
                     {paginatedVisits.map((visit) => (
-                      <tr key={visit.id} role="button" tabIndex={0} aria-label={`${visit.visitor.firstName} ${visit.visitor.lastName} ziyaret detaylarını görüntüle`} className="record-row-hover h-[3.125rem] cursor-pointer border-b last:border-b-0 transition-colors hover:bg-slate-50 focus-visible:bg-blue-50 focus-visible:outline-none" onClick={() => setSelectedVisit(visit)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedVisit(visit) } }}>
+                      <tr key={visit.id} role="button" tabIndex={0} aria-label={`${visit.visitor.firstName} ${visit.visitor.lastName} ziyaret detaylarını görüntüle`} className="record-row-hover h-[3.125rem] cursor-pointer border-b transition-colors hover:bg-slate-50 focus-visible:bg-blue-50 focus-visible:outline-none" onClick={() => setSelectedVisit(visit)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedVisit(visit) } }}>
                         <td className="px-3 py-1 tabular-nums">{formatTr(new Date(visit.plannedStart), "d MMM yyyy")}</td>
                         <td className="px-3 py-1"><p className="truncate font-medium text-slate-900" title={`${visit.visitor.firstName} ${visit.visitor.lastName}`}>{visit.visitor.firstName} {visit.visitor.lastName}</p></td>
                         <td className="px-3 py-1"><p className="truncate" title={visit.visitor.company}>{visit.visitor.company}</p></td>

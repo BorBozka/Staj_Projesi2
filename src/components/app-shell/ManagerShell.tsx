@@ -79,7 +79,7 @@ export function ManagerShell() {
 
   return (
     <ManagerRefreshProvider value={{ companyId, currentTime, facilityId, isRefreshing, lastUpdated, refreshVersion, refresh, selectCompany, selectFacility: setFacilityId }}>
-      <div className={cn("min-h-screen overflow-x-hidden bg-slate-50 transition-[padding-left] duration-200", collapsed ? "md:pl-[60px]" : "md:pl-[188px]")} style={{ zoom: 0.9 }}>
+      <div className={cn("min-h-screen overflow-x-hidden bg-slate-50 transition-[padding-left] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] will-change-[padding-left] motion-reduce:transition-none", collapsed ? "md:pl-[60px]" : "md:pl-[188px]")} style={{ zoom: 0.9 }}>
         <ManagerSidebar collapsed={collapsed} onCollapsedChange={setCollapsed} />
         <ManagerMobileNavigation open={mobileNavigationOpen} onOpenChange={setMobileNavigationOpen} />
 
@@ -104,10 +104,10 @@ export function ManagerShell() {
 
 function ManagerSidebar({ collapsed, onCollapsedChange }: { collapsed: boolean; onCollapsedChange(value: boolean): void }) {
   return (
-    <aside className={cn("fixed inset-y-0 left-0 z-40 hidden overflow-x-hidden border-r border-slate-800 bg-slate-950 text-slate-200 transition-[width] duration-200 md:flex md:flex-col", collapsed ? "w-[60px]" : "w-[188px]")}>
-      <div className={cn("flex h-[66px] shrink-0 items-center", collapsed ? "justify-center" : "pl-2.5 pr-4")}>
+    <aside className={cn("fixed inset-y-0 left-0 z-40 hidden overflow-x-hidden border-r border-slate-800 bg-slate-950 text-slate-200 transition-[width] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] will-change-[width] motion-reduce:transition-none md:flex md:flex-col", collapsed ? "w-[60px]" : "w-[188px]")}>
+      <div className="flex h-[66px] shrink-0 items-center gap-3 pl-2.5 pr-4">
         <img src={bplasLogo} alt="BPLAS" className="size-10 rounded-lg object-cover shadow-sm" />
-        {!collapsed && <p className="ml-3 min-w-0 truncate text-sm font-semibold text-white">Yönetim Sistemi</p>}
+        <p aria-hidden={collapsed} className={cn("min-w-0 shrink-0 truncate text-sm font-semibold text-white transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-none", collapsed ? "translate-x-1 opacity-0" : "translate-x-0 opacity-100 delay-100")}>Yönetim Sistemi</p>
       </div>
 
       <nav className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-2 py-1.5" aria-label="Yönetici menüsü">
@@ -143,13 +143,13 @@ function ManagerNotifications({ collapsed }: { collapsed: boolean }) {
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
-            size={collapsed ? "icon-sm" : "sm"}
-            className={cn("relative mb-1.5 text-slate-400 hover:bg-slate-800 hover:text-white", collapsed ? "w-full" : "w-full justify-start")}
+            size="sm"
+            className="relative mb-1.5 w-full justify-start gap-2 overflow-hidden px-3.5 text-slate-400 hover:bg-slate-800 hover:text-white"
             aria-label={`Bildirimler${pendingInvitations.length ? `, ${pendingInvitations.length} eylem bekleyen davet` : ""}`}
             title={collapsed ? "Bildirimler" : undefined}
           >
             <Bell />
-            {!collapsed && <span>Bildirimler</span>}
+            <span aria-hidden={collapsed} className={cn("shrink-0 transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-none", collapsed ? "translate-x-1 opacity-0" : "translate-x-0 opacity-100 delay-100")}>Bildirimler</span>
             {pendingInvitations.length > 0 && <span className="absolute right-1 top-0.5 flex min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white">{pendingInvitations.length}</span>}
           </Button>
         </DropdownMenuTrigger>
@@ -235,17 +235,15 @@ function InvitationNotificationStatus({ status }: { status: InvitationStatus }) 
 function ManagerProfile({ collapsed = false }: { collapsed?: boolean }) {
   return (
     <div
-      className={cn("flex min-w-0 items-center rounded-md", collapsed ? "justify-center py-1.5" : "gap-2.5 px-1.5 py-2")}
-      aria-label="Oturum açan kullanıcı: Eda Karaca, Yönetici"
-      title={collapsed ? "Eda Karaca · Yönetici" : undefined}
+      className="flex min-w-0 items-center gap-2.5 rounded-md px-1 py-2"
+      aria-label="Oturum açan kullanıcı: Atahan Bozkurt, Yönetici"
+      title={collapsed ? "Atahan Bozkurt · Yönetici" : undefined}
     >
       <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">AB</div>
-      {!collapsed && (
-        <div className="min-w-0 flex-1 leading-tight">
-          <p className="truncate text-sm font-semibold text-white">Eda Karaca</p>
+      <div aria-hidden={collapsed} className={cn("min-w-0 shrink-0 leading-tight transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-none", collapsed ? "translate-x-1 opacity-0" : "translate-x-0 opacity-100 delay-100")}>
+          <p className="truncate text-sm font-semibold text-white">Atahan Bozkurt</p>
           <p className="mt-0.5 truncate text-xs text-slate-400">Yönetici</p>
-        </div>
-      )}
+      </div>
     </div>
   )
 }
@@ -283,7 +281,8 @@ function ManagerMobileNavigation({ open, onOpenChange }: { open: boolean; onOpen
 
 function NavigationGroup({ label, collapsed, items, className }: { label: string; collapsed: boolean; items: { label: string; icon: typeof CalendarDays; to?: string }[]; className?: string }) {
   const { pathname } = useLocation()
-  return <div className={className}><p className="h-6 overflow-hidden px-2 pb-2 text-xs font-medium text-slate-400"><span className={cn("whitespace-nowrap", collapsed && "invisible")}>{label}</span></p>{items.map(({ label: itemLabel, icon: Icon, to }) => to ? <NavLink key={itemLabel} to={to === "/manager/reports" ? getSavedReportsHref() : to} title={collapsed ? itemLabel : undefined} aria-label={collapsed ? itemLabel : undefined} aria-current={pathname === to ? "page" : undefined} className={({ isActive }) => cn("mb-1 flex h-11 items-center whitespace-nowrap rounded-md text-sm font-medium transition-[padding,gap,colors] duration-200", collapsed ? "justify-center" : "gap-3 pl-3 pr-3", isActive ? "bg-blue-600 text-white shadow-sm" : "text-slate-300 hover:bg-slate-800 hover:text-white")}><Icon className="size-5 shrink-0" />{!collapsed && <span className="truncate">{itemLabel}</span>}</NavLink> : <div key={itemLabel} className={cn("mb-1 flex h-11 cursor-not-allowed items-center whitespace-nowrap rounded-md text-sm text-slate-600 transition-[padding,gap] duration-200", collapsed ? "justify-center" : "gap-3 pl-3 pr-3")} aria-disabled="true"><Icon className="size-5 shrink-0" />{!collapsed && <span className="truncate">{itemLabel}</span>}</div>)}</div>
+  const labelTransition = cn("min-w-0 shrink-0 truncate transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-none", collapsed ? "translate-x-1 opacity-0" : "translate-x-0 opacity-100 delay-100")
+  return <div className={className}><p className="h-6 overflow-hidden px-2 pb-2 text-xs font-medium text-slate-400"><span aria-hidden={collapsed} className={cn("inline-block whitespace-nowrap", labelTransition)}>{label}</span></p>{items.map(({ label: itemLabel, icon: Icon, to }) => to ? <NavLink key={itemLabel} to={to === "/manager/reports" ? getSavedReportsHref() : to} title={collapsed ? itemLabel : undefined} aria-label={collapsed ? itemLabel : undefined} aria-current={pathname === to ? "page" : undefined} className={({ isActive }) => cn("mb-1 flex h-11 items-center gap-3 whitespace-nowrap rounded-md px-3 text-sm font-medium transition-colors duration-150", isActive ? "bg-blue-600 text-white shadow-sm" : "text-slate-300 hover:bg-slate-800 hover:text-white")}><Icon className="size-5 shrink-0" /><span aria-hidden={collapsed} className={labelTransition}>{itemLabel}</span></NavLink> : <div key={itemLabel} className="mb-1 flex h-11 cursor-not-allowed items-center gap-3 whitespace-nowrap rounded-md px-3 text-sm text-slate-600" aria-disabled="true"><Icon className="size-5 shrink-0" /><span aria-hidden={collapsed} className={labelTransition}>{itemLabel}</span></div>)}</div>
 }
 
 function MobileNavigationGroup({ label, items, onNavigate, className }: { label: string; items: { label: string; icon: typeof CalendarDays; to?: string }[]; onNavigate(): void; className?: string }) {

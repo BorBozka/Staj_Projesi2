@@ -33,6 +33,8 @@ describe("Visits report UI contracts", () => {
     expect(tabSource).not.toContain("RECORD_ROW_HEIGHT_PX")
     expect(tabSource).not.toContain("recordsPageSize")
     expect(tabSource).toContain("normalizedRecordsPage")
+    expect(tabSource).toContain('className="w-full min-w-[980px] table-fixed text-left text-xs"')
+    expect(tabSource).not.toContain('className="h-full w-full min-w-[980px]')
   })
 
   it("starts the records card directly with the table header and avoids a duplicate divider above pagination", () => {
@@ -40,7 +42,8 @@ describe("Visits report UI contracts", () => {
     const tableHeaderEndIndex = tabSource.indexOf("</thead>")
     expect(tabSource).not.toContain('className="flex h-8 shrink-0 items-center justify-end border-b px-2"')
     expect(tabSource.slice(tableHeaderIndex, tableHeaderEndIndex)).not.toContain("Analize dön")
-    expect(tabSource).toContain('className="record-row-hover h-[3.125rem] cursor-pointer border-b last:border-b-0 transition-colors hover:bg-slate-50')
+    expect(tabSource).toContain('className="record-row-hover h-[3.125rem] cursor-pointer border-b transition-colors hover:bg-slate-50')
+    expect(tabSource).not.toContain("last:border-b-0")
     expect(tabSource).toContain("ziyaret detaylarını görüntüle")
     expect(tabSource).toContain("<VisitDetailsDialog")
   })

@@ -18,6 +18,7 @@ import { isDateRangeInvalid } from "@/features/manager/all-visits-utils"
 import { FleetReportTab } from "@/features/reports/FleetReportTab"
 import { parseFleetReportWorkspace, setFleetReportWorkspace } from "@/features/reports/fleet-report-utils"
 import { GoodsReportTab } from "@/features/reports/GoodsReportTab"
+import { parseGoodsReportWorkspace, setGoodsReportWorkspace } from "@/features/reports/goods-report-utils"
 import {
   getDefaultReportsRange,
   getComparisonPeriod,
@@ -75,15 +76,15 @@ export function ReportsPage() {
   )
   const filters = queryState?.filters
   const fleetWorkspace = useMemo(() => parseFleetReportWorkspace(searchParams), [searchParams])
+  const goodsWorkspace = useMemo(() => parseGoodsReportWorkspace(searchParams), [searchParams])
 
   useEffect(() => {
     saveReportsSearch(searchParams)
   }, [searchParams])
 
-  // Both analysis-workspace tabs fill the remaining viewport without page scroll; Goods keeps
-  // its ordinary report-page flow. Fleet's view state is parsed independently so it does not
-  // reinterpret the Visits workspace state when users switch report tabs.
-  const { ref: workspacePanelRef, height: workspacePanelHeight } = useFillViewportHeight(14, [queryState?.comparison, queryState?.tab, queryState?.view, fleetWorkspace.view])
+  // Each tab parses its own workspace keys. This lets view and pagination choices survive a
+  // tab switch without one report accidentally treating another report's state as its own.
+  const { ref: workspacePanelRef, height: workspacePanelHeight } = useFillViewportHeight(14, [queryState?.comparison, queryState?.tab, queryState?.view, fleetWorkspace.view, goodsWorkspace.view])
 
   if (isLoading) return <ReportsSkeleton />
 
@@ -201,7 +202,7 @@ export function ReportsPage() {
           </div>
 
           <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2">
-            {((queryState.tab === "visits" && queryState.view === "analysis") || (queryState.tab === "vehicle" && fleetWorkspace.view === "analysis")) && (
+            {((queryState.tab === "visits" && queryState.view === "analysis") || (queryState.tab === "vehicle" && fleetWorkspace.view === "analysis") || (queryState.tab === "goods" && goodsWorkspace.view === "analysis")) && (
               <ComparisonFilter value={queryState.comparison} filters={filters} customStart={searchParams.get("compareFrom") ?? ""} onChange={(value) => setSearchParams(setReportsComparison(searchParams, value))} onCustomStart={(value) => setSearchParams(setReportsCustomComparison(searchParams, filters, value))} />
             )}
             {queryState.tab === "visits" && queryState.view === "analysis" && !isTodayRange && (
@@ -210,13 +211,15 @@ export function ReportsPage() {
             {queryState.tab === "visits" && <ReportWorkspaceSwitch mode={queryState.view} onChange={(value) => setSearchParams(setReportsView(searchParams, value))} />}
             {queryState.tab === "vehicle" && fleetWorkspace.view === "analysis" && <FleetDimensionSwitch dimension={fleetWorkspace.dimension} onChange={(dimension) => setSearchParams(setFleetReportWorkspace(searchParams, { dimension }))} />}
             {queryState.tab === "vehicle" && <FleetWorkspaceSwitch view={fleetWorkspace.view} onChange={(view) => setSearchParams(setFleetReportWorkspace(searchParams, { view }))} />}
+            {queryState.tab === "goods" && goodsWorkspace.view === "analysis" && <GranularitySelect value={queryState.granularity} onChange={(value) => setSearchParams(setReportsGranularity(searchParams, value))} />}
+            {queryState.tab === "goods" && <GoodsWorkspaceSwitch view={goodsWorkspace.view} onChange={(view) => setSearchParams(setGoodsReportWorkspace(searchParams, { view }))} />}
           </div>
         </div>
 
         {dateRangeInvalid && <p className="mt-1.5 text-xs font-medium text-red-700" role="alert">Başlangıç tarihi bitiş tarihinden sonra olamaz.</p>}
       </section>
 
-      {queryState.tab === "visits" || queryState.tab === "vehicle" ? (
+      {queryState.tab === "visits" || queryState.tab === "vehicle" || queryState.tab === "goods" ? (
         <div ref={workspacePanelRef} role="tabpanel" className="min-h-0 overflow-hidden" style={workspacePanelHeight !== undefined ? { height: workspacePanelHeight } : undefined}>
           {queryState.tab === "visits" ? (
             <VisitsReportTab
@@ -231,15 +234,13 @@ export function ReportsPage() {
               comparisonFilters={comparisonFilters}
               comparisonLabel={comparisonLabel}
             />
-          ) : (
+          ) : queryState.tab === "vehicle" ? (
             <FleetReportTab meetings={meetings} visits={visits} filters={filters} dateRangeInvalid={dateRangeInvalid} comparisonFilters={comparisonFilters} comparisonLabel={comparisonLabel} />
+          ) : (
+            <GoodsReportTab filters={filters} dateRangeInvalid={dateRangeInvalid} selectedGranularity={queryState.granularity} comparisonFilters={comparisonFilters} comparisonLabel={comparisonLabel} />
           )}
         </div>
-      ) : (
-        <div role="tabpanel">
-          <GoodsReportTab filters={filters} dateRangeInvalid={dateRangeInvalid} />
-        </div>
-      )}
+      ) : null}
     </div>
   )
 }
@@ -280,10 +281,43 @@ function ReportWorkspaceSwitch({ mode, onChange }: { mode: ReportView; onChange(
 }
 
 function ComparisonFilter({ value, filters, customStart, onChange, onCustomStart }: { value: ReportComparisonMode; filters: ReportsScopeFilters; customStart: string; onChange(next: ReportComparisonMode): void; onCustomStart(value: string): void }) {
+  const [open, setOpen] = useState(false)
+  const [pendingCustom, setPendingCustom] = useState(false)
+  const [draftCustomStart, setDraftCustomStart] = useState(customStart)
   const label = comparisonOptions.find((option) => option.value === value)?.label ?? comparisonOptions[0].label
+  const customVisible = pendingCustom || value === "custom"
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen)
+    if (!nextOpen) {
+      // An unfinished custom selection is intentionally local to this menu. Closing it never
+      // replaces an already committed comparison period with an incomplete URL state.
+      setPendingCustom(false)
+      setDraftCustomStart(customStart)
+    } else {
+      setDraftCustomStart(customStart)
+    }
+  }
+
+  const selectComparison = (next: ReportComparisonMode) => {
+    if (next === "custom") {
+      setPendingCustom(true)
+      return
+    }
+    setPendingCustom(false)
+    onChange(next)
+    setOpen(false)
+  }
+
+  const updateCustomStart = (nextStart: string) => {
+    setDraftCustomStart(nextStart)
+    if (!getComparisonPeriod(filters, "custom", nextStart)) return
+    setPendingCustom(false)
+    onCustomStart(nextStart)
+  }
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger asChild>
         <Button type="button" variant="outline" className="h-8 max-w-full justify-start gap-1.5 bg-white px-2.5 text-left text-xs font-normal text-slate-700 shadow-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-blue-300" aria-label={`Karşılaştırma. ${label}`}>
           <ArrowLeftRight className="size-3.5 shrink-0" />
@@ -293,12 +327,12 @@ function ComparisonFilter({ value, filters, customStart, onChange, onCustomStart
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-[min(15rem,calc(100vw-2rem))] p-1.5" aria-label="Karşılaştırma dönemi seç">
         <DropdownMenuLabel className="text-sm text-slate-900">Karşılaştırma</DropdownMenuLabel>
-        <DropdownMenuRadioGroup value={value} onValueChange={(next) => onChange(next as ReportComparisonMode)}>
+        <DropdownMenuRadioGroup value={customVisible ? "custom" : value} onValueChange={(next) => selectComparison(next as ReportComparisonMode)}>
           {comparisonOptions.map((option) => (
-            <DropdownMenuRadioItem key={option.value} value={option.value} className="data-[state=checked]:bg-blue-50 data-[state=checked]:font-medium data-[state=checked]:text-blue-900">{option.label}</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem key={option.value} value={option.value} onSelect={option.value === "custom" ? (event) => event.preventDefault() : undefined} className="data-[state=checked]:bg-blue-50 data-[state=checked]:font-medium data-[state=checked]:text-blue-900">{option.label}</DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
-        {value === "custom" && <div className="mt-1 border-t px-2 pt-2"><label className="text-[11px] font-medium text-slate-600" htmlFor="comparison-custom-from">Karşılaştırma başlangıcı</label><Input id="comparison-custom-from" type="date" value={customStart} onChange={(event) => onCustomStart(event.target.value)} className="mt-1 h-8 text-xs" /><p className="mt-1 text-[10px] text-slate-500">Bitiş, seçili dönemin uzunluğuna göre otomatik hesaplanır.</p>{!getComparisonPeriod(filters, "custom", customStart) && <p className="mt-1 text-[10px] text-amber-700">Geçerli bir başlangıç tarihi seçin.</p>}</div>}
+        {customVisible && <div className="mt-1 border-t px-2 pt-2"><label className="text-[11px] font-medium text-slate-600" htmlFor="comparison-custom-from">Karşılaştırma başlangıcı</label><Input id="comparison-custom-from" type="date" value={draftCustomStart} onChange={(event) => updateCustomStart(event.target.value)} className="mt-1 h-8 text-xs" /><p className="mt-1 text-[10px] text-slate-500">Bitiş, seçili dönemin uzunluğuna göre otomatik hesaplanır.</p>{!getComparisonPeriod(filters, "custom", draftCustomStart) && <p className="mt-1 text-[10px] text-amber-700">Geçerli bir başlangıç tarihi seçin.</p>}</div>}
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -309,6 +343,11 @@ function FleetDimensionSwitch({ dimension, onChange }: { dimension: "vehicles" |
 }
 
 function FleetWorkspaceSwitch({ view, onChange }: { view: "analysis" | "records"; onChange(value: "analysis" | "records"): void }) {
+  const records = view === "records"
+  return <Button type="button" variant="outline" size="sm" className="h-8 shrink-0 gap-1.5 bg-white px-2.5 text-xs font-medium text-slate-700 shadow-none" onClick={() => onChange(records ? "analysis" : "records")}>{records ? <ChartBar className="size-3.5" /> : <List className="size-3.5" />}{records ? "Analize dön" : "Kayıtlar"}</Button>
+}
+
+function GoodsWorkspaceSwitch({ view, onChange }: { view: "analysis" | "records"; onChange(value: "analysis" | "records"): void }) {
   const records = view === "records"
   return <Button type="button" variant="outline" size="sm" className="h-8 shrink-0 gap-1.5 bg-white px-2.5 text-xs font-medium text-slate-700 shadow-none" onClick={() => onChange(records ? "analysis" : "records")}>{records ? <ChartBar className="size-3.5" /> : <List className="size-3.5" />}{records ? "Analize dön" : "Kayıtlar"}</Button>
 }

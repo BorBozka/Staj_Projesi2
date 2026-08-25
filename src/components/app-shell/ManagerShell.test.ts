@@ -20,3 +20,13 @@ describe("ManagerNotifications", () => {
     expect(componentSource).not.toContain("Bildirimleri temizle")
   })
 })
+
+describe("Manager sidebar transition", () => {
+  it("keeps labels mounted and aligns the sidebar and content transitions", () => {
+    expect(componentSource).toContain("transition-[padding-left] duration-300")
+    expect(componentSource).toContain("transition-[width] duration-300")
+    expect(componentSource).toContain("cubic-bezier(0.4,0,0.2,1)")
+    expect(componentSource).toContain("transition-[opacity,transform] duration-150")
+    expect(componentSource).not.toContain("{!collapsed && <span className=\"truncate\">{itemLabel}</span>}")
+  })
+})

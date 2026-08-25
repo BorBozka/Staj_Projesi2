@@ -1,4 +1,4 @@
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
+import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts"
 
 import {
   calculateVisitsTrendYAxis,
@@ -8,6 +8,7 @@ import {
   VISITS_REPORT_STATUS_LABELS,
   type VisitsReportDailyTrendGroupedPoint,
 } from "@/features/reports/visits-report-utils"
+import { ReportChartContainer } from "@/features/reports/ReportChartContainer"
 
 const DEFAULT_MAX_X_AXIS_TICKS = 10
 const LEGEND_ORDER = ["PLANNED", "COMPLETED", "NO_SHOW", "CANCELLED"] as const
@@ -43,9 +44,9 @@ export function VisitsTrendChart({ points, yAxisMax, yAxisTicks, maxXAxisTicks =
   const barSizing = getVisitsTrendBarSizing(points.length)
 
   return (
-    <div className="h-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={points} margin={{ top: 2, right: 4, left: 0, bottom: 2 }} maxBarSize={barSizing.maxBarSize} barCategoryGap={barSizing.barCategoryGap}>
+    <div className="report-chart h-full cursor-default [contain:paint]" aria-label="Ziyaret trend grafiği" onPointerDown={(event) => event.preventDefault()}>
+      <ReportChartContainer>
+        {({ width, height }) => <BarChart width={width} height={height} accessibilityLayer={false} tabIndex={-1} data={points} margin={{ top: 2, right: 4, left: 0, bottom: 2 }} maxBarSize={barSizing.maxBarSize} barCategoryGap={barSizing.barCategoryGap}>
           <CartesianGrid vertical={false} stroke="#e2e8f0" strokeDasharray="3 3" />
           <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={tickInterval} tickLine={false} axisLine={false} />
           <YAxis width={34} tick={{ fontSize: 10 }} allowDecimals={false} tickLine={false} axisLine={false} domain={[0, axis.max]} ticks={axis.ticks} />
@@ -68,8 +69,8 @@ export function VisitsTrendChart({ points, yAxisMax, yAxisTicks, maxXAxisTicks =
           <Bar dataKey="COMPLETED" stackId="status" fill={VISITS_REPORT_STATUS_COLORS.COMPLETED} barSize={barSizing.maxBarSize} maxBarSize={barSizing.maxBarSize} isAnimationActive={false} />
           <Bar dataKey="NO_SHOW" stackId="status" fill={VISITS_REPORT_STATUS_COLORS.NO_SHOW} barSize={barSizing.maxBarSize} maxBarSize={barSizing.maxBarSize} isAnimationActive={false} />
           <Bar dataKey="CANCELLED" stackId="status" fill={VISITS_REPORT_STATUS_COLORS.CANCELLED} barSize={barSizing.maxBarSize} maxBarSize={barSizing.maxBarSize} radius={[3, 3, 0, 0]} isAnimationActive={false} />
-        </BarChart>
-      </ResponsiveContainer>
+        </BarChart>}
+      </ReportChartContainer>
     </div>
   )
 }

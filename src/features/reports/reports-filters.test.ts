@@ -124,6 +124,11 @@ describe("parseReportsQuery", () => {
     })
     expect(parseReportsQuery(new URLSearchParams("tab=vehicle&view=records"), mockVisitReferenceData, now).view).toBe("analysis")
   })
+
+  it("rejects an incomplete custom comparison from the URL", () => {
+    expect(parseReportsQuery(new URLSearchParams("comparison=custom"), mockVisitReferenceData, now)).toMatchObject({ comparison: "none", compareFrom: null, compareTo: null })
+    expect(parseReportsQuery(new URLSearchParams("comparison=custom&compareFrom=2025-07-19"), mockVisitReferenceData, now)).toMatchObject({ comparison: "custom", compareFrom: "2025-07-19", compareTo: "2025-08-17" })
+  })
 })
 
 describe("shared comparison periods", () => {
@@ -142,6 +147,12 @@ describe("shared comparison periods", () => {
   it("cleans stale custom parameters when comparison changes", () => {
     expect(setReportsComparison(new URLSearchParams("comparison=custom&compareFrom=2025-06-01&compareTo=2025-08-31"), "previous").toString()).toBe("comparison=previous")
     expect(setReportsCustomComparison(new URLSearchParams(""), filters, "2025-06-01").toString()).toBe("comparison=custom&compareFrom=2025-06-01&compareTo=2025-08-31")
+  })
+
+  it("does not commit an incomplete custom draft and preserves the previous comparison", () => {
+    const previous = new URLSearchParams("comparison=previous")
+    expect(setReportsCustomComparison(previous, filters, "").toString()).toBe("comparison=previous")
+    expect(setReportsCustomComparison(new URLSearchParams("comparison=custom&compareFrom=2025-06-01&compareTo=2025-08-31"), filters, "").toString()).toBe("comparison=custom&compareFrom=2025-06-01&compareTo=2025-08-31")
   })
 })
 
@@ -162,6 +173,13 @@ describe("reports search param helpers", () => {
   it("omits the tab param for the default visits tab and sets it otherwise", () => {
     expect(setReportsTab(new URLSearchParams("tab=vehicle"), "visits").get("tab")).toBeNull()
     expect(setReportsTab(new URLSearchParams(""), "vehicle").get("tab")).toBe("vehicle")
+  })
+
+  it("preserves each report's independent workspace state while switching tabs", () => {
+    const current = new URLSearchParams("tab=vehicle&view=records&page=2&fleetView=records&fleetPage=4&goodsView=records&goodsPage=3")
+    const visits = setReportsTab(current, "visits")
+    expect(visits.toString()).toBe("view=records&page=2&fleetView=records&fleetPage=4&goodsView=records&goodsPage=3")
+    expect(setReportsTab(visits, "vehicle").toString()).toBe("view=records&page=2&fleetView=records&fleetPage=4&goodsView=records&goodsPage=3&tab=vehicle")
   })
 
   it("sets or clears the from/to range params together", () => {

@@ -4,7 +4,7 @@ import type { PlannedTransportAssignment } from "@/domain/transport-assignments"
 import { filterAssignmentsForReport } from "@/features/reports/fleet-report-utils"
 import { getComparisonPeriod, getDefaultReportsRange, type ReportsScopeFilters } from "@/features/reports/reports-filters"
 import { initialMockResources } from "@/services/mock-resource-data"
-import { mockScenarioNow } from "@/services/mock-scenario"
+import { mockScenarioNow, scenarioDate } from "@/services/mock-scenario"
 import { initialMockTransportAssignments } from "@/services/mock-transport-assignment-data"
 import { initialMockMeetings, initialMockVisitRecords } from "@/services/mock-visit-data"
 
@@ -18,18 +18,18 @@ const previousYear = filterAssignmentsForReport(initialMockTransportAssignments,
 
 describe("deterministic mock transport report dataset", () => {
   it("supplies realistic assignment volume for all comparison periods", () => {
-    expect(initialMockTransportAssignments).toHaveLength(137)
-    expect(current).toHaveLength(57)
+    expect(initialMockTransportAssignments).toHaveLength(151)
+    expect(current).toHaveLength(64)
     expect(previous).toHaveLength(40)
-    expect(previousYear).toHaveLength(38)
+    expect(previousYear).toHaveLength(45)
   })
 
   it("covers diverse current resources, scopes, durations, and cancellations", () => {
     const active = current.filter((assignment) => assignment.status === "ACTIVE")
     expect(new Set(active.map((assignment) => assignment.vehicleResourceId)).size).toBe(9)
-    expect(new Set(active.map((assignment) => assignment.driverResourceId)).size).toBe(9)
+    expect(new Set(active.map((assignment) => assignment.driverResourceId)).size).toBe(10)
     expect(new Set(current.map((assignment) => assignment.facilityId))).toEqual(new Set(["bplas-merkez", "bplas-arge", "otomotiv-uretim"]))
-    expect(current.filter((assignment) => assignment.status === "CANCELLED")).toHaveLength(9)
+    expect(current.filter((assignment) => assignment.status === "CANCELLED")).toHaveLength(10)
     const durations = new Set(active.map(durationMinutes))
     expect([30, 45, 60, 90, 120, 150, 180, 240].every((duration) => durations.has(duration))).toBe(true)
   })
@@ -39,6 +39,20 @@ describe("deterministic mock transport report dataset", () => {
     const previousVehicles = new Set(previous.map((assignment) => assignment.vehicleResourceId))
     expect([...currentVehicles].some((id) => !previousVehicles.has(id))).toBe(true)
     expect([...previousVehicles].some((id) => !currentVehicles.has(id))).toBe(true)
+  })
+
+  it("provides visible vehicle and driver data for today's previous and previous-year comparisons", () => {
+    const today = { startDate: scenarioDate(), endDate: scenarioDate() }
+    const todayPrevious = getComparisonPeriod(today, "previous")!
+    const todayPreviousYear = getComparisonPeriod(today, "previous-year")!
+
+    for (const range of [todayPrevious, todayPreviousYear]) {
+      const assignments = filterAssignmentsForReport(initialMockTransportAssignments, allScope(range))
+      const active = assignments.filter((assignment) => assignment.status === "ACTIVE")
+      expect(active.length).toBeGreaterThan(0)
+      expect(new Set(active.map((assignment) => assignment.vehicleResourceId)).size).toBeGreaterThan(1)
+      expect(new Set(active.map((assignment) => assignment.driverResourceId)).size).toBeGreaterThan(1)
+    }
   })
 
   it("never overlaps active assignments for the same vehicle or driver", () => {

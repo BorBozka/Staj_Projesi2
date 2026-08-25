@@ -71,10 +71,14 @@ export function parseReportsQuery(searchParams: URLSearchParams, referenceData: 
   const facilityId = facility && (companyId === "all" || facility.companyId === companyId) ? facility.id : "all"
   const view: ReportView = tab === "visits" && searchParams.get("view") === "records" ? "records" : "analysis"
   const comparisonParam = searchParams.get("comparison")
-  const comparison: ReportComparisonMode = reportComparisonModes.includes(comparisonParam as ReportComparisonMode) ? comparisonParam as ReportComparisonMode : "none"
+  const requestedComparison: ReportComparisonMode = reportComparisonModes.includes(comparisonParam as ReportComparisonMode) ? comparisonParam as ReportComparisonMode : "none"
   const granularity: ReportGranularity = searchParams.get("granularity") === "weekly" ? "weekly" : "daily"
 
-  const comparisonPeriod = getComparisonPeriod({ startDate: hasExplicitRange ? fromParam ?? "" : defaultRange.startDate, endDate: hasExplicitRange ? toParam ?? "" : defaultRange.endDate }, comparison, searchParams.get("compareFrom"))
+  const reportRange = { startDate: hasExplicitRange ? fromParam ?? "" : defaultRange.startDate, endDate: hasExplicitRange ? toParam ?? "" : defaultRange.endDate }
+  const comparisonPeriod = getComparisonPeriod(reportRange, requestedComparison, searchParams.get("compareFrom"))
+  // A custom comparison only exists once its equal-length range can be derived. This rejects
+  // hand-authored or interrupted `comparison=custom` URLs as safely as the UI avoids creating them.
+  const comparison: ReportComparisonMode = requestedComparison === "custom" && !comparisonPeriod ? "none" : requestedComparison
   return {
     tab,
     view,
@@ -84,8 +88,7 @@ export function parseReportsQuery(searchParams: URLSearchParams, referenceData: 
     compareTo: comparisonPeriod?.endDate ?? null,
     granularity,
     filters: {
-      startDate: hasExplicitRange ? fromParam ?? "" : defaultRange.startDate,
-      endDate: hasExplicitRange ? toParam ?? "" : defaultRange.endDate,
+      ...reportRange,
       companyId,
       facilityId,
     },
@@ -105,10 +108,6 @@ export function setReportsTab(current: URLSearchParams, tab: ReportTab) {
   const next = new URLSearchParams(current)
   if (tab === "visits") next.delete("tab")
   else next.set("tab", tab)
-  if (tab !== "visits") {
-    next.delete("view")
-    next.delete("page")
-  }
   return next
 }
 
@@ -150,12 +149,10 @@ export function setReportsComparison(current: URLSearchParams, comparison: Repor
 
 export function setReportsCustomComparison(current: URLSearchParams, filters: Pick<ReportsScopeFilters, "startDate" | "endDate">, compareFrom: string) {
   const period = getComparisonPeriod(filters, "custom", compareFrom)
+  // Do not manufacture an incomplete custom comparison. The caller may be holding a date
+  // field draft, but URL state remains the previously committed comparison until it is valid.
+  if (!period) return new URLSearchParams(current)
   const next = setReportsComparison(current, "custom")
-  if (!period) {
-    next.delete("compareFrom")
-    next.delete("compareTo")
-    return next
-  }
   next.set("compareFrom", period.startDate)
   next.set("compareTo", period.endDate)
   next.delete("page")

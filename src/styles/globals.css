@@ -59,6 +59,34 @@
 }
 
 @layer utilities {
+  /* Reports are hover-only visualizations. Recharts renders an SVG surface that some
+     browser versions can still focus after a pointer click, leaving a black native outline.
+     Keep the reset scoped to reports so normal keyboard focus remains visible elsewhere. */
+  .report-chart .recharts-wrapper,
+  .report-chart .recharts-surface,
+  .report-chart .recharts-layer,
+  .report-chart .recharts-bar,
+  .report-chart .recharts-bar-rectangles,
+  .report-chart .recharts-bar-rectangle,
+  .report-chart .recharts-rectangle,
+  .report-chart .recharts-wrapper:focus,
+  .report-chart .recharts-surface:focus,
+  .report-chart .recharts-layer:focus,
+  .report-chart .recharts-bar:focus,
+  .report-chart .recharts-bar-rectangles:focus,
+  .report-chart .recharts-bar-rectangle:focus,
+  .report-chart .recharts-rectangle:focus,
+  .report-chart .recharts-wrapper:focus-visible,
+  .report-chart .recharts-surface:focus-visible,
+  .report-chart .recharts-layer:focus-visible,
+  .report-chart .recharts-bar:focus-visible,
+  .report-chart .recharts-bar-rectangles:focus-visible,
+  .report-chart .recharts-bar-rectangle:focus-visible,
+  .report-chart .recharts-rectangle:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
   /* Table rows paint below their cells. Apply the hover state to the cells so its contrast
      remains identical from the first record through the last one. */
   .record-row-hover > td {

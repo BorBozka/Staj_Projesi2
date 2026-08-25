@@ -141,10 +141,14 @@ describe("fleet chart scale and interaction helpers", () => {
 
 describe("fleet report URL state and pagination", () => {
   it("defaults invalid workspace parameters and persists non-default state", () => {
-    expect(parseFleetReportWorkspace(new URLSearchParams("view=wrong&dimension=wrong&page=0"))).toEqual({ view: "analysis", dimension: "vehicles", page: 1 })
+    expect(parseFleetReportWorkspace(new URLSearchParams("fleetView=wrong&fleetDimension=wrong&fleetPage=0"))).toEqual({ view: "analysis", dimension: "vehicles", page: 1 })
     const records = setFleetReportWorkspace(new URLSearchParams("tab=vehicle&granularity=daily&page=3"), { view: "records", dimension: "drivers" })
-    expect(records.toString()).toBe("tab=vehicle&granularity=daily&view=records&dimension=drivers")
-    expect(setFleetReportPage(records, 2).toString()).toBe("tab=vehicle&granularity=daily&view=records&dimension=drivers&page=2")
+    expect(records.toString()).toBe("tab=vehicle&granularity=daily&page=3&fleetView=records&fleetDimension=drivers")
+    expect(setFleetReportPage(records, 2).toString()).toBe("tab=vehicle&granularity=daily&page=3&fleetView=records&fleetDimension=drivers&fleetPage=2")
+  })
+
+  it("ignores visits workspace keys so tab switches cannot overwrite fleet state", () => {
+    expect(parseFleetReportWorkspace(new URLSearchParams("view=records&page=4&fleetView=records&fleetPage=3"))).toEqual({ view: "records", dimension: "vehicles", page: 3 })
   })
 
   it("uses the fixed nine-row records page size", () => {
