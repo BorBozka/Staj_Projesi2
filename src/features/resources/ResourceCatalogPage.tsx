@@ -1,6 +1,7 @@
-import { AlertCircle, ArrowDown, ArrowUp, Boxes, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FilterX, Plus, Search, X } from "lucide-react"
+import { AlertCircle, ArrowDown, ArrowUp, Boxes, ChevronDown, FilterX, Plus, Search, X } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 
+import { PaginationFooter } from "@/components/common/PaginationFooter"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
@@ -225,7 +226,7 @@ export function ResourceCatalogPage() {
         </div>
       )}
 
-      <section ref={setTableSectionRefs} className="scroll-mt-3 flex h-full min-h-[35.5rem] flex-col justify-between overflow-hidden rounded-lg border bg-card shadow-panel" style={tableViewportHeight !== undefined ? { height: tableViewportHeight } : undefined} aria-label="Kaynak kataloğu">
+      <section ref={setTableSectionRefs} className={cn("scroll-mt-3 flex h-full min-h-0 flex-col justify-between overflow-hidden rounded-lg border bg-card shadow-panel", tableViewportHeight === undefined && "min-h-[35.5rem]")} style={tableViewportHeight !== undefined ? { height: tableViewportHeight } : undefined} aria-label="Kaynak kataloğu">
         {filteredResources.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center px-4 py-24 text-center">
             <Boxes className="mx-auto size-8 text-slate-400" />
@@ -317,84 +318,16 @@ export function ResourceCatalogPage() {
           </div>
         )}
 
-        <div className="flex flex-col gap-2 border-t bg-slate-50/50 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs tabular-nums text-slate-600">{visibleStart}–{visibleEnd} / {filteredResources.length} kayıt</p>
-          <nav className="flex items-center gap-1" aria-label="Kaynak sayfaları">
-            {page > 1 && (
-              <>
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  className="h-8 w-8 text-xs"
-                  onClick={() => changePage(1)}
-                  title="İlk sayfa"
-                  aria-label="İlk sayfa"
-                >
-                  <ChevronsLeft className="size-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  className="h-8 w-8 text-xs"
-                  onClick={() => changePage(page - 1)}
-                  title="Önceki sayfa"
-                  aria-label="Önceki sayfa"
-                >
-                  <ChevronLeft className="size-4" />
-                </Button>
-              </>
-            )}
-            {(() => {
-              const visible = getVisibleResourcePageNumbers(page, Math.max(1, pageCount))
-              return (
-                <>
-                  {visible.map((pageNumber) => (
-                    <Button
-                      key={pageNumber}
-                      variant={pageNumber === page ? "default" : "outline"}
-                      size="icon-sm"
-                      className="h-8 w-8 text-xs"
-                      aria-current={pageNumber === page ? "page" : undefined}
-                      aria-label={`${pageNumber}. sayfa`}
-                      onClick={() => changePage(pageNumber)}
-                    >
-                      {pageNumber}
-                    </Button>
-                  ))}
-                </>
-              )
-            })()}
-            {page < pageCount ? (
-              <>
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  className="h-8 w-8 text-xs"
-                  onClick={() => changePage(page + 1)}
-                  title="Sonraki sayfa"
-                  aria-label="Sonraki sayfa"
-                >
-                  <ChevronRight className="size-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  className="h-8 w-8 text-xs"
-                  onClick={() => changePage(pageCount)}
-                  title="Son sayfa"
-                  aria-label="Son sayfa"
-                >
-                  <ChevronsRight className="size-4" />
-                </Button>
-              </>
-            ) : (
-              <>
-                <span key="slot-next" className="h-8 w-8 invisible" aria-hidden="true" />
-                <span key="slot-last" className="h-8 w-8 invisible" aria-hidden="true" />
-              </>
-            )}
-          </nav>
-        </div>
+        <PaginationFooter
+          page={page}
+          pageCount={pageCount}
+          visibleStart={visibleStart}
+          visibleEnd={visibleEnd}
+          total={filteredResources.length}
+          visiblePageNumbers={getVisibleResourcePageNumbers(page, Math.max(1, pageCount))}
+          onPageChange={changePage}
+          ariaLabel="Kaynak sayfaları"
+        />
       </section>
 
       <ResourceFormDialog

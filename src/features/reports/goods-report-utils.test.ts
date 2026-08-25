@@ -16,6 +16,8 @@ import {
   paginateGoodsReport,
   setGoodsReportPage,
   setGoodsReportWorkspace,
+  searchGoodsReportRecords,
+  sortGoodsReportRecords,
 } from "@/features/reports/goods-report-utils"
 
 const baseFilters: ReportsScopeFilters = { startDate: "", endDate: "", companyId: "all", facilityId: "all" }
@@ -57,6 +59,21 @@ describe("calculateGoodsReportKpis", () => {
 
   it("reports zero totals and rate when there is no data", () => {
     expect(calculateGoodsReportKpis([])).toEqual({ total: 0, inbound: 0, outbound: 0, lateRate: 0 })
+  })
+})
+
+describe("goods records search and sort", () => {
+  it("matches counterparty, reference, plate, driver and scope fields", () => {
+    const searchable = [movement("plate", "INBOUND", "2026-08-10", { companyId: "bplas", facilityId: "bplas-merkez", referenceNumber: "REF-42", actualPlate: "16 ABC 16", actualDriverName: "Mehmet Kaya" })]
+    expect(searchGoodsReportRecords(searchable, "mehmet")).toHaveLength(1)
+    expect(searchGoodsReportRecords(searchable, "ref-42")).toHaveLength(1)
+    expect(searchGoodsReportRecords(searchable, "16 abc")).toHaveLength(1)
+    expect(searchGoodsReportRecords(searchable, "BPLAS-MERKEZ")).toHaveLength(1)
+  })
+
+  it("sorts date and keeps null actual times deterministic", () => {
+    expect(ids(sortGoodsReportRecords(movements, { field: "planned", direction: "asc" }))).toEqual(["1", "2", "3"])
+    expect(ids(sortGoodsReportRecords(movements, { field: "actual", direction: "desc" }))).toEqual(["1", "2", "3"])
   })
 })
 
@@ -104,7 +121,7 @@ describe("goods movement trend analysis", () => {
 describe("goods workspace and summary helpers", () => {
   it("keeps the goods workspace isolated in its own URL keys", () => {
     const state = parseGoodsReportWorkspace(new URLSearchParams("view=records&page=3&goodsView=records&goodsPage=2"))
-    expect(state).toEqual({ view: "records", page: 2 })
+    expect(state).toEqual({ view: "records", page: 2, search: "", sort: null })
     const recordsSearch = setGoodsReportWorkspace(new URLSearchParams("view=records&page=3"), { view: "records" })
     expect(recordsSearch.toString()).toBe("view=records&page=3&goodsView=records")
     expect(setGoodsReportPage(recordsSearch, 4).get("goodsPage")).toBe("4")
@@ -141,6 +158,9 @@ function movement(id: string, direction: GoodsMovement["direction"], plannedDate
   facilityId: string
   status?: GoodsMovement["status"]
   plannedTime?: string
+  referenceNumber?: string
+  actualPlate?: string
+  actualDriverName?: string
 }): GoodsMovement {
   return {
     id,
@@ -153,6 +173,9 @@ function movement(id: string, direction: GoodsMovement["direction"], plannedDate
     plannedDate,
     plannedTime: overrides.plannedTime,
     goodsDescription: "Test kalemi",
+    referenceNumber: overrides.referenceNumber,
+    actualPlate: overrides.actualPlate,
+    actualDriverName: overrides.actualDriverName,
     status: overrides.status ?? "PLANNED",
     createdAt: `${plannedDate}T08:00:00+03:00`,
   }

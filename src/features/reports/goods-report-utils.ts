@@ -5,13 +5,16 @@ import type { ReportsScopeFilters } from "@/features/reports/reports-filters"
 import { calculateVisitsTrendYAxis } from "@/features/reports/visits-report-utils"
 import { formatTr } from "@/lib/date"
 import { getPageCount as getPageCountShared, paginate } from "@/lib/pagination"
+import { matchesReportSearch, sortReportRecords } from "@/features/reports/report-records-utils"
+import type { SingleSortState } from "@/lib/sort"
 
 export const GOODS_REPORT_PAGE_SIZE = 10
 export type GoodsReportView = "analysis" | "records"
 export type GoodsReportGranularity = "daily" | "weekly"
 export type GoodsTrendGranularity = GoodsReportGranularity | "hourly"
+export type GoodsReportSortField = "direction" | "scope" | "counterparty" | "planned" | "actual" | "status" | "reference" | "driver"
 
-export interface GoodsReportWorkspaceState { view: GoodsReportView; page: number }
+export interface GoodsReportWorkspaceState { view: GoodsReportView; page: number; search: string; sort: SingleSortState<GoodsReportSortField> }
 export interface GoodsReportKpis { total: number; inbound: number; outbound: number; lateRate: number }
 export interface GoodsMovementTrendPoint { date: string; label: string; periodDayCount?: number; INBOUND: number; OUTBOUND: number }
 
@@ -32,6 +35,24 @@ export function filterGoodsMovementsForReport(movements: GoodsMovement[], filter
       && (!rangeStart || planned >= rangeStart) && (!rangeEnd || planned <= rangeEnd)
   })
   return [...filtered].sort((left, right) => `${right.plannedDate}${right.plannedTime ?? ""}`.localeCompare(`${left.plannedDate}${left.plannedTime ?? ""}`))
+}
+
+export function searchGoodsReportRecords(movements: GoodsMovement[], search: string) {
+  return movements.filter((movement) => matchesReportSearch(search, [movement.counterpartyName, movement.referenceNumber, movement.actualPlate, movement.actualDriverName, movement.companyName, movement.facilityName]))
+}
+
+export function sortGoodsReportRecords(movements: GoodsMovement[], sort: SingleSortState<GoodsReportSortField>) {
+  return sortReportRecords(movements, sort, (movement, field) => {
+    if (field === "direction") return movement.direction
+    if (field === "scope") return `${movement.companyName} ${movement.facilityName}`
+    if (field === "counterparty") return movement.counterpartyName
+    if (field === "planned") return new Date(`${movement.plannedDate}T${movement.plannedTime ?? "00:00"}:00`).getTime()
+    if (field === "actual") return movement.actualAt ? new Date(movement.actualAt).getTime() : null
+    if (field === "status") return { PLANNED: 0, COMPLETED: 1, LATE: 2, CANCELLED: 3 }[getGoodsMovementDisplayStatus(movement)]
+    if (field === "reference") return movement.referenceNumber
+    const driverLabel = [movement.actualPlate, movement.actualDriverName].filter(Boolean).join(" ")
+    return driverLabel || null
+  })
 }
 
 export function calculateGoodsReportKpis(movements: GoodsMovement[], now = new Date()): GoodsReportKpis {
@@ -143,12 +164,16 @@ export function isGoodsRecordActivationKey(key: string) { return key === "Enter"
 
 export function parseGoodsReportWorkspace(searchParams: URLSearchParams): GoodsReportWorkspaceState {
   const rawPage = Number(searchParams.get("goodsPage"))
-  return { view: searchParams.get("goodsView") === "records" ? "records" : "analysis", page: Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1 }
+  const rawSort = searchParams.get("goodsSort")
+  const validSort: GoodsReportSortField | null = ["direction", "scope", "counterparty", "planned", "actual", "status", "reference", "driver"].includes(rawSort ?? "") ? rawSort as GoodsReportSortField : null
+  return { view: searchParams.get("goodsView") === "records" ? "records" : "analysis", page: Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1, search: searchParams.get("goodsSearch")?.trim() ?? "", sort: validSort ? { field: validSort, direction: searchParams.get("goodsDir") === "desc" ? "desc" : "asc" } : null }
 }
 
-export function setGoodsReportWorkspace(current: URLSearchParams, nextState: Partial<Pick<GoodsReportWorkspaceState, "view">>) {
+export function setGoodsReportWorkspace(current: URLSearchParams, nextState: Partial<Pick<GoodsReportWorkspaceState, "view" | "search" | "sort">>) {
   const next = new URLSearchParams(current)
   if (nextState.view) { if (nextState.view === "analysis") next.delete("goodsView"); else next.set("goodsView", nextState.view) }
+  if (nextState.search !== undefined) { if (nextState.search.trim()) next.set("goodsSearch", nextState.search.trim()); else next.delete("goodsSearch") }
+  if (nextState.sort !== undefined) { if (nextState.sort) { next.set("goodsSort", nextState.sort.field); next.set("goodsDir", nextState.sort.direction) } else { next.delete("goodsSort"); next.delete("goodsDir") } }
   next.delete("goodsPage")
   return next
 }

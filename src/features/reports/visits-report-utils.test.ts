@@ -24,6 +24,8 @@ import {
   getVisitReportStatusGroup,
   groupVisitsReportDailyTrendByOutcome,
   paginateReportVisits,
+  searchVisitsReportRecords,
+  sortVisitsReportRecords,
   VISITS_REPORT_PAGE_SIZE,
   VISITS_REPORT_STATUS_LABELS,
 } from "@/features/reports/visits-report-utils"
@@ -56,6 +58,21 @@ describe("filterVisitsForReport", () => {
 
   it("sorts by planned start descending, most recent first", () => {
     expect(ids(filterVisitsForReport(visits, baseFilters))).toEqual(["4", "3", "2", "1"])
+  })
+})
+
+describe("visits records search and sort", () => {
+  it("searches visitor, visitor company and host with Turkish case handling", () => {
+    expect(ids(searchVisitsReportRecords(visits, "ayşe"))).toEqual(["1"])
+    expect(ids(searchVisitsReportRecords(visits, "TEST A.Ş."))).toEqual(["1", "2", "3", "4"])
+    expect(ids(searchVisitsReportRecords(visits, "selin"))).toEqual(["3"])
+    expect(searchVisitsReportRecords(visits, "")).toHaveLength(4)
+  })
+
+  it("sorts representative string, date and status fields", () => {
+    expect(ids(sortVisitsReportRecords(visits, { field: "visitor", direction: "desc" }))).toEqual(["4", "3", "2", "1"])
+    expect(ids(sortVisitsReportRecords(visits, { field: "date", direction: "desc" }))).toEqual(["4", "3", "2", "1"])
+    expect(ids(sortVisitsReportRecords(visits, { field: "status", direction: "asc" }))).toEqual(["1", "2", "4", "3"])
   })
 })
 

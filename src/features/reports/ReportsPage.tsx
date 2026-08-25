@@ -1,5 +1,5 @@
-import { AlertCircle, ArrowLeftRight, Building2, ChartBar, ChevronDown, FilterX, List } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { AlertCircle, ArrowLeftRight, Building2, ChartBar, ChevronDown, Download, FilterX, List, Search } from "lucide-react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
@@ -7,6 +7,7 @@ import { QuickDateRangeSelect } from "@/components/common/QuickDateRangeSelect"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -22,7 +23,9 @@ import { parseGoodsReportWorkspace, setGoodsReportWorkspace } from "@/features/r
 import {
   getDefaultReportsRange,
   getComparisonPeriod,
+  parseRecordsReportFilters,
   resetReportsFilters,
+  resetRecordsReportFilters,
   saveReportsSearch,
   setReportsComparison,
   setReportsCustomComparison,
@@ -32,9 +35,12 @@ import {
   getQuickRangeOptions,
   parseReportsQuery,
   reportTabs,
+  setRecordsReportRange,
   setReportsRange,
   setReportsTab,
   setReportsView,
+  setVisitsReportRecordsWorkspace,
+  updateRecordsReportSearchParams,
   updateReportsSearchParams,
   type ReportComparisonMode,
   type ReportGranularity,
@@ -42,6 +48,7 @@ import {
   type ReportView,
   type ReportsScopeFilters,
 } from "@/features/reports/reports-filters"
+import type { ReportExportHandle } from "@/features/reports/report-export"
 import {
   VisitsReportTab,
 } from "@/features/reports/VisitsReportTab"
@@ -69,14 +76,25 @@ export function ReportsPage() {
   const { meetings, visits, referenceData, isLoading, error, reload } = useVisits()
   const [searchParams, setSearchParams] = useSearchParams()
   const [now] = useState(() => new Date())
+  const exportRef = useRef<ReportExportHandle>(null)
+  const [exportAvailability, setExportAvailability] = useState({ key: "", canExport: false })
 
   const queryState = useMemo(
     () => referenceData ? parseReportsQuery(searchParams, referenceData, now) : null,
     [referenceData, searchParams, now],
   )
-  const filters = queryState?.filters
+  const recordsFilters = useMemo(
+    () => referenceData ? parseRecordsReportFilters(searchParams, referenceData, now) : null,
+    [referenceData, searchParams, now],
+  )
   const fleetWorkspace = useMemo(() => parseFleetReportWorkspace(searchParams), [searchParams])
   const goodsWorkspace = useMemo(() => parseGoodsReportWorkspace(searchParams), [searchParams])
+
+  const analysisMode = queryState?.tab === "visits" ? queryState.view === "analysis" : queryState?.tab === "vehicle" ? fleetWorkspace.view === "analysis" : goodsWorkspace.view === "analysis"
+  const recordsMode = !analysisMode
+  const filters = analysisMode ? queryState?.filters : recordsFilters
+  const activeExportKey = `${queryState?.tab ?? "visits"}:${analysisMode ? "analysis" : "records"}`
+  const updateExportAvailability = useCallback((key: string, canExport: boolean) => setExportAvailability((current) => current.key === key && current.canExport === canExport ? current : { key, canExport }), [])
 
   useEffect(() => {
     saveReportsSearch(searchParams)
@@ -88,7 +106,7 @@ export function ReportsPage() {
 
   if (isLoading) return <ReportsSkeleton />
 
-  if (error || !referenceData || !filters || !queryState) {
+  if (error || !referenceData || !filters || !queryState || !recordsFilters) {
     return (
       <section className="rounded-lg border border-red-200 bg-white px-5 py-12 text-center shadow-panel" role="alert">
         <AlertCircle className="mx-auto size-8 text-red-600" />
@@ -106,24 +124,29 @@ export function ReportsPage() {
     || filters.endDate !== defaultRange.endDate
     || filters.companyId !== "all"
     || filters.facilityId !== "all"
-    || queryState.comparison !== "none"
-    || queryState.granularity !== "daily"
+    || (analysisMode && (queryState.comparison !== "none" || queryState.granularity !== "daily"))
   const quickRanges = getQuickRangeOptions(now)
   const maxEndDate = getMaxEndDate(now)
-  const comparisonPeriod = getComparisonPeriod(filters, queryState.comparison, searchParams.get("compareFrom"))
-  const comparisonFilters = comparisonPeriod ? { ...filters, ...comparisonPeriod } : null
+  const comparisonPeriod = getComparisonPeriod(queryState.filters, queryState.comparison, searchParams.get("compareFrom"))
+  const comparisonFilters = comparisonPeriod ? { ...queryState.filters, ...comparisonPeriod } : null
   const comparisonLabel = comparisonOptions.find((item) => item.value === queryState.comparison)?.label ?? "Önceki dönem"
 
-  const setFilter = (key: string, value: string) => {
+  const setFilter = (key: "from" | "to" | "company" | "facility", value: string) => {
+    if (recordsMode) {
+      setSearchParams(updateRecordsReportSearchParams(searchParams, key, value))
+      return
+    }
     setSearchParams(updateReportsSearchParams(searchParams, key, value))
   }
 
   const setRange = (startDate: string, endDate: string) => {
-    setSearchParams(setReportsRange(searchParams, startDate, endDate))
+    setSearchParams(recordsMode
+      ? setRecordsReportRange(searchParams, startDate, endDate)
+      : setReportsRange(searchParams, startDate, endDate))
   }
 
   const resetToDefault = () => {
-    setSearchParams(resetReportsFilters(searchParams))
+    setSearchParams(recordsMode ? resetRecordsReportFilters(searchParams) : resetReportsFilters(searchParams))
   }
 
   const selectTab = (tab: ReportTab) => {
@@ -164,6 +187,14 @@ export function ReportsPage() {
             )
           })}
         </nav>
+        <ReportExportAction canExport={exportAvailability.key === activeExportKey && exportAvailability.canExport && !dateRangeInvalid} analysisMode={analysisMode} onExport={(kind) => {
+          const handle = exportRef.current
+          if (!handle) return
+          if (kind === "png") handle.exportChartPng?.()
+          else if (kind === "csv") handle.exportCsv()
+          else if (kind === "excel") handle.exportExcel()
+          else handle.exportPdf()
+        }} />
 
       </div>
 
@@ -182,8 +213,8 @@ export function ReportsPage() {
           </Button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        <div className={cn("flex flex-wrap items-center gap-2", recordsMode && "lg:flex-nowrap")}>
+          <div className={cn("flex min-w-0 flex-1 flex-wrap items-center gap-2", recordsMode && "lg:flex-none lg:flex-nowrap")}>
             <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             <label htmlFor="reports-from" className="sr-only">Başlangıç tarihi</label>
             <Input id="reports-from" type="date" value={filters.startDate} aria-invalid={dateRangeInvalid} onChange={(event) => setFilter("from", event.target.value)} className="h-8 w-[8.75rem] text-xs" />
@@ -196,12 +227,15 @@ export function ReportsPage() {
               <QuickDateRangeSelect options={quickRanges} startDate={filters.startDate} endDate={filters.endDate} onSelect={setRange} ariaLabel="Hızlı tarih aralığı" />
             </div>
 
-            <div className="min-w-[12rem] flex-1">
+            <div className={cn("min-w-[12rem] flex-1", recordsMode && "lg:w-[15rem] lg:flex-none")}>
               <ScopeFilter filters={filters} companyOptions={referenceData.companies} facilityOptions={facilities} onSelectCompany={(value) => setFilter("company", value)} onSelectFacility={(value) => setFilter("facility", value)} />
             </div>
           </div>
 
-          <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <div className={cn("ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2", recordsMode && "lg:flex-nowrap")}>
+            {queryState.tab === "visits" && queryState.view === "records" && <RecordsSearch value={queryState.search} placeholder="Ziyaretçi, firma veya çalışan ara" onChange={(search) => setSearchParams(setVisitsReportRecordsWorkspace(searchParams, { search }))} />}
+            {queryState.tab === "vehicle" && fleetWorkspace.view === "records" && <RecordsSearch value={fleetWorkspace.search} placeholder="Araç, plaka, şoför veya amaç ara" onChange={(search) => setSearchParams(setFleetReportWorkspace(searchParams, { search }))} />}
+            {queryState.tab === "goods" && goodsWorkspace.view === "records" && <RecordsSearch value={goodsWorkspace.search} placeholder="Karşı taraf, referans, plaka veya şoför ara" onChange={(search) => setSearchParams(setGoodsReportWorkspace(searchParams, { search }))} />}
             {((queryState.tab === "visits" && queryState.view === "analysis") || (queryState.tab === "vehicle" && fleetWorkspace.view === "analysis") || (queryState.tab === "goods" && goodsWorkspace.view === "analysis")) && (
               <ComparisonFilter value={queryState.comparison} filters={filters} customStart={searchParams.get("compareFrom") ?? ""} onChange={(value) => setSearchParams(setReportsComparison(searchParams, value))} onCustomStart={(value) => setSearchParams(setReportsCustomComparison(searchParams, filters, value))} />
             )}
@@ -223,6 +257,7 @@ export function ReportsPage() {
         <div ref={workspacePanelRef} role="tabpanel" className="min-h-0 overflow-hidden" style={workspacePanelHeight !== undefined ? { height: workspacePanelHeight } : undefined}>
           {queryState.tab === "visits" ? (
             <VisitsReportTab
+              ref={exportRef}
               visits={visits}
               filters={filters}
               dateRangeInvalid={dateRangeInvalid}
@@ -230,14 +265,18 @@ export function ReportsPage() {
               selectedGranularity={queryState.granularity}
               recordsPage={queryState.page}
               onRecordsPageChange={(page) => setSearchParams(setReportsPage(searchParams, page))}
+              recordsSearch={queryState.search}
+              recordsSort={queryState.sort}
+              onRecordsSortChange={(sort) => setSearchParams(setVisitsReportRecordsWorkspace(searchParams, { sort }))}
               comparisonEnabled={comparisonFilters !== null}
               comparisonFilters={comparisonFilters}
               comparisonLabel={comparisonLabel}
+              onExportAvailabilityChange={(canExport) => updateExportAvailability(`visits:${queryState.view}`, canExport)}
             />
           ) : queryState.tab === "vehicle" ? (
-            <FleetReportTab meetings={meetings} visits={visits} filters={filters} dateRangeInvalid={dateRangeInvalid} comparisonFilters={comparisonFilters} comparisonLabel={comparisonLabel} />
+            <FleetReportTab ref={exportRef} meetings={meetings} visits={visits} filters={filters} dateRangeInvalid={dateRangeInvalid} comparisonFilters={comparisonFilters} comparisonLabel={comparisonLabel} onExportAvailabilityChange={(canExport) => updateExportAvailability(`vehicle:${fleetWorkspace.view}`, canExport)} />
           ) : (
-            <GoodsReportTab filters={filters} dateRangeInvalid={dateRangeInvalid} selectedGranularity={queryState.granularity} comparisonFilters={comparisonFilters} comparisonLabel={comparisonLabel} />
+            <GoodsReportTab ref={exportRef} filters={filters} dateRangeInvalid={dateRangeInvalid} selectedGranularity={queryState.granularity} comparisonFilters={comparisonFilters} comparisonLabel={comparisonLabel} onExportAvailabilityChange={(canExport) => updateExportAvailability(`goods:${goodsWorkspace.view}`, canExport)} />
           )}
         </div>
       ) : null}
@@ -345,6 +384,18 @@ function FleetDimensionSwitch({ dimension, onChange }: { dimension: "vehicles" |
 function FleetWorkspaceSwitch({ view, onChange }: { view: "analysis" | "records"; onChange(value: "analysis" | "records"): void }) {
   const records = view === "records"
   return <Button type="button" variant="outline" size="sm" className="h-8 shrink-0 gap-1.5 bg-white px-2.5 text-xs font-medium text-slate-700 shadow-none" onClick={() => onChange(records ? "analysis" : "records")}>{records ? <ChartBar className="size-3.5" /> : <List className="size-3.5" />}{records ? "Analize dön" : "Kayıtlar"}</Button>
+}
+
+function RecordsSearch({ value, placeholder, onChange }: { value: string; placeholder: string; onChange(value: string): void }) {
+  return <label className="relative w-[min(17rem,100%)] shrink-0"><span className="sr-only">Kayıtlarda ara</span><Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" aria-hidden="true" /><Input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-8 w-full pl-8 text-xs" /></label>
+}
+
+function ReportExportAction({ canExport, analysisMode, onExport }: { canExport: boolean; analysisMode: boolean; onExport(kind: "png" | "csv" | "excel" | "pdf"): void }) {
+  if (analysisMode) {
+    return <Button type="button" variant="outline" size="sm" disabled={!canExport} onClick={() => onExport("png")} className="h-8 shrink-0 gap-1.5 bg-white px-2.5 text-xs font-medium text-slate-700 shadow-none"><Download className="size-3.5" aria-hidden="true" />Grafiği indir</Button>
+  }
+
+  return <DropdownMenu><DropdownMenuTrigger asChild><Button type="button" variant="outline" size="sm" disabled={!canExport} className="h-8 shrink-0 gap-1.5 bg-white px-2.5 text-xs font-medium text-slate-700 shadow-none"><Download className="size-3.5" aria-hidden="true" />İndir<ChevronDown className="size-3" aria-hidden="true" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-36" aria-label="Rapor indir"><DropdownMenuItem onSelect={() => onExport("csv")}>CSV</DropdownMenuItem><DropdownMenuItem onSelect={() => onExport("excel")}>Excel</DropdownMenuItem><DropdownMenuItem onSelect={() => onExport("pdf")}>PDF</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
 }
 
 function GoodsWorkspaceSwitch({ view, onChange }: { view: "analysis" | "records"; onChange(value: "analysis" | "records"): void }) {

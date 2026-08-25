@@ -2,6 +2,8 @@ import { addDays, differenceInCalendarDays, format, isValid, parse, subDays, sub
 
 import type { VisitReferenceData } from "@/domain/visits"
 import { getQuickDateRangeOptions, matchesQuickDateRange, type QuickDateRangeKey, type QuickDateRangeOption } from "@/lib/quick-date-range"
+import type { SingleSortState } from "@/lib/sort"
+import type { VisitsReportSortField } from "@/features/reports/visits-report-utils"
 
 export const reportTabs = ["visits", "vehicle", "goods"] as const
 export type ReportTab = (typeof reportTabs)[number]
@@ -30,6 +32,8 @@ export interface ReportsQueryState {
   compareFrom: string | null
   compareTo: string | null
   granularity: ReportGranularity
+  search: string
+  sort: SingleSortState<VisitsReportSortField>
 }
 
 export type QuickRangeKey = QuickDateRangeKey
@@ -55,27 +59,15 @@ export function parseReportsQuery(searchParams: URLSearchParams, referenceData: 
   const tabParam = searchParams.get("tab")
   const tab: ReportTab = reportTabs.includes(tabParam as ReportTab) ? (tabParam as ReportTab) : "visits"
 
-  const fromParam = parseDateParameter(searchParams.get("from"))
-  const rawToParam = parseDateParameter(searchParams.get("to"))
-  const maxEndDate = getMaxEndDate(now)
-  // Clamp here (the single source of truth for `filters`) rather than only in the date-picker's
-  // onChange, so a hand-edited URL or bookmark can't sneak a future end date into the analysis.
-  const toParam = rawToParam && rawToParam > maxEndDate ? maxEndDate : rawToParam
-  const hasExplicitRange = Boolean(fromParam || toParam)
-  const defaultRange = getDefaultReportsRange(now)
-
-  const companyParam = searchParams.get("company")
-  const companyId = referenceData.companies.some((company) => company.id === companyParam) ? companyParam! : "all"
-  const facilityParam = searchParams.get("facility")
-  const facility = referenceData.facilities.find((item) => item.id === facilityParam)
-  const facilityId = facility && (companyId === "all" || facility.companyId === companyId) ? facility.id : "all"
+  const filters = parseReportsScopeFilters(searchParams, referenceData, now, reportsAnalysisScopeKeys)
   const view: ReportView = tab === "visits" && searchParams.get("view") === "records" ? "records" : "analysis"
   const comparisonParam = searchParams.get("comparison")
   const requestedComparison: ReportComparisonMode = reportComparisonModes.includes(comparisonParam as ReportComparisonMode) ? comparisonParam as ReportComparisonMode : "none"
   const granularity: ReportGranularity = searchParams.get("granularity") === "weekly" ? "weekly" : "daily"
+  const rawSort = searchParams.get("visitSort")
+  const validSort: VisitsReportSortField | null = ["date", "visitor", "company", "host", "planned", "duration", "status"].includes(rawSort ?? "") ? rawSort as VisitsReportSortField : null
 
-  const reportRange = { startDate: hasExplicitRange ? fromParam ?? "" : defaultRange.startDate, endDate: hasExplicitRange ? toParam ?? "" : defaultRange.endDate }
-  const comparisonPeriod = getComparisonPeriod(reportRange, requestedComparison, searchParams.get("compareFrom"))
+  const comparisonPeriod = getComparisonPeriod(filters, requestedComparison, searchParams.get("compareFrom"))
   // A custom comparison only exists once its equal-length range can be derived. This rejects
   // hand-authored or interrupted `comparison=custom` URLs as safely as the UI avoids creating them.
   const comparison: ReportComparisonMode = requestedComparison === "custom" && !comparisonPeriod ? "none" : requestedComparison
@@ -87,12 +79,17 @@ export function parseReportsQuery(searchParams: URLSearchParams, referenceData: 
     compareFrom: comparisonPeriod?.startDate ?? null,
     compareTo: comparisonPeriod?.endDate ?? null,
     granularity,
-    filters: {
-      ...reportRange,
-      companyId,
-      facilityId,
-    },
+    search: searchParams.get("visitSearch")?.trim() ?? "",
+    sort: validSort ? { field: validSort, direction: searchParams.get("visitDir") === "desc" ? "desc" : "asc" } : null,
+    filters,
   }
+}
+
+// Records and analysis deliberately keep their report context in different URL keys. It prevents
+// returning to Records from inheriting an analysis-only filter (and vice versa), while preserving
+// a shareable URL for each workspace.
+export function parseRecordsReportFilters(searchParams: URLSearchParams, referenceData: VisitReferenceData, now: Date): ReportsScopeFilters {
+  return parseReportsScopeFilters(searchParams, referenceData, now, reportsRecordsScopeKeys)
 }
 
 export function updateReportsSearchParams(current: URLSearchParams, key: string, value: string) {
@@ -100,7 +97,7 @@ export function updateReportsSearchParams(current: URLSearchParams, key: string,
   if (!value || value === "all") next.delete(key)
   else next.set(key, value)
   if (key === "company") next.delete("facility")
-  next.delete("page")
+  clearReportPages(next)
   return next
 }
 
@@ -111,13 +108,23 @@ export function setReportsTab(current: URLSearchParams, tab: ReportTab) {
   return next
 }
 
+export function updateRecordsReportSearchParams(current: URLSearchParams, key: "from" | "to" | "company" | "facility", value: string) {
+  const next = new URLSearchParams(current)
+  const param = reportsRecordsScopeKeys[key]
+  if (!value || value === "all") next.delete(param)
+  else next.set(param, value)
+  if (key === "company") next.delete(reportsRecordsScopeKeys.facility)
+  clearReportPages(next)
+  return next
+}
+
 export function setReportsRange(current: URLSearchParams, startDate: string, endDate: string) {
   const next = new URLSearchParams(current)
   if (startDate) next.set("from", startDate)
   else next.delete("from")
   if (endDate) next.set("to", endDate)
   else next.delete("to")
-  next.delete("page")
+  clearReportPages(next)
   return next
 }
 
@@ -125,6 +132,21 @@ export function setReportsView(current: URLSearchParams, view: ReportView) {
   const next = new URLSearchParams(current)
   if (view === "analysis") next.delete("view")
   else next.set("view", view)
+  next.delete("page")
+  return next
+}
+
+export function setRecordsReportRange(current: URLSearchParams, startDate: string, endDate: string) {
+  const next = new URLSearchParams(current)
+  setScopeRange(next, reportsRecordsScopeKeys, startDate, endDate)
+  clearReportPages(next)
+  return next
+}
+
+export function setVisitsReportRecordsWorkspace(current: URLSearchParams, nextState: { search?: string; sort?: SingleSortState<VisitsReportSortField> }) {
+  const next = new URLSearchParams(current)
+  if (nextState.search !== undefined) { if (nextState.search.trim()) next.set("visitSearch", nextState.search.trim()); else next.delete("visitSearch") }
+  if (nextState.sort !== undefined) { if (nextState.sort) { next.set("visitSort", nextState.sort.field); next.set("visitDir", nextState.sort.direction) } else { next.delete("visitSort"); next.delete("visitDir") } }
   next.delete("page")
   return next
 }
@@ -155,7 +177,7 @@ export function setReportsCustomComparison(current: URLSearchParams, filters: Pi
   const next = setReportsComparison(current, "custom")
   next.set("compareFrom", period.startDate)
   next.set("compareTo", period.endDate)
-  next.delete("page")
+  clearReportPages(next)
   return next
 }
 
@@ -168,10 +190,71 @@ export function setReportsGranularity(current: URLSearchParams, granularity: Rep
 
 export function resetReportsFilters(current: URLSearchParams) {
   const next = new URLSearchParams(current)
-  for (const key of ["from", "to", "company", "facility", "page", "comparison", "compareFrom", "compareTo", "granularity"]) {
+  for (const key of ["from", "to", "company", "facility", "comparison", "compareFrom", "compareTo", "granularity"]) {
     next.delete(key)
   }
+  clearReportPages(next)
   return next
+}
+
+export function resetRecordsReportFilters(current: URLSearchParams) {
+  const next = new URLSearchParams(current)
+  for (const key of Object.values(reportsRecordsScopeKeys)) next.delete(key)
+  clearReportPages(next)
+  return next
+}
+
+function clearReportPages(params: URLSearchParams) {
+  params.delete("page")
+  params.delete("fleetPage")
+  params.delete("goodsPage")
+}
+
+const reportsAnalysisScopeKeys = {
+  from: "from",
+  to: "to",
+  company: "company",
+  facility: "facility",
+} as const
+
+const reportsRecordsScopeKeys = {
+  from: "recordsFrom",
+  to: "recordsTo",
+  company: "recordsCompany",
+  facility: "recordsFacility",
+} as const
+
+type ReportsScopeKeyMap = typeof reportsAnalysisScopeKeys | typeof reportsRecordsScopeKeys
+
+function parseReportsScopeFilters(searchParams: URLSearchParams, referenceData: VisitReferenceData, now: Date, keys: ReportsScopeKeyMap): ReportsScopeFilters {
+  const fromParam = parseDateParameter(searchParams.get(keys.from))
+  const rawToParam = parseDateParameter(searchParams.get(keys.to))
+  const maxEndDate = getMaxEndDate(now)
+  // Clamp here (the single source of truth for scope filters) rather than only in the date-picker's
+  // onChange, so a hand-edited URL or bookmark can't sneak a future end date into a report.
+  const toParam = rawToParam && rawToParam > maxEndDate ? maxEndDate : rawToParam
+  const hasExplicitRange = Boolean(fromParam || toParam)
+  const defaultRange = getDefaultReportsRange(now)
+
+  const companyParam = searchParams.get(keys.company)
+  const companyId = referenceData.companies.some((company) => company.id === companyParam) ? companyParam! : "all"
+  const facilityParam = searchParams.get(keys.facility)
+  const facility = referenceData.facilities.find((item) => item.id === facilityParam)
+  const facilityId = facility && (companyId === "all" || facility.companyId === companyId) ? facility.id : "all"
+
+  return {
+    startDate: hasExplicitRange ? fromParam ?? "" : defaultRange.startDate,
+    endDate: hasExplicitRange ? toParam ?? "" : defaultRange.endDate,
+    companyId,
+    facilityId,
+  }
+}
+
+function setScopeRange(params: URLSearchParams, keys: ReportsScopeKeyMap, startDate: string, endDate: string) {
+  if (startDate) params.set(keys.from, startDate)
+  else params.delete(keys.from)
+  if (endDate) params.set(keys.to, endDate)
+  else params.delete(keys.to)
 }
 
 export function saveReportsSearch(searchParams: URLSearchParams) {

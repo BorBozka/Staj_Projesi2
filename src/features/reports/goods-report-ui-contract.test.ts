@@ -36,7 +36,7 @@ describe("Goods report workspace UI contract", () => {
     expect(tabSource).toContain('className="w-full min-w-[1100px] table-fixed text-left text-xs"')
     expect(tabSource).not.toContain('className="h-full w-full min-w-[1100px]')
     expect(tabSource).toContain('h-[3.125rem] cursor-pointer border-b')
-    expect(tabSource).toContain('className="w-[9%] px-3 py-1.5">Yön</th>')
+    expect(tabSource).toContain('<SortableHeader className="w-[9%]" label="Yön"')
     expect(tabSource).toContain('h-[3.125rem] cursor-pointer border-b transition-colors')
     expect(tabSource).not.toContain("last:border-b-0")
   })

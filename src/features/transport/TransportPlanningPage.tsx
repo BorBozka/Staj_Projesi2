@@ -1,9 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { isAfter, isSameDay } from "date-fns"
-import { CarFront, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ClipboardList, UserRound } from "lucide-react"
+import { CarFront, ClipboardList, UserRound } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { useForm } from "react-hook-form"
 
+import { PaginationFooter } from "@/components/common/PaginationFooter"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -174,24 +175,20 @@ export function TransportPlanningPage() {
         <div className="mt-4 flex justify-end gap-2 border-t border-slate-100 pt-3"><Button type="submit" disabled={isSubmitting || !availability}><ClipboardList />{isSubmitting ? "Kaydediliyor…" : "Planlı atama oluştur"}</Button></div>
       </form>
     </div>
-    <div ref={recordsCardViewportRef} className="scroll-mt-3 flex h-full min-h-[20rem] flex-col overflow-hidden rounded-lg border bg-card shadow-panel" style={recordsCardHeight !== undefined ? { height: recordsCardHeight } : undefined}>
+    <div ref={recordsCardViewportRef} className={cn("scroll-mt-3 flex h-full min-h-0 flex-col overflow-hidden rounded-lg border bg-card shadow-panel", recordsCardHeight === undefined && "min-h-[20rem]")} style={recordsCardHeight !== undefined ? { height: recordsCardHeight } : undefined}>
       <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden">
         {visibleAssignments.length === 0 ? <p className="flex h-full items-center justify-center px-3 text-center text-sm text-slate-500">{date && companyId && facilityId ? "Seçili tarih ve tesis için planlı atama yok." : "Yaklaşan aktif atama yok."}</p> : <table className="h-full w-full min-w-[760px] text-left text-xs"><thead className="border-b bg-slate-50 text-[11px] font-medium text-slate-500"><tr><th className="px-3 py-2.5">Tarih / saat</th><th className="px-3 py-2.5">Araç</th><th className="px-3 py-2.5">Şoför</th><th className="px-3 py-2.5">Görev / amaç</th><th className="px-3 py-2.5">DURUM</th></tr></thead><tbody className="divide-y">{visibleAssignments.map((assignment) => <tr key={assignment.id} role="button" tabIndex={0} aria-label={`${assignment.vehicleName} ${assignment.vehicleLicensePlate} araç görevi detaylarını aç`} className={cn("record-row-hover group cursor-pointer text-slate-700 transition-colors hover:bg-blue-50/60 focus-visible:bg-blue-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600", assignment.status === "CANCELLED" && "bg-slate-50 text-slate-400 hover:bg-slate-100 focus-visible:bg-slate-100")} onClick={() => setViewingAssignment(assignment)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setViewingAssignment(assignment) } }}><td className="whitespace-nowrap px-3 py-2.5 font-medium">{formatTransportAssignmentSchedule(assignment)}</td><td className="px-3 py-2.5"><p className="font-medium text-slate-900 transition-colors group-hover:text-blue-800 group-focus-visible:text-blue-800">{assignment.vehicleName}</p><p className="mt-0.5 text-slate-500">{assignment.vehicleLicensePlate}</p></td><td className="px-3 py-2.5 font-medium text-slate-900">{assignment.driverName}</td><td className="px-3 py-2.5">{assignment.purpose}</td><td className="px-3 py-2.5"><span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700">Planlı</span></td></tr>)}{Array.from({ length: Math.max(0, TRANSPORT_PAGE_SIZE - visibleAssignments.length) }).map((_, index) => <tr key={`filler-${index}`} aria-hidden="true" className={cn("pointer-events-none select-none", index > 0 && "border-transparent")}><td className="px-3 py-2.5"><p className="font-medium text-transparent">&nbsp;</p><p className="mt-0.5 text-[11px] text-transparent">&nbsp;</p></td><td className="px-3 py-2.5 text-transparent">&nbsp;</td><td className="px-3 py-2.5 text-transparent">&nbsp;</td><td className="px-3 py-2.5 text-transparent">&nbsp;</td><td className="px-3 py-2.5 text-transparent">&nbsp;</td></tr>)}</tbody></table>}
       </div>
-    <div className="flex flex-col gap-2 border-t bg-slate-50/50 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-xs tabular-nums text-slate-600">{visibleStart}–{visibleEnd} / {allVisibleAssignments.length} kayıt</p>
-      <nav className="flex items-center gap-1" aria-label="Planlı atama sayfaları">
-        <span className="flex w-[68px] shrink-0 justify-end gap-1">{page > 1 && <>
-          <Button type="button" variant="outline" size="icon-sm" className="h-8 w-8 text-xs" onClick={() => setPage(1)} title="İlk sayfa" aria-label="İlk sayfa"><ChevronsLeft className="size-4" /></Button>
-          <Button type="button" variant="outline" size="icon-sm" className="h-8 w-8 text-xs" onClick={() => setPage(page - 1)} title="Önceki sayfa" aria-label="Önceki sayfa"><ChevronLeft className="size-4" /></Button>
-        </>}</span>
-        {getVisibleTransportPageNumbers(page, pageCount).map((pageNumber) => <Button key={pageNumber} type="button" variant={pageNumber === page ? "default" : "outline"} size="icon-sm" className="h-8 w-8 text-xs" aria-current={pageNumber === page ? "page" : undefined} aria-label={`${pageNumber}. sayfa`} onClick={() => setPage(pageNumber)}>{pageNumber}</Button>)}
-        <span className="flex w-[68px] shrink-0 gap-1">{page < pageCount && <>
-          <Button type="button" variant="outline" size="icon-sm" className="h-8 w-8 text-xs" onClick={() => setPage(page + 1)} title="Sonraki sayfa" aria-label="Sonraki sayfa"><ChevronRight className="size-4" /></Button>
-          <Button type="button" variant="outline" size="icon-sm" className="h-8 w-8 text-xs" onClick={() => setPage(pageCount)} title="Son sayfa" aria-label="Son sayfa"><ChevronsRight className="size-4" /></Button>
-        </>}</span>
-      </nav>
-    </div>
+    <PaginationFooter
+      page={page}
+      pageCount={pageCount}
+      visibleStart={visibleStart}
+      visibleEnd={visibleEnd}
+      total={allVisibleAssignments.length}
+      visiblePageNumbers={getVisibleTransportPageNumbers(page, pageCount)}
+      onPageChange={setPage}
+      ariaLabel="Planlı atama sayfaları"
+    />
     </div>
     <TransportAssignmentDetailsDialog
       assignment={viewingAssignment}

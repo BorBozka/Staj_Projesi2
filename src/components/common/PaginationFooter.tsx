@@ -15,7 +15,7 @@ export interface PaginationFooterProps {
 
 export function PaginationFooter({ page, pageCount, visibleStart, visibleEnd, total, visiblePageNumbers, onPageChange, ariaLabel }: PaginationFooterProps) {
   return (
-    <div className="flex min-h-[3.75rem] flex-col gap-2 border-t bg-slate-50/50 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex min-h-[3.75rem] shrink-0 flex-col gap-2 border-t bg-slate-50/50 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
       <p className="text-xs tabular-nums text-slate-600">{visibleStart}–{visibleEnd} / {total} kayıt</p>
       {pageCount > 1 && <nav className="flex items-center gap-1" aria-label={ariaLabel}>
         <span className="flex w-[68px] shrink-0 justify-end gap-1">

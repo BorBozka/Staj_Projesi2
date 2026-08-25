@@ -33,7 +33,7 @@ describe("Fleet report records UI contract", () => {
     expect(tabSource).toContain('className="w-full min-w-[900px] table-fixed text-left text-xs"')
     expect(tabSource).not.toContain('className="h-full w-full min-w-[900px]')
     expect(tabSource).toContain('h-[3.125rem] cursor-pointer border-b')
-    expect(tabSource).toContain('className="w-[11%] px-3 py-1.5">Tarih</th>')
+    expect(tabSource).toContain('<SortableHeader className="w-[11%]" label="Tarih"')
   })
 
   it("waits for assignment loading before normalizing a restored page", () => {

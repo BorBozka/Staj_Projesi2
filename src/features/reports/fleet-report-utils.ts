@@ -5,6 +5,8 @@ import type { Meeting, Visit } from "@/domain/visits"
 import { formatDurationMinutes } from "@/features/reports/report-format"
 import type { ReportsScopeFilters } from "@/features/reports/reports-filters"
 import { getPageCount as getPageCountShared, paginate } from "@/lib/pagination"
+import { matchesReportSearch, sortReportRecords } from "@/features/reports/report-records-utils"
+import type { SingleSortState } from "@/lib/sort"
 
 // The records workspace has a deliberately fixed page size. Nine compact, two-line rows fit
 // the viewport-filling report card at the manager shell's normal desktop height without giving
@@ -22,11 +24,14 @@ const NICE_DURATION_STEPS = [30, 60, 120, 180, 240, 360, 480, 720, 1_440] as con
 
 export type FleetReportDimension = "vehicles" | "drivers"
 export type FleetReportView = "analysis" | "records"
+export type FleetReportSortField = "date" | "purpose" | "vehicle" | "driver" | "planned" | "status"
 
 export interface FleetReportWorkspaceState {
   view: FleetReportView
   dimension: FleetReportDimension
   page: number
+  search: string
+  sort: SingleSortState<FleetReportSortField>
 }
 
 export interface FleetReportMetrics {
@@ -105,6 +110,20 @@ export function filterAssignmentsForReport(assignments: PlannedTransportAssignme
   })
 
   return [...filtered].sort((left, right) => new Date(right.plannedStart).getTime() - new Date(left.plannedStart).getTime())
+}
+
+export function searchFleetReportRecords(assignments: PlannedTransportAssignment[], search: string, getRelatedLabel?: (assignment: PlannedTransportAssignment) => string) {
+  return assignments.filter((assignment) => matchesReportSearch(search, [assignment.vehicleName, assignment.vehicleLicensePlate, assignment.driverName, assignment.purpose, getRelatedLabel?.(assignment)]))
+}
+
+export function sortFleetReportRecords(assignments: PlannedTransportAssignment[], sort: SingleSortState<FleetReportSortField>) {
+  return sortReportRecords(assignments, sort, (assignment, field) => {
+    if (field === "date" || field === "planned") return new Date(assignment.plannedStart).getTime()
+    if (field === "purpose") return assignment.purpose
+    if (field === "vehicle") return `${assignment.vehicleName} ${assignment.vehicleLicensePlate}`
+    if (field === "driver") return assignment.driverName
+    return assignment.status === "ACTIVE" ? 0 : 1
+  })
 }
 
 // Metadata deliberately counts every filtered assignment, including cancelled records. The
@@ -267,14 +286,18 @@ export function parseFleetReportWorkspace(searchParams: URLSearchParams): FleetR
   const rawView = searchParams.get("fleetView")
   const rawDimension = searchParams.get("fleetDimension")
   const rawPage = Number(searchParams.get("fleetPage"))
+  const rawSort = searchParams.get("fleetSort")
+  const validSort: FleetReportSortField | null = ["date", "purpose", "vehicle", "driver", "planned", "status"].includes(rawSort ?? "") ? rawSort as FleetReportSortField : null
   return {
     view: rawView === "records" ? "records" : "analysis",
     dimension: rawDimension === "drivers" ? "drivers" : "vehicles",
     page: Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1,
+    search: searchParams.get("fleetSearch")?.trim() ?? "",
+    sort: validSort ? { field: validSort, direction: searchParams.get("fleetDir") === "desc" ? "desc" : "asc" } : null,
   }
 }
 
-export function setFleetReportWorkspace(current: URLSearchParams, nextState: Partial<Pick<FleetReportWorkspaceState, "view" | "dimension">>) {
+export function setFleetReportWorkspace(current: URLSearchParams, nextState: Partial<Pick<FleetReportWorkspaceState, "view" | "dimension" | "search" | "sort">>) {
   const next = new URLSearchParams(current)
   if (nextState.view) {
     if (nextState.view === "analysis") next.delete("fleetView")
@@ -284,6 +307,8 @@ export function setFleetReportWorkspace(current: URLSearchParams, nextState: Par
     if (nextState.dimension === "vehicles") next.delete("fleetDimension")
     else next.set("fleetDimension", nextState.dimension)
   }
+  if (nextState.search !== undefined) { if (nextState.search.trim()) next.set("fleetSearch", nextState.search.trim()); else next.delete("fleetSearch") }
+  if (nextState.sort !== undefined) { if (nextState.sort) { next.set("fleetSort", nextState.sort.field); next.set("fleetDir", nextState.sort.direction) } else { next.delete("fleetSort"); next.delete("fleetDir") } }
   next.delete("fleetPage")
   return next
 }

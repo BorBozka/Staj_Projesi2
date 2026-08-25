@@ -18,6 +18,7 @@ export interface ReportExportHandle {
   exportCsv(): void
   exportExcel(): void
   exportPdf(): void
+  exportChartPng?(): void
 }
 
 // Single source of truth for the Visits report table, CSV, Excel, and PDF exports —
@@ -117,6 +118,98 @@ function triggerBrowserDownload(blob: Blob, filename: string) {
   URL.revokeObjectURL(url)
 }
 
+export const REPORT_PNG_CAPTURE_OPTIONS = {
+  backgroundColor: "#ffffff",
+  scale: 2,
+} as const
+
+const REPORT_PNG_TRANSIENT_SELECTOR = ".recharts-tooltip-wrapper, .recharts-tooltip-cursor, .recharts-active-dot, .recharts-active-bar, [role=tooltip]"
+const REPORT_PNG_COMPARISON_LABEL_SELECTOR = ".report-png-comparison-label"
+
+export function getReportPngCaptureSize(element: HTMLElement) {
+  const bounds = element.getBoundingClientRect()
+  return {
+    width: Math.max(1, Math.ceil(element.scrollWidth || bounds.width)),
+    height: Math.max(1, Math.ceil(element.scrollHeight || bounds.height)),
+  }
+}
+
+function nextAnimationFrame() {
+  return new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()))
+}
+
+function hideTransientChartUi(captureCard: HTMLElement) {
+  captureCard.querySelectorAll<HTMLElement>(REPORT_PNG_TRANSIENT_SELECTOR).forEach((node) => {
+    node.style.display = "none"
+  })
+}
+
+function prepareComparisonLabelsForPngCapture(captureCard: HTMLElement) {
+  // `truncate` gives the live label an overflow boundary. Under html2canvas' cloned layout,
+  // the fractional 11px/16.5px line box can be rounded below an ascender and clip the label's
+  // top edge. Keep its original box and flex allocation, but allow that raster-only clone to
+  // paint its full glyph bounds above the chart boundary.
+  captureCard.querySelectorAll<HTMLElement>(REPORT_PNG_COMPARISON_LABEL_SELECTOR).forEach((label) => {
+    label.style.overflow = "visible"
+    label.style.textOverflow = "clip"
+    label.style.position = "relative"
+    label.style.zIndex = "1"
+  })
+}
+
+export async function downloadElementAsPng(element: HTMLElement, filename: string) {
+  // Capture a detached copy. The live card can use a constrained viewport height and contains
+  // responsive Recharts markup; capturing it in-place caused clipping and hover artifacts.
+  await document.fonts?.ready
+  await nextAnimationFrame()
+  await nextAnimationFrame()
+
+  const { width, height } = getReportPngCaptureSize(element)
+  const host = document.createElement("div")
+  const captureCard = element.cloneNode(true) as HTMLElement
+  host.setAttribute("aria-hidden", "true")
+  host.style.cssText = `position:fixed;left:-100000px;top:0;width:${width}px;pointer-events:none;overflow:visible;background:#ffffff;`
+  captureCard.classList.add("report-png-capture")
+  captureCard.style.width = `${width}px`
+  captureCard.style.height = `${height}px`
+  captureCard.style.minHeight = "0"
+  captureCard.style.maxHeight = "none"
+  captureCard.style.overflow = "visible"
+  captureCard.style.backgroundColor = REPORT_PNG_CAPTURE_OPTIONS.backgroundColor
+  captureCard.style.cursor = "default"
+  captureCard.querySelectorAll<HTMLElement>("p, h1, h2, h3, span, li, text").forEach((node) => {
+    node.style.wordSpacing = "normal"
+    node.style.letterSpacing = node.style.letterSpacing || "normal"
+  })
+  hideTransientChartUi(captureCard)
+  prepareComparisonLabelsForPngCapture(captureCard)
+  host.appendChild(captureCard)
+  document.body.appendChild(host)
+
+  try {
+    const { default: html2canvas } = await import("html2canvas")
+    const canvas = await html2canvas(captureCard, {
+      ...REPORT_PNG_CAPTURE_OPTIONS,
+      height,
+      width,
+      windowHeight: height,
+      windowWidth: width,
+      scrollX: 0,
+      scrollY: 0,
+      logging: false,
+      useCORS: true,
+    })
+    const link = document.createElement("a")
+    link.download = filename
+    link.href = canvas.toDataURL("image/png")
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  } finally {
+    host.remove()
+  }
+}
+
 const UTF8_BOM = String.fromCharCode(0xfeff)
 
 export function downloadReportCsv(headers: string[], rows: string[][], filename: string) {
@@ -125,21 +218,73 @@ export function downloadReportCsv(headers: string[], rows: string[][], filename:
   triggerBrowserDownload(blob, filename)
 }
 
-// xlsx and jspdf are dynamically imported so viewing the Reports page never pulls their
+// xlsx-js-style and jspdf are dynamically imported so viewing the Reports page never pulls their
 // ~700KB combined weight in — only clicking Excel/PDF export does.
+function spreadsheetColumnName(index: number) {
+  let value = index + 1
+  let name = ""
+  while (value > 0) {
+    const remainder = (value - 1) % 26
+    name = String.fromCharCode(65 + remainder) + name
+    value = Math.floor((value - 1) / 26)
+  }
+  return name
+}
+
+function getExcelColumnLimits(header: string) {
+  if (/^(Yön|Tarih|Durum|Süre|Referans No|Gecikme \(dk\)|Planlanan Giriş|Planlanan Çıkış|Gerçek Giriş|Gerçek Çıkış)$/u.test(header)) return { min: 12, max: 20 }
+  if (/Şirket|Karşı Taraf|İlişkili/u.test(header)) return { min: 18, max: 40 }
+  return { min: 16, max: 30 }
+}
+
+export function getReportExcelColumnWidths(headers: string[], rows: string[][]) {
+  return headers.map((header, index) => {
+    const longestValue = rows.reduce((longest, row) => Math.max(longest, row[index]?.length ?? 0), header.length)
+    const limits = getExcelColumnLimits(header)
+    return { wch: Math.min(limits.max, Math.max(limits.min, longestValue + 2)) }
+  })
+}
+
+export function formatReportWorksheet(worksheet: { [key: string]: unknown }, headers: string[], rows: string[][]) {
+  worksheet["!cols"] = getReportExcelColumnWidths(headers, rows)
+  worksheet["!autofilter"] = { ref: `A1:${spreadsheetColumnName(headers.length - 1)}${rows.length + 1}` }
+  worksheet["!rows"] = [{ hpt: 24 }, ...rows.map(() => ({ hpt: 20 }))]
+
+  headers.forEach((_, columnIndex) => {
+    const cell = worksheet[`${spreadsheetColumnName(columnIndex)}1`] as { s?: unknown } | undefined
+    if (!cell) return
+    cell.s = {
+      font: { bold: true, color: { rgb: "FFFFFF" } },
+      fill: { fgColor: { rgb: "1E3A5F" } },
+      alignment: { horizontal: "center", vertical: "center", wrapText: true },
+    }
+  })
+}
+
 export async function downloadReportExcel(sheetName: string, headers: string[], rows: string[][], filename: string) {
-  const XLSX = await import("xlsx")
+  const XLSX = await import("xlsx-js-style")
   const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows])
+  formatReportWorksheet(worksheet, headers, rows)
   const workbook = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(workbook, worksheet, sheetName)
   XLSX.writeFile(workbook, filename)
 }
 
 export async function downloadReportPdf(title: string, headers: string[], rows: string[][], filename: string) {
-  const [{ jsPDF }, { default: autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")])
+  const [{ jsPDF }, { default: autoTable }, { loadReportPdfFont, registerReportPdfFont, REPORT_PDF_FONT }] = await Promise.all([import("jspdf"), import("jspdf-autotable"), import("@/features/reports/report-pdf-font")])
   const doc = new jsPDF({ orientation: "landscape" })
+  registerReportPdfFont(doc, await loadReportPdfFont())
   doc.setFontSize(12)
   doc.text(title, 14, 12)
-  autoTable(doc, { head: [headers], body: rows, startY: 16, styles: { fontSize: 8 } })
+  autoTable(doc, {
+    head: [headers],
+    body: rows,
+    startY: 17,
+    margin: { left: 10, right: 10, bottom: 12 },
+    styles: { font: REPORT_PDF_FONT.family, fontStyle: "normal", fontSize: 7, cellPadding: 1.6, overflow: "linebreak", valign: "middle" },
+    headStyles: { font: REPORT_PDF_FONT.family, fontStyle: "normal", fontSize: 7.2, fillColor: [30, 58, 95], textColor: [255, 255, 255], halign: "center" },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    didDrawPage: () => { doc.setFont(REPORT_PDF_FONT.family, "normal") },
+  })
   doc.save(filename)
 }

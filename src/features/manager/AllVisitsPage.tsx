@@ -248,7 +248,7 @@ export function AllVisitsPage() {
         )}
       </section>
 
-      <section ref={setTableSectionRefs} className="scroll-mt-3 flex h-full min-h-[35.5rem] flex-col overflow-hidden rounded-lg border bg-card shadow-panel" style={tableViewportHeight !== undefined ? { height: tableViewportHeight } : undefined} aria-label="Ziyaret listesi">
+      <section ref={setTableSectionRefs} className={cn("scroll-mt-3 flex h-full min-h-0 flex-col overflow-hidden rounded-lg border bg-card shadow-panel", tableViewportHeight === undefined && "min-h-[35.5rem]")} style={tableViewportHeight !== undefined ? { height: tableViewportHeight } : undefined} aria-label="Ziyaret listesi">
         {filteredVisits.length === 0 ? (
           <div className="flex h-[35.5rem] flex-col items-center justify-center px-4 py-24 text-center">
             <Search className="mx-auto size-8 text-slate-400" />

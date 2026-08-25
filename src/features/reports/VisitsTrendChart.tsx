@@ -56,12 +56,8 @@ export function VisitsTrendChart({ points, yAxisMax, yAxisTicks, maxXAxisTicks =
             labelFormatter={(label, payload) => {
               const point = payload[0]?.payload as VisitsReportDailyTrendGroupedPoint | undefined
               const periodContext = getVisitsTrendTooltipPeriodContext(point)
-              return (
-                <div>
-                  <p>{`Zaman aralığı: ${String(label).replace("–", " – ")}`}</p>
-                  {periodContext && <p className="mt-0.5 text-[10px] font-normal text-slate-500">{periodContext}</p>}
-                </div>
-              )
+              const periodLabel = `Zaman aralığı: ${String(label).replace("–", " – ")}`
+              return periodContext ? `${periodLabel} · ${periodContext}` : periodLabel
             }}
             formatter={(value, name) => [value, VISITS_REPORT_STATUS_LABELS[String(name) as keyof typeof VISITS_REPORT_STATUS_LABELS] ?? name]}
           />

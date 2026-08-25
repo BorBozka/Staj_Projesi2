@@ -22,6 +22,8 @@ import {
   parseFleetReportWorkspace,
   setFleetReportPage,
   setFleetReportWorkspace,
+  searchFleetReportRecords,
+  sortFleetReportRecords,
   sortFleetLoadResources,
 } from "@/features/reports/fleet-report-utils"
 
@@ -48,6 +50,20 @@ describe("fleet report filtering and metrics", () => {
 
   it("keeps an empty dataset safe", () => {
     expect(calculateFleetReportMetrics([])).toEqual({ totalAssignments: 0, cancelledAssignments: 0, plannedLoadMinutes: 0, usedVehicleCount: 0, usedDriverCount: 0 })
+  })
+})
+
+describe("fleet records search and sort", () => {
+  it("finds vehicle, plate, driver and purpose text case-insensitively", () => {
+    expect(ids(searchFleetReportRecords(reportAssignments, "ayşe"))).toEqual(["a1", "a2"])
+    expect(ids(searchFleetReportRecords(reportAssignments, "İPTAL ARAÇ"))).toEqual(["a4"])
+    expect(searchFleetReportRecords(reportAssignments, "")).toHaveLength(4)
+  })
+
+  it("sorts records deterministically and returns to default order when cleared", () => {
+    expect(ids(sortFleetReportRecords(reportAssignments, { field: "driver", direction: "asc" }))).toEqual(["a1", "a2", "a4", "a3"])
+    expect(ids(sortFleetReportRecords(reportAssignments, { field: "date", direction: "desc" }))).toEqual(["a4", "a3", "a2", "a1"])
+    expect(sortFleetReportRecords(reportAssignments, null)).toEqual(reportAssignments)
   })
 })
 
@@ -141,14 +157,14 @@ describe("fleet chart scale and interaction helpers", () => {
 
 describe("fleet report URL state and pagination", () => {
   it("defaults invalid workspace parameters and persists non-default state", () => {
-    expect(parseFleetReportWorkspace(new URLSearchParams("fleetView=wrong&fleetDimension=wrong&fleetPage=0"))).toEqual({ view: "analysis", dimension: "vehicles", page: 1 })
+    expect(parseFleetReportWorkspace(new URLSearchParams("fleetView=wrong&fleetDimension=wrong&fleetPage=0"))).toEqual({ view: "analysis", dimension: "vehicles", page: 1, search: "", sort: null })
     const records = setFleetReportWorkspace(new URLSearchParams("tab=vehicle&granularity=daily&page=3"), { view: "records", dimension: "drivers" })
     expect(records.toString()).toBe("tab=vehicle&granularity=daily&page=3&fleetView=records&fleetDimension=drivers")
     expect(setFleetReportPage(records, 2).toString()).toBe("tab=vehicle&granularity=daily&page=3&fleetView=records&fleetDimension=drivers&fleetPage=2")
   })
 
   it("ignores visits workspace keys so tab switches cannot overwrite fleet state", () => {
-    expect(parseFleetReportWorkspace(new URLSearchParams("view=records&page=4&fleetView=records&fleetPage=3"))).toEqual({ view: "records", dimension: "vehicles", page: 3 })
+    expect(parseFleetReportWorkspace(new URLSearchParams("view=records&page=4&fleetView=records&fleetPage=3"))).toEqual({ view: "records", dimension: "vehicles", page: 3, search: "", sort: null })
   })
 
   it("uses the fixed nine-row records page size", () => {

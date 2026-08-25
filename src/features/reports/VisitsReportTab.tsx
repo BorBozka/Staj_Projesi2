@@ -1,6 +1,6 @@
 import { parse } from "date-fns"
-import { Search } from "lucide-react"
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react"
+import { ArrowDown, ArrowUp, Search } from "lucide-react"
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react"
 
 import type { Visit } from "@/domain/visits"
 import {
@@ -8,6 +8,7 @@ import {
   downloadReportCsv,
   downloadReportExcel,
   downloadReportPdf,
+  downloadElementAsPng,
   VISITS_REPORT_COLUMNS,
   type ReportExportHandle,
 } from "@/features/reports/report-export"
@@ -30,15 +31,19 @@ import {
   getVisitReportStatusGroup,
   groupVisitsReportDailyTrendByOutcome,
   paginateReportVisits,
+  searchVisitsReportRecords,
+  sortVisitsReportRecords,
   VISITS_REPORT_STATUS_COLORS,
   VISITS_REPORT_STATUS_LABELS,
   type VisitsReportDailyTrendGroupedPoint,
   type VisitsReportPeriodSummaryInput,
   type VisitsReportTrendGranularity,
+  type VisitsReportSortField,
 } from "@/features/reports/visits-report-utils"
 import { VisitsTrendChart, VisitsTrendLegend } from "@/features/reports/VisitsTrendChart"
 import { VisitDetailsDialog } from "@/features/visits/VisitDetailsDialog"
 import { formatTr } from "@/lib/date"
+import { toggleSingleSort, type SingleSortState } from "@/lib/sort"
 
 export type VisitsWorkspaceMode = "analysis" | "records"
 export type VisitsReportGranularity = Exclude<VisitsReportTrendGranularity, "hourly">
@@ -51,6 +56,9 @@ interface VisitsReportTabProps {
   selectedGranularity: VisitsReportGranularity
   recordsPage: number
   onRecordsPageChange(page: number): void
+  recordsSearch: string
+  recordsSort: SingleSortState<VisitsReportSortField>
+  onRecordsSortChange(sort: SingleSortState<VisitsReportSortField>): void
   comparisonEnabled?: boolean
   comparisonFilters?: ReportsScopeFilters | null
   comparisonLabel?: string
@@ -80,11 +88,13 @@ function formatRangeLabel(filters: ReportsScopeFilters) {
   return `${formatTr(start, "d MMM yyyy")} – ${formatTr(end, "d MMM yyyy")}`
 }
 
-export const VisitsReportTab = forwardRef<ReportExportHandle, VisitsReportTabProps>(function VisitsReportTab({ visits, filters, dateRangeInvalid, workspaceMode, selectedGranularity, recordsPage, onRecordsPageChange, comparisonEnabled = false, comparisonFilters = null, comparisonLabel = "Önceki dönem", onExportAvailabilityChange }, ref) {
+export const VisitsReportTab = forwardRef<ReportExportHandle, VisitsReportTabProps>(function VisitsReportTab({ visits, filters, dateRangeInvalid, workspaceMode, selectedGranularity, recordsPage, onRecordsPageChange, recordsSearch, recordsSort, onRecordsSortChange, comparisonEnabled = false, comparisonFilters = null, comparisonLabel = "Önceki dönem", onExportAvailabilityChange }, ref) {
   const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null)
+  const analysisCardRef = useRef<HTMLElement | null>(null)
   const isTodayRange = filters.startDate !== "" && filters.startDate === filters.endDate && filters.endDate === formatTr(new Date(), "yyyy-MM-dd")
   const trendGranularity: VisitsReportTrendGranularity = isTodayRange ? "hourly" : selectedGranularity
   const reportVisits = useMemo(() => filterVisitsForReport(visits, filters), [filters, visits])
+  const recordVisits = useMemo(() => sortVisitsReportRecords(searchVisitsReportRecords(reportVisits, recordsSearch), recordsSort), [recordsSearch, recordsSort, reportVisits])
   const kpis = useMemo(() => calculateVisitsReportKpis(reportVisits), [reportVisits])
   const dailyTrendWithStatus = useMemo(() => calculateVisitsReportTrendWithStatus(reportVisits, filters, trendGranularity), [reportVisits, filters, trendGranularity])
   const dailyTrendGrouped = useMemo(() => groupVisitsReportDailyTrendByOutcome(dailyTrendWithStatus), [dailyTrendWithStatus])
@@ -117,25 +127,26 @@ export const VisitsReportTab = forwardRef<ReportExportHandle, VisitsReportTabPro
     [kpis, dailyTrendGrouped, previousSummary],
   )
 
-  const recordsPageCount = getReportPageCount(reportVisits.length)
+  const recordsPageCount = getReportPageCount(recordVisits.length)
   const normalizedRecordsPage = Math.min(Math.max(1, recordsPage), recordsPageCount)
-  const paginatedVisits = useMemo(() => paginateReportVisits(reportVisits, normalizedRecordsPage), [reportVisits, normalizedRecordsPage])
-  const recordsRange = getReportPageRange(reportVisits.length, normalizedRecordsPage)
+  const paginatedVisits = useMemo(() => paginateReportVisits(recordVisits, normalizedRecordsPage), [recordVisits, normalizedRecordsPage])
+  const recordsRange = getReportPageRange(recordVisits.length, normalizedRecordsPage)
 
   useEffect(() => {
     if (recordsPage !== normalizedRecordsPage) onRecordsPageChange(normalizedRecordsPage)
   }, [normalizedRecordsPage, onRecordsPageChange, recordsPage])
 
   useEffect(() => {
-    onExportAvailabilityChange?.(reportVisits.length > 0)
-  }, [onExportAvailabilityChange, reportVisits.length])
+    onExportAvailabilityChange?.(!dateRangeInvalid && (workspaceMode === "records" ? recordVisits.length > 0 : reportVisits.length > 0))
+  }, [dateRangeInvalid, onExportAvailabilityChange, recordVisits.length, reportVisits.length, workspaceMode])
 
-  const exportRows = () => buildVisitsReportRows(reportVisits)
+  const exportRows = () => buildVisitsReportRows(workspaceMode === "records" ? recordVisits : reportVisits)
 
   useImperativeHandle(ref, () => ({
     exportCsv: () => downloadReportCsv(headers, exportRows(), `${exportFilenameBase}.csv`),
     exportExcel: () => { void downloadReportExcel("Ziyaretler", headers, exportRows(), `${exportFilenameBase}.xlsx`) },
     exportPdf: () => { void downloadReportPdf("Ziyaretler Raporu", headers, exportRows(), `${exportFilenameBase}.pdf`) },
+    exportChartPng: () => { if (analysisCardRef.current) void downloadElementAsPng(analysisCardRef.current, `ziyaret-analizi_${filters.startDate || "tumu"}_${filters.endDate || "tumu"}.png`) },
   }))
 
   if (workspaceMode === "records") {
@@ -144,8 +155,8 @@ export const VisitsReportTab = forwardRef<ReportExportHandle, VisitsReportTabPro
         <h2 id="visits-records-title" className="sr-only">Ziyaret kayıtları</h2>
         {dateRangeInvalid ? (
           <EmptyRecordsState invalid />
-        ) : reportVisits.length === 0 ? (
-          <EmptyRecordsState />
+        ) : recordVisits.length === 0 ? (
+          <EmptyRecordsState searched={reportVisits.length > 0 && Boolean(recordsSearch.trim())} />
         ) : (
           <>
             <div className="min-h-0 flex-1 overflow-hidden">
@@ -153,14 +164,14 @@ export const VisitsReportTab = forwardRef<ReportExportHandle, VisitsReportTabPro
                 <table className="w-full min-w-[980px] table-fixed text-left text-xs">
                   <thead className="border-b bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                     <tr>
-                      <th className="w-[10%] px-3 py-1.5">Tarih</th>
-                      <th className="w-[15%] px-3 py-1.5">Ziyaretçi</th>
-                      <th className="w-[14%] px-3 py-1.5">Firma</th>
-                      <th className="w-[14%] px-3 py-1.5">Ziyaret Edilen</th>
-                      <th className="w-[12%] px-3 py-1.5">Planlanan</th>
+                      <SortableHeader className="w-[10%]" label="Tarih" field="date" sort={recordsSort} onChange={onRecordsSortChange} />
+                      <SortableHeader className="w-[15%]" label="Ziyaretçi" field="visitor" sort={recordsSort} onChange={onRecordsSortChange} />
+                      <SortableHeader className="w-[14%]" label="Firma" field="company" sort={recordsSort} onChange={onRecordsSortChange} />
+                      <SortableHeader className="w-[14%]" label="Ziyaret Edilen" field="host" sort={recordsSort} onChange={onRecordsSortChange} />
+                      <SortableHeader className="w-[12%]" label="Planlanan" field="planned" sort={recordsSort} onChange={onRecordsSortChange} />
                       <th className="w-[13%] px-3 py-1.5">Gerçekleşen</th>
-                      <th className="w-[9%] px-3 py-1.5">Süre</th>
-                      <th className="w-[13%] px-3 py-1.5">Durum</th>
+                      <SortableHeader className="w-[9%]" label="Süre" field="duration" sort={recordsSort} onChange={onRecordsSortChange} />
+                      <SortableHeader className="w-[13%]" label="Durum" field="status" sort={recordsSort} onChange={onRecordsSortChange} />
                     </tr>
                   </thead>
                   <tbody>
@@ -186,7 +197,7 @@ export const VisitsReportTab = forwardRef<ReportExportHandle, VisitsReportTabPro
                 pageCount={recordsPageCount}
                 visibleStart={recordsRange.start}
                 visibleEnd={recordsRange.end}
-                total={reportVisits.length}
+                total={recordVisits.length}
                 visiblePageNumbers={getVisibleReportPageNumbers(normalizedRecordsPage, Math.max(1, recordsPageCount))}
                 onPageChange={onRecordsPageChange}
                 ariaLabel="Ziyaret kayıtları sayfaları"
@@ -209,7 +220,7 @@ export const VisitsReportTab = forwardRef<ReportExportHandle, VisitsReportTabPro
   }
 
   return (
-    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border bg-card p-3 shadow-panel" aria-labelledby="visits-analysis-title">
+    <section ref={analysisCardRef} className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border bg-card p-3 shadow-panel" aria-labelledby="visits-analysis-title">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <h2 id="visits-analysis-title" className="shrink-0 text-xs font-semibold uppercase tracking-wider text-slate-900">Ziyaret Analizi</h2>
         {!dateRangeInvalid && (
@@ -251,7 +262,7 @@ export const VisitsReportTab = forwardRef<ReportExportHandle, VisitsReportTabPro
 function ComparisonTrendPanel({ label, points, yAxisMax, yAxisTicks }: { label?: string; points: VisitsReportDailyTrendGroupedPoint[]; yAxisMax?: number; yAxisTicks?: number[] }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {label && <p className="mb-0.5 shrink-0 truncate text-[11px] font-medium uppercase tracking-[0.02em] text-slate-500">{label}</p>}
+      {label && <p className="report-png-comparison-label mb-0.5 shrink-0 truncate text-[11px] font-medium uppercase tracking-[0.02em] text-slate-500">{label}</p>}
       <div className="min-h-0 flex-1"><VisitsTrendChart points={points} yAxisMax={yAxisMax} yAxisTicks={yAxisTicks} /></div>
     </div>
   )
@@ -261,7 +272,7 @@ function MetadataMetric({ value, delta, last = false }: { value: string; delta: 
   return <span className="inline-flex items-baseline"><span className="text-slate-700">{value}</span>{delta && <span className="ml-1 text-[10px] font-normal text-slate-400">{delta.label}</span>}{!last && <span className="ml-1.5 text-slate-300">·</span>}</span>
 }
 
-function EmptyRecordsState({ invalid = false }: { invalid?: boolean }) {
+function EmptyRecordsState({ invalid = false, searched = false }: { invalid?: boolean; searched?: boolean }) {
   if (invalid) {
     return (
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-4 text-center">
@@ -274,10 +285,16 @@ function EmptyRecordsState({ invalid = false }: { invalid?: boolean }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-4 text-center">
       <Search className="mx-auto size-6 text-slate-400" />
-      <h3 className="mt-2 text-xs font-semibold text-slate-900">Eşleşen ziyaret bulunamadı</h3>
-      <p className="mt-0.5 text-[11px] text-slate-600">Filtre ölçütlerini değiştirerek yeniden deneyin.</p>
+      <h3 className="mt-2 text-xs font-semibold text-slate-900">{searched ? "Eşleşen kayıt bulunamadı" : "Eşleşen ziyaret bulunamadı"}</h3>
+      <p className="mt-0.5 text-[11px] text-slate-600">{searched ? "Arama ifadesini değiştirerek yeniden deneyin." : "Filtre ölçütlerini değiştirerek yeniden deneyin."}</p>
     </div>
   )
+}
+
+function SortableHeader({ className, label, field, sort, onChange }: { className: string; label: string; field: VisitsReportSortField; sort: SingleSortState<VisitsReportSortField>; onChange(sort: SingleSortState<VisitsReportSortField>): void }) {
+  const active = sort?.field === field
+  const Icon = sort?.direction === "asc" ? ArrowUp : ArrowDown
+  return <th className={`${className} px-3 py-1.5`} aria-sort={active ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}><button type="button" className="inline-flex cursor-pointer items-center gap-1 rounded-sm transition-colors hover:text-slate-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-blue-300" aria-label={active ? `${label} sütunu sıralamasını kaldır` : `${label} sütununu artan sırala`} onClick={() => onChange(toggleSingleSort(sort, field))}>{label}{active && <Icon className="size-3" aria-hidden="true" />}</button></th>
 }
 
 function ActualTimesCell({ visit }: { visit: Visit }) {

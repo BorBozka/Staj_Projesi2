@@ -1,4 +1,4 @@
-import { Search } from "lucide-react"
+import { ArrowDown, ArrowUp, Search } from "lucide-react"
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 
@@ -21,7 +21,11 @@ import {
   mergeFleetLoadComparison,
   paginateFleetReport,
   parseFleetReportWorkspace,
+  setFleetReportWorkspace,
   setFleetReportPage,
+  searchFleetReportRecords,
+  sortFleetReportRecords,
+  type FleetReportSortField,
 } from "@/features/reports/fleet-report-utils"
 import { ReportPagination } from "@/features/reports/ReportPagination"
 import {
@@ -29,11 +33,13 @@ import {
   downloadReportCsv,
   downloadReportExcel,
   downloadReportPdf,
+  downloadElementAsPng,
   FLEET_REPORT_COLUMNS,
   type ReportExportHandle,
 } from "@/features/reports/report-export"
 import type { ReportsScopeFilters } from "@/features/reports/reports-filters"
 import { formatTr } from "@/lib/date"
+import { toggleSingleSort } from "@/lib/sort"
 import { transportAssignmentService } from "@/services"
 
 export const FleetReportTab = forwardRef<ReportExportHandle, { meetings: Meeting[]; visits: Visit[]; filters: ReportsScopeFilters; dateRangeInvalid: boolean; comparisonFilters?: ReportsScopeFilters | null; comparisonLabel?: string; onExportAvailabilityChange?(canExport: boolean): void }>(function FleetReportTab({ meetings, visits, filters, dateRangeInvalid, comparisonFilters = null, comparisonLabel = "Önceki dönem", onExportAvailabilityChange }, ref) {
@@ -56,6 +62,7 @@ export const FleetReportTab = forwardRef<ReportExportHandle, { meetings: Meeting
   }, [])
 
   const reportAssignments = useMemo(() => filterAssignmentsForReport(assignments, filters), [assignments, filters])
+  const recordAssignments = useMemo(() => sortFleetReportRecords(searchFleetReportRecords(reportAssignments, workspace.search, (assignment) => getRelatedRecordLabel(assignment, meetings, visits)), workspace.sort), [meetings, reportAssignments, visits, workspace.search, workspace.sort])
   const metrics = useMemo(() => calculateFleetReportMetrics(reportAssignments), [reportAssignments])
   const currentResources = useMemo(() => aggregateFleetResourceLoad(reportAssignments, workspace.dimension), [reportAssignments, workspace.dimension])
   const previousFilters = comparisonFilters
@@ -74,11 +81,11 @@ export const FleetReportTab = forwardRef<ReportExportHandle, { meetings: Meeting
     return previousFilters && !hasComparisonData ? `${base} Karşılaştırma döneminde görev kaydı yok.` : base
   }, [currentResources, hasComparisonData, metrics, previousFilters, previousMetrics, previousResources, workspace.dimension])
   const metadata = useMemo(() => buildFleetMetadata(metrics, hasComparisonData ? previousMetrics : null), [hasComparisonData, metrics, previousMetrics])
-  const pageCount = getFleetReportPageCount(reportAssignments.length)
+  const pageCount = getFleetReportPageCount(recordAssignments.length)
   const page = Math.min(workspace.page, pageCount)
-  const paginatedAssignments = useMemo(() => paginateFleetReport(reportAssignments, page), [reportAssignments, page])
-  const visibleStart = reportAssignments.length === 0 ? 0 : (page - 1) * FLEET_REPORT_PAGE_SIZE + 1
-  const visibleEnd = Math.min(page * FLEET_REPORT_PAGE_SIZE, reportAssignments.length)
+  const paginatedAssignments = useMemo(() => paginateFleetReport(recordAssignments, page), [recordAssignments, page])
+  const visibleStart = recordAssignments.length === 0 ? 0 : (page - 1) * FLEET_REPORT_PAGE_SIZE + 1
+  const visibleEnd = Math.min(page * FLEET_REPORT_PAGE_SIZE, recordAssignments.length)
   const headers = useMemo(() => FLEET_REPORT_COLUMNS.map((column) => column.header), [])
   const exportFilenameBase = `arac-sofor-raporu_${filters.startDate || "tumu"}_${filters.endDate || "tumu"}`
 
@@ -92,15 +99,16 @@ export const FleetReportTab = forwardRef<ReportExportHandle, { meetings: Meeting
   }, [assignmentsLoaded, page, searchParams, setSearchParams, workspace.page, workspace.view])
 
   useEffect(() => {
-    onExportAvailabilityChange?.(reportAssignments.length > 0)
-  }, [onExportAvailabilityChange, reportAssignments.length])
+    onExportAvailabilityChange?.(!dateRangeInvalid && assignmentsLoaded && (workspace.view === "records" ? recordAssignments.length > 0 : reportAssignments.length > 0))
+  }, [assignmentsLoaded, dateRangeInvalid, onExportAvailabilityChange, recordAssignments.length, reportAssignments.length, workspace.view])
 
-  const exportRows = () => buildFleetReportRows(reportAssignments, meetings, visits)
+  const exportRows = () => buildFleetReportRows(workspace.view === "records" ? recordAssignments : reportAssignments, meetings, visits)
 
   useImperativeHandle(ref, () => ({
     exportCsv: () => downloadReportCsv(headers, exportRows(), `${exportFilenameBase}.csv`),
     exportExcel: () => { void downloadReportExcel("Araç-Şoför", headers, exportRows(), `${exportFilenameBase}.xlsx`) },
     exportPdf: () => { void downloadReportPdf("Araç / Şoför Raporu", headers, exportRows(), `${exportFilenameBase}.pdf`) },
+    exportChartPng: () => { const card = document.getElementById("fleet-analysis-card"); if (card) void downloadElementAsPng(card, `arac-sofor-analizi_${filters.startDate || "tumu"}_${filters.endDate || "tumu"}.png`) },
   }))
 
   if (workspace.view === "records") {
@@ -110,8 +118,8 @@ export const FleetReportTab = forwardRef<ReportExportHandle, { meetings: Meeting
 
         {dateRangeInvalid ? (
           <EmptyState title="Geçersiz tarih aralığı" description="Başlangıç tarihi bitiş tarihinden sonra olamaz." />
-        ) : reportAssignments.length === 0 ? (
-          <EmptyState title="Eşleşen araç görevi bulunamadı" description="Filtre ölçütlerini değiştirerek yeniden deneyin." showSearch />
+        ) : recordAssignments.length === 0 ? (
+          <EmptyState title={workspace.search ? "Eşleşen kayıt bulunamadı" : "Eşleşen araç görevi bulunamadı"} description={workspace.search ? "Arama ifadesini değiştirerek yeniden deneyin." : "Filtre ölçütlerini değiştirerek yeniden deneyin."} showSearch />
         ) : (
           <>
             <div className="min-h-0 flex-1 overflow-hidden">
@@ -119,13 +127,13 @@ export const FleetReportTab = forwardRef<ReportExportHandle, { meetings: Meeting
                 <table className="w-full min-w-[900px] table-fixed text-left text-xs">
                   <thead className="border-b bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                     <tr>
-                      <th className="w-[11%] px-3 py-1.5">Tarih</th>
-                      <th className="w-[22%] px-3 py-1.5">Amaç</th>
-                      <th className="w-[15%] px-3 py-1.5">Araç</th>
-                      <th className="w-[14%] px-3 py-1.5">Şoför</th>
-                      <th className="w-[16%] px-3 py-1.5">Planlanan</th>
+                      <SortableHeader className="w-[11%]" label="Tarih" field="date" sort={workspace.sort} onChange={(sort) => setSearchParams(setFleetReportWorkspace(searchParams, { sort }))} />
+                      <SortableHeader className="w-[22%]" label="Amaç" field="purpose" sort={workspace.sort} onChange={(sort) => setSearchParams(setFleetReportWorkspace(searchParams, { sort }))} />
+                      <SortableHeader className="w-[15%]" label="Araç" field="vehicle" sort={workspace.sort} onChange={(sort) => setSearchParams(setFleetReportWorkspace(searchParams, { sort }))} />
+                      <SortableHeader className="w-[14%]" label="Şoför" field="driver" sort={workspace.sort} onChange={(sort) => setSearchParams(setFleetReportWorkspace(searchParams, { sort }))} />
+                      <SortableHeader className="w-[16%]" label="Planlanan" field="planned" sort={workspace.sort} onChange={(sort) => setSearchParams(setFleetReportWorkspace(searchParams, { sort }))} />
                       <th className="w-[16%] px-3 py-1.5">İlişkili Kayıt</th>
-                      <th className="w-[10%] px-3 py-1.5">Durum</th>
+                      <SortableHeader className="w-[10%]" label="Durum" field="status" sort={workspace.sort} onChange={(sort) => setSearchParams(setFleetReportWorkspace(searchParams, { sort }))} />
                     </tr>
                   </thead>
                   <tbody>
@@ -135,7 +143,7 @@ export const FleetReportTab = forwardRef<ReportExportHandle, { meetings: Meeting
               </div>
             </div>
             <div className="shrink-0">
-              <ReportPagination page={page} pageCount={pageCount} visibleStart={visibleStart} visibleEnd={visibleEnd} total={reportAssignments.length} visiblePageNumbers={getVisibleFleetReportPageNumbers(page, pageCount)} onPageChange={(nextPage) => setSearchParams(setFleetReportPage(searchParams, nextPage))} ariaLabel="Araç / şoför rapor sayfaları" />
+              <ReportPagination page={page} pageCount={pageCount} visibleStart={visibleStart} visibleEnd={visibleEnd} total={recordAssignments.length} visiblePageNumbers={getVisibleFleetReportPageNumbers(page, pageCount)} onPageChange={(nextPage) => setSearchParams(setFleetReportPage(searchParams, nextPage))} ariaLabel="Araç / şoför rapor sayfaları" />
             </div>
           </>
         )}
@@ -146,7 +154,7 @@ export const FleetReportTab = forwardRef<ReportExportHandle, { meetings: Meeting
   }
 
   return (
-    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border bg-card p-3 shadow-panel" aria-labelledby="fleet-analysis-title">
+    <section id="fleet-analysis-card" className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border bg-card p-3 shadow-panel" aria-labelledby="fleet-analysis-title">
       <div className="flex shrink-0 flex-wrap items-start justify-between gap-2">
         <h2 id="fleet-analysis-title" className="min-w-0 text-xs font-semibold uppercase tracking-wider text-slate-900">Araç / Şoför Analizi</h2>
         <p className="max-w-full text-right text-[11px] tabular-nums text-slate-500">{metadata}</p>
@@ -195,4 +203,10 @@ function FleetStatusPill({ status }: { status: PlannedTransportAssignment["statu
 
 function EmptyState({ title, description, showSearch = false }: { title: string; description: string; showSearch?: boolean }) {
   return <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-4 text-center">{showSearch && <Search className="size-6 text-slate-400" />}<p className={`${showSearch ? "mt-2" : ""} text-xs font-semibold text-slate-900`}>{title}</p><p className="mt-0.5 text-[11px] text-slate-600">{description}</p></div>
+}
+
+function SortableHeader({ className, label, field, sort, onChange }: { className: string; label: string; field: FleetReportSortField; sort: import("@/lib/sort").SingleSortState<FleetReportSortField>; onChange(sort: import("@/lib/sort").SingleSortState<FleetReportSortField>): void }) {
+  const active = sort?.field === field
+  const Icon = sort?.direction === "asc" ? ArrowUp : ArrowDown
+  return <th className={`${className} px-3 py-1.5`} aria-sort={active ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}><button type="button" className="inline-flex cursor-pointer items-center gap-1 rounded-sm transition-colors hover:text-slate-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-blue-300" aria-label={active ? `${label} sütunu sıralamasını kaldır` : `${label} sütununu artan sırala`} onClick={() => onChange(toggleSingleSort(sort, field))}>{label}{active && <Icon className="size-3" aria-hidden="true" />}</button></th>
 }

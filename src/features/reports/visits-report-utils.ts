@@ -5,8 +5,13 @@ import { filterVisits, type AllVisitsFilters } from "@/features/manager/all-visi
 import type { ReportsScopeFilters } from "@/features/reports/reports-filters"
 import { formatTr, getIstanbulHour } from "@/lib/date"
 import { getPageCount as getPageCountShared, paginate } from "@/lib/pagination"
+import { sortReportRecords, matchesReportSearch } from "@/features/reports/report-records-utils"
+import type { SingleSortState } from "@/lib/sort"
 
 export const VISITS_REPORT_PAGE_SIZE = 9
+export type VisitsReportSortField = "date" | "visitor" | "company" | "host" | "planned" | "duration" | "status"
+
+const VISITS_STATUS_SORT_ORDER: Record<VisitStatus, number> = { PLANNED: 0, CHECKED_IN: 1, CHECKED_OUT: 2, NO_SHOW: 3, CANCELLED: 4 }
 
 function toFullFilters(filters: ReportsScopeFilters): AllVisitsFilters {
   return {
@@ -28,6 +33,25 @@ function toFullFilters(filters: ReportsScopeFilters): AllVisitsFilters {
 export function filterVisitsForReport(visits: Visit[], filters: ReportsScopeFilters): Visit[] {
   const filtered = filterVisits(visits, toFullFilters(filters))
   return [...filtered].sort((left, right) => new Date(right.plannedStart).getTime() - new Date(left.plannedStart).getTime())
+}
+
+export function searchVisitsReportRecords(visits: Visit[], search: string) {
+  return visits.filter((visit) => matchesReportSearch(search, [
+    `${visit.visitor.firstName} ${visit.visitor.lastName}`,
+    visit.visitor.company,
+    visit.hostEmployeeName,
+  ]))
+}
+
+export function sortVisitsReportRecords(visits: Visit[], sort: SingleSortState<VisitsReportSortField>) {
+  return sortReportRecords(visits, sort, (visit, field) => {
+    if (field === "date" || field === "planned") return new Date(visit.plannedStart).getTime()
+    if (field === "visitor") return `${visit.visitor.firstName} ${visit.visitor.lastName}`
+    if (field === "company") return visit.visitor.company
+    if (field === "host") return visit.hostEmployeeName
+    if (field === "duration") return getVisitDurationMinutes(visit)
+    return VISITS_STATUS_SORT_ORDER[visit.status]
+  })
 }
 
 export function getVisitDelayMinutes(visit: Visit): number | null {

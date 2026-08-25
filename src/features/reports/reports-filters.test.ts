@@ -7,7 +7,9 @@ import {
   getPreviousPeriod,
   getQuickRangeOptions,
   matchesQuickRange,
+  parseRecordsReportFilters,
   parseReportsQuery,
+  resetRecordsReportFilters,
   resetReportsFilters,
   setReportsComparison,
   setReportsCustomComparison,
@@ -16,6 +18,9 @@ import {
   setReportsRange,
   setReportsTab,
   setReportsView,
+  setVisitsReportRecordsWorkspace,
+  setRecordsReportRange,
+  updateRecordsReportSearchParams,
   updateReportsSearchParams,
 } from "@/features/reports/reports-filters"
 import { mockVisitReferenceData } from "@/services/mock-visit-data"
@@ -125,9 +130,35 @@ describe("parseReportsQuery", () => {
     expect(parseReportsQuery(new URLSearchParams("tab=vehicle&view=records"), mockVisitReferenceData, now).view).toBe("analysis")
   })
 
+  it("keeps visits records search and sort in their own URL state", () => {
+    const state = parseReportsQuery(new URLSearchParams("view=records&visitSearch=Mehmet%20Kaya&visitSort=visitor&visitDir=desc"), mockVisitReferenceData, now)
+    expect(state).toMatchObject({ search: "Mehmet Kaya", sort: { field: "visitor", direction: "desc" } })
+    const next = setVisitsReportRecordsWorkspace(new URLSearchParams("page=3&fleetPage=4"), { search: "Ayşe", sort: { field: "status", direction: "asc" } })
+    expect(next.get("fleetPage")).toBe("4")
+    expect(next.get("visitSearch")).toBe("Ayşe")
+    expect(next.get("visitSort")).toBe("status")
+    expect(next.get("visitDir")).toBe("asc")
+    expect(setVisitsReportRecordsWorkspace(next, { search: "", sort: null }).toString()).toBe("fleetPage=4")
+  })
+
   it("rejects an incomplete custom comparison from the URL", () => {
     expect(parseReportsQuery(new URLSearchParams("comparison=custom"), mockVisitReferenceData, now)).toMatchObject({ comparison: "none", compareFrom: null, compareTo: null })
     expect(parseReportsQuery(new URLSearchParams("comparison=custom&compareFrom=2025-07-19"), mockVisitReferenceData, now)).toMatchObject({ comparison: "custom", compareFrom: "2025-07-19", compareTo: "2025-08-17" })
+  })
+})
+
+describe("records report scope filters", () => {
+  it("defaults independently from an analysis scope stored in the same URL", () => {
+    const params = new URLSearchParams("from=2026-08-01&to=2026-08-05&company=bplas&facility=bplas-merkez&comparison=previous")
+
+    expect(parseReportsQuery(params, mockVisitReferenceData, now).filters).toMatchObject({ startDate: "2026-08-01", endDate: "2026-08-05", companyId: "bplas", facilityId: "bplas-merkez" })
+    expect(parseRecordsReportFilters(params, mockVisitReferenceData, now)).toEqual({ startDate: "2026-07-19", endDate: "2026-08-17", companyId: "all", facilityId: "all" })
+  })
+
+  it("validates its own prefixed URL values without reading analysis filters", () => {
+    const filters = parseRecordsReportFilters(new URLSearchParams("from=2026-08-01&recordsFrom=2026-08-03&recordsTo=2099-01-01&recordsCompany=bplas&recordsFacility=bplas-merkez"), mockVisitReferenceData, now)
+
+    expect(filters).toEqual({ startDate: "2026-08-03", endDate: "2026-08-17", companyId: "bplas", facilityId: "bplas-merkez" })
   })
 })
 
@@ -175,6 +206,18 @@ describe("reports search param helpers", () => {
     expect(setReportsTab(new URLSearchParams(""), "vehicle").get("tab")).toBe("vehicle")
   })
 
+  it("updates records scope without changing analysis scope", () => {
+    const current = new URLSearchParams("from=2026-08-01&to=2026-08-05&company=bplas&comparison=previous&page=2&fleetPage=3")
+    const changed = updateRecordsReportSearchParams(current, "company", "anadolu")
+
+    expect(changed.get("company")).toBe("bplas")
+    expect(changed.get("comparison")).toBe("previous")
+    expect(changed.get("recordsCompany")).toBe("anadolu")
+    expect(changed.get("recordsFacility")).toBeNull()
+    expect(changed.get("page")).toBeNull()
+    expect(changed.get("fleetPage")).toBeNull()
+  })
+
   it("preserves each report's independent workspace state while switching tabs", () => {
     const current = new URLSearchParams("tab=vehicle&view=records&page=2&fleetView=records&fleetPage=4&goodsView=records&goodsPage=3")
     const visits = setReportsTab(current, "visits")
@@ -193,6 +236,26 @@ describe("reports search param helpers", () => {
     expect(cleared.get("page")).toBeNull()
   })
 
+  it("sets and resets records scope without touching analysis state", () => {
+    const current = new URLSearchParams("from=2026-08-01&to=2026-08-05&company=bplas&comparison=previous&granularity=weekly&recordsCompany=anadolu&recordsFacility=anadolu-depo&page=2")
+    const withRange = setRecordsReportRange(current, "2026-08-10", "2026-08-12")
+    expect(withRange.get("recordsFrom")).toBe("2026-08-10")
+    expect(withRange.get("recordsTo")).toBe("2026-08-12")
+    expect(withRange.get("from")).toBe("2026-08-01")
+    expect(withRange.get("page")).toBeNull()
+
+    const reset = resetRecordsReportFilters(withRange)
+    expect(reset.get("recordsFrom")).toBeNull()
+    expect(reset.get("recordsTo")).toBeNull()
+    expect(reset.get("recordsCompany")).toBeNull()
+    expect(reset.get("recordsFacility")).toBeNull()
+    expect(reset.get("from")).toBe("2026-08-01")
+    expect(reset.get("to")).toBe("2026-08-05")
+    expect(reset.get("company")).toBe("bplas")
+    expect(reset.get("comparison")).toBe("previous")
+    expect(reset.get("granularity")).toBe("weekly")
+  })
+
   it("keeps records state in URL helpers and resets only page when filters change", () => {
     const records = setReportsView(new URLSearchParams("page=2"), "records")
     expect(records.get("view")).toBe("records")
@@ -208,7 +271,7 @@ describe("reports search param helpers", () => {
   })
 
   it("resets filters but preserves the selected report workspace", () => {
-    const reset = resetReportsFilters(new URLSearchParams("tab=vehicle&view=records&page=2&from=2026-08-01&to=2026-08-05&company=bplas&facility=bplas-merkez&comparison=previous&granularity=weekly"))
-    expect(reset.toString()).toBe("tab=vehicle&view=records")
+    const reset = resetReportsFilters(new URLSearchParams("tab=vehicle&view=records&page=2&from=2026-08-01&to=2026-08-05&company=bplas&facility=bplas-merkez&comparison=previous&granularity=weekly&recordsFrom=2026-08-10&recordsTo=2026-08-12&recordsCompany=anadolu"))
+    expect(reset.toString()).toBe("tab=vehicle&view=records&recordsFrom=2026-08-10&recordsTo=2026-08-12&recordsCompany=anadolu")
   })
 })

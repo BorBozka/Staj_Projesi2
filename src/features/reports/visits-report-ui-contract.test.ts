@@ -110,7 +110,7 @@ describe("Visits report UI contracts", () => {
   })
 
   it("keeps the report toolbar's action group at the right and preserves an empty second line slot", () => {
-    expect(pageSource).toContain('className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2"')
+    expect(pageSource).toContain('className={cn("ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2", recordsMode && "lg:flex-nowrap")}')
     expect(pageSource).toContain("Rapor filtreleri")
     expect(pageSource).toContain('className={cn("h-5 shrink-0 gap-1 border-none px-1')
     expect(pageSource).toContain('!hasActiveReportFilters && "invisible"')

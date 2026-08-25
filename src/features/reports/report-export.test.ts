@@ -7,8 +7,11 @@ import {
   buildFleetReportRows,
   buildGoodsReportRows,
   buildVisitsReportRows,
+  formatReportWorksheet,
   FLEET_REPORT_COLUMNS,
+  getReportExcelColumnWidths,
   GOODS_REPORT_COLUMNS,
+  REPORT_PNG_CAPTURE_OPTIONS,
   rowsToCsv,
   VISITS_REPORT_COLUMNS,
 } from "@/features/reports/report-export"
@@ -180,6 +183,30 @@ describe("rowsToCsv", () => {
   it("quotes values containing commas, quotes, semicolons or newlines", () => {
     const csv = rowsToCsv(["Name"], [['Say "hi", please'], ["line1\nline2"], ["a;b"]])
     expect(csv).toBe('Name\r\n"Say ""hi"", please"\r\n"line1\nline2"\r\n"a;b"')
+  })
+})
+
+describe("Excel report formatting", () => {
+  it("calculates capped readable widths from headers and complete export rows", () => {
+    const widths = getReportExcelColumnWidths(["Durum", "Ziyaretçi Şirketi"], [["Planlandı", "Çok Uzun Bir Şirket Adı ve Açıklaması"]])
+
+    expect(widths).toEqual([{ wch: 12 }, { wch: 39 }])
+  })
+
+  it("adds widths, autofilter, row heights and a styled header to the worksheet", () => {
+    const worksheet: Record<string, unknown> = { A1: {}, B1: {} }
+    formatReportWorksheet(worksheet, ["Durum", "Ziyaretçi"], [["Planlandı", "Ayşe Yılmaz"]])
+
+    expect(worksheet["!cols"]).toEqual([{ wch: 12 }, { wch: 16 }])
+    expect(worksheet["!autofilter"]).toEqual({ ref: "A1:B2" })
+    expect(worksheet["!rows"]).toEqual([{ hpt: 24 }, { hpt: 20 }])
+    expect(worksheet.A1).toMatchObject({ s: { font: { bold: true }, alignment: { wrapText: true } } })
+  })
+})
+
+describe("PNG capture configuration", () => {
+  it("uses a solid white, two-times raster capture independent of browser pixel ratio", () => {
+    expect(REPORT_PNG_CAPTURE_OPTIONS).toEqual({ backgroundColor: "#ffffff", scale: 2 })
   })
 })
 
