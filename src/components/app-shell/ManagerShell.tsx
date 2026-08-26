@@ -8,6 +8,9 @@ import {
   LayoutDashboard,
   Menu,
   PackageCheck,
+  Settings,
+  Users,
+  Building2,
 } from "lucide-react"
 import { lazy, Suspense, useCallback, useEffect, useState } from "react"
 import { NavLink, Outlet, useLocation } from "react-router-dom"
@@ -28,24 +31,32 @@ import { getSavedReportsHref } from "@/features/reports/reports-filters"
 import { getVisiblePendingInvitationVisits } from "@/features/visits/invitation-status"
 import { useVisits } from "@/features/visits/visit-context"
 import type { InvitationStatus } from "@/domain/visits"
+import type { ApplicationRole } from "@/domain/admin"
 import { formatTr } from "@/lib/date"
 import { cn } from "@/lib/utils"
 
-const personalNavigationItems = [{ label: "Ziyaretlerim", icon: CalendarDays, to: "/manager/my-visits" }]
+const personalNavigationItems = (basePath: string) => [{ label: "Ziyaretlerim", icon: CalendarDays, to: `${basePath}/my-visits` }]
 const VisitFormDialog = lazy(() =>
   import("@/features/visits/VisitFormDialog").then((module) => ({ default: module.VisitFormDialog })),
 )
-const managementNavigationItems = [
-  { label: "Dashboard", icon: LayoutDashboard, to: "/manager/dashboard" },
-  { label: "Tüm Ziyaretler", icon: CalendarDays, to: "/manager/all-visits" },
-  { label: "Kaynaklar", icon: Boxes, to: "/manager/resources" },
-  { label: "Mal hareketleri", icon: PackageCheck, to: "/manager/goods-movements" },
-  { label: "Araç planı", icon: CarFront, to: "/manager/transport-planning" },
-  { label: "Raporlar", icon: FileBarChart, to: "/manager/reports" },
+const managementNavigationItems = (basePath: string) => [
+  { label: "Dashboard", icon: LayoutDashboard, to: `${basePath}/dashboard` },
+  { label: "Tüm Ziyaretler", icon: CalendarDays, to: `${basePath}/all-visits` },
+  { label: "Kaynaklar", icon: Boxes, to: `${basePath}/resources` },
+  { label: "Mal hareketleri", icon: PackageCheck, to: `${basePath}/goods-movements` },
+  { label: "Araç planı", icon: CarFront, to: `${basePath}/transport-planning` },
+  { label: "Raporlar", icon: FileBarChart, to: `${basePath}/reports` },
+]
+const systemNavigationItems = [
+  { label: "Kullanıcılar", icon: Users, to: "/admin/users" },
+  { label: "Organizasyon", icon: Building2, to: "/admin/organization" },
+  { label: "Sistem Ayarları", icon: Settings, to: "/admin/system-settings" },
 ]
 
-export function ManagerShell() {
-  const [collapsed, setCollapsed] = useState(() => window.sessionStorage.getItem("manager-navigation-collapsed") === "true")
+export function ManagerShell({ role = "MANAGER" }: { role?: Extract<ApplicationRole, "MANAGER" | "ADMIN"> }) {
+  const isAdmin = role === "ADMIN"
+  const basePath = isAdmin ? "/admin" : "/manager"
+  const [collapsed, setCollapsed] = useState(() => window.sessionStorage.getItem(`${role.toLowerCase()}-navigation-collapsed`) === "true")
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false)
   const [companyId, setCompanyId] = useState("all")
   const [currentTime, setCurrentTime] = useState(() => new Date())
@@ -56,8 +67,8 @@ export function ManagerShell() {
   const { reload } = useVisits()
 
   useEffect(() => {
-    window.sessionStorage.setItem("manager-navigation-collapsed", String(collapsed))
-  }, [collapsed])
+    window.sessionStorage.setItem(`${role.toLowerCase()}-navigation-collapsed`, String(collapsed))
+  }, [collapsed, role])
 
   useEffect(() => startMinuteClock(setCurrentTime), [])
 
@@ -79,9 +90,9 @@ export function ManagerShell() {
 
   return (
     <ManagerRefreshProvider value={{ companyId, currentTime, facilityId, isRefreshing, lastUpdated, refreshVersion, refresh, selectCompany, selectFacility: setFacilityId }}>
-      <div className={cn("min-h-screen overflow-x-hidden bg-slate-50 transition-[padding-left] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] will-change-[padding-left] motion-reduce:transition-none", collapsed ? "md:pl-[60px]" : "md:pl-[188px]")} style={{ zoom: 0.9 }}>
-        <ManagerSidebar collapsed={collapsed} onCollapsedChange={setCollapsed} />
-        <ManagerMobileNavigation open={mobileNavigationOpen} onOpenChange={setMobileNavigationOpen} />
+      <div className={cn("min-h-[111.112vh] overflow-x-hidden bg-slate-50 transition-[padding-left] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] will-change-[padding-left] motion-reduce:transition-none", collapsed ? "md:pl-[60px]" : "md:pl-[188px]")} style={{ zoom: 0.9 }}>
+        <ManagerSidebar collapsed={collapsed} onCollapsedChange={setCollapsed} role={role} basePath={basePath} />
+        <ManagerMobileNavigation open={mobileNavigationOpen} onOpenChange={setMobileNavigationOpen} role={role} basePath={basePath} />
 
         <header className="sticky top-0 z-30 flex h-12 items-center border-b bg-white/95 px-3 backdrop-blur md:hidden">
           <Button
@@ -102,28 +113,36 @@ export function ManagerShell() {
   )
 }
 
-function ManagerSidebar({ collapsed, onCollapsedChange }: { collapsed: boolean; onCollapsedChange(value: boolean): void }) {
+function ManagerSidebar({ collapsed, onCollapsedChange, role, basePath }: { collapsed: boolean; onCollapsedChange(value: boolean): void; role: "MANAGER" | "ADMIN"; basePath: string }) {
   return (
-    <aside className={cn("fixed inset-y-0 left-0 z-40 hidden overflow-x-hidden border-r border-slate-800 bg-slate-950 text-slate-200 transition-[width] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] will-change-[width] motion-reduce:transition-none md:flex md:flex-col", collapsed ? "w-[60px]" : "w-[188px]")}>
-      <div className="flex h-[66px] shrink-0 items-center gap-3 pl-2.5 pr-4">
+    <aside className={cn("fixed inset-y-0 left-0 z-40 hidden overflow-hidden border-r border-slate-800 bg-slate-950 text-slate-200 transition-[width] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] will-change-[width] motion-reduce:transition-none md:flex md:flex-col", collapsed ? "w-[60px]" : "w-[188px]")}>
+      <button
+        type="button"
+        className={cn("flex h-[66px] w-full shrink-0 cursor-pointer items-center text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500", collapsed ? "justify-center px-1" : "gap-3 pl-2.5 pr-2.5")}
+        onClick={() => onCollapsedChange(!collapsed)}
+        aria-label={collapsed ? "Menüyü genişlet" : "Menüyü daralt"}
+        title={collapsed ? "Menüyü genişlet" : "Menüyü daralt"}
+      >
         <img src={bplasLogo} alt="BPLAS" className="size-10 rounded-lg object-cover shadow-sm" />
-        <p aria-hidden={collapsed} className={cn("min-w-0 shrink-0 truncate text-sm font-semibold text-white transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-none", collapsed ? "translate-x-1 opacity-0" : "translate-x-0 opacity-100 delay-100")}>Yönetim Sistemi</p>
-      </div>
+        <p aria-hidden={collapsed} className={cn("min-w-0 shrink-0 truncate text-sm font-semibold text-white transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-none", collapsed ? "w-0 translate-x-1 opacity-0" : "translate-x-0 opacity-100 delay-100")}>Yönetim Sistemi</p>
+      </button>
 
-      <nav className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-2 py-1.5" aria-label="Yönetici menüsü">
-        <NavigationGroup label="Yönetim" collapsed={collapsed} items={managementNavigationItems} />
-        <NavigationGroup label="Kişisel" collapsed={collapsed} items={personalNavigationItems} className="mt-5" />
-        <button
-          type="button"
-          className="mt-2 flex-1 cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-          onClick={() => onCollapsedChange(!collapsed)}
-          aria-label={collapsed ? "Menüyü genişlet" : "Menüyü daralt"}
-        />
+      <nav
+        className="flex min-h-0 flex-1 cursor-pointer flex-col overflow-hidden px-2 py-1"
+        aria-label={role === "ADMIN" ? "Admin menüsü" : "Yönetici menüsü"}
+        onClick={(event) => { if (event.target === event.currentTarget) onCollapsedChange(!collapsed) }}
+      >
+        <NavigationGroup label="Yönetim" collapsed={collapsed} items={managementNavigationItems(basePath)} />
+        {role === "ADMIN" && <NavigationGroup label="Sistem Yönetimi" collapsed={collapsed} items={systemNavigationItems} className="mt-3" />}
+        <NavigationGroup label="Kişisel" collapsed={collapsed} items={personalNavigationItems(basePath)} className="mt-3" />
       </nav>
 
-      <div className="shrink-0 border-t border-slate-800 p-2">
+      <div
+        className="shrink-0 cursor-pointer border-t border-slate-800 p-1.5"
+        onClick={(event) => { if (event.target === event.currentTarget) onCollapsedChange(!collapsed) }}
+      >
         <ManagerNotifications collapsed={collapsed} />
-        <ManagerProfile collapsed={collapsed} />
+        <ManagerProfile collapsed={collapsed} role={role} />
       </div>
     </aside>
   )
@@ -232,23 +251,24 @@ function InvitationNotificationStatus({ status }: { status: InvitationStatus }) 
   return <span className={cn("mt-1 inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium", statusClass)}>{statusContent}</span>
 }
 
-function ManagerProfile({ collapsed = false }: { collapsed?: boolean }) {
+function ManagerProfile({ collapsed = false, role = "MANAGER" }: { collapsed?: boolean; role?: "MANAGER" | "ADMIN" }) {
+  const title = role === "ADMIN" ? "Admin" : "Yönetici"
   return (
     <div
       className="flex min-w-0 items-center gap-2.5 rounded-md px-1 py-2"
-      aria-label="Oturum açan kullanıcı: Atahan Bozkurt, Yönetici"
-      title={collapsed ? "Atahan Bozkurt · Yönetici" : undefined}
+      aria-label={`Oturum açan kullanıcı: Atahan Bozkurt, ${title}`}
+      title={collapsed ? `Atahan Bozkurt · ${title}` : undefined}
     >
       <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">AB</div>
       <div aria-hidden={collapsed} className={cn("min-w-0 shrink-0 leading-tight transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-none", collapsed ? "translate-x-1 opacity-0" : "translate-x-0 opacity-100 delay-100")}>
           <p className="truncate text-sm font-semibold text-white">Atahan Bozkurt</p>
-          <p className="mt-0.5 truncate text-xs text-slate-400">Yönetici</p>
+          <p className="mt-0.5 truncate text-xs text-slate-400">{title}</p>
       </div>
     </div>
   )
 }
 
-function ManagerMobileNavigation({ open, onOpenChange }: { open: boolean; onOpenChange(open: boolean): void }) {
+function ManagerMobileNavigation({ open, onOpenChange, role, basePath }: { open: boolean; onOpenChange(open: boolean): void; role: "MANAGER" | "ADMIN"; basePath: string }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -265,14 +285,15 @@ function ManagerMobileNavigation({ open, onOpenChange }: { open: boolean; onOpen
           </div>
         </DialogHeader>
 
-        <nav className="min-h-0 flex-1 overflow-y-auto px-2 py-3" aria-label="Mobil yönetici menüsü">
-          <MobileNavigationGroup label="Yönetim" items={managementNavigationItems} onNavigate={() => onOpenChange(false)} />
-          <MobileNavigationGroup label="Kişisel" items={personalNavigationItems} onNavigate={() => onOpenChange(false)} className="mt-5" />
+        <nav className="min-h-0 flex-1 overflow-y-auto px-2 py-3" aria-label={role === "ADMIN" ? "Mobil admin menüsü" : "Mobil yönetici menüsü"}>
+          <MobileNavigationGroup label="Yönetim" items={managementNavigationItems(basePath)} onNavigate={() => onOpenChange(false)} />
+          {role === "ADMIN" && <MobileNavigationGroup label="Sistem Yönetimi" items={systemNavigationItems} onNavigate={() => onOpenChange(false)} className="mt-5" />}
+          <MobileNavigationGroup label="Kişisel" items={personalNavigationItems(basePath)} onNavigate={() => onOpenChange(false)} className="mt-5" />
         </nav>
 
         <div className="border-t border-slate-800 p-2">
           <ManagerNotifications collapsed={false} />
-          <ManagerProfile />
+          <ManagerProfile role={role} />
         </div>
       </DialogContent>
     </Dialog>
@@ -282,7 +303,7 @@ function ManagerMobileNavigation({ open, onOpenChange }: { open: boolean; onOpen
 function NavigationGroup({ label, collapsed, items, className }: { label: string; collapsed: boolean; items: { label: string; icon: typeof CalendarDays; to?: string }[]; className?: string }) {
   const { pathname } = useLocation()
   const labelTransition = cn("min-w-0 shrink-0 truncate transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-none", collapsed ? "translate-x-1 opacity-0" : "translate-x-0 opacity-100 delay-100")
-  return <div className={className}><p className="h-6 overflow-hidden px-2 pb-2 text-xs font-medium text-slate-400"><span aria-hidden={collapsed} className={cn("inline-block whitespace-nowrap", labelTransition)}>{label}</span></p>{items.map(({ label: itemLabel, icon: Icon, to }) => to ? <NavLink key={itemLabel} to={to === "/manager/reports" ? getSavedReportsHref() : to} title={collapsed ? itemLabel : undefined} aria-label={collapsed ? itemLabel : undefined} aria-current={pathname === to ? "page" : undefined} className={({ isActive }) => cn("mb-1 flex h-11 items-center gap-3 whitespace-nowrap rounded-md px-3 text-sm font-medium transition-colors duration-150", isActive ? "bg-blue-600 text-white shadow-sm" : "text-slate-300 hover:bg-slate-800 hover:text-white")}><Icon className="size-5 shrink-0" /><span aria-hidden={collapsed} className={labelTransition}>{itemLabel}</span></NavLink> : <div key={itemLabel} className="mb-1 flex h-11 cursor-not-allowed items-center gap-3 whitespace-nowrap rounded-md px-3 text-sm text-slate-600" aria-disabled="true"><Icon className="size-5 shrink-0" /><span aria-hidden={collapsed} className={labelTransition}>{itemLabel}</span></div>)}</div>
+  return <div className={className}><p className="h-5 overflow-hidden px-2 pb-1 text-[10px] font-medium text-slate-400"><span aria-hidden={collapsed} className={cn("inline-block whitespace-nowrap", labelTransition)}>{label}</span></p>{items.map(({ label: itemLabel, icon: Icon, to }) => to ? <NavLink key={itemLabel} to={to.endsWith("/reports") ? getSavedReportsHref(to.slice(0, -"/reports".length)) : to} title={collapsed ? itemLabel : undefined} aria-label={collapsed ? itemLabel : undefined} aria-current={pathname === to ? "page" : undefined} className={({ isActive }) => cn("mb-0.5 flex h-9 items-center gap-3 whitespace-nowrap rounded-md px-3 text-sm font-medium transition-colors duration-150", isActive ? "bg-blue-600 text-white shadow-sm" : "text-slate-300 hover:bg-slate-800 hover:text-white")}><Icon className="size-5 shrink-0" /><span aria-hidden={collapsed} className={labelTransition}>{itemLabel}</span></NavLink> : <div key={itemLabel} className="mb-0.5 flex h-9 cursor-not-allowed items-center gap-3 whitespace-nowrap rounded-md px-3 text-sm text-slate-600" aria-disabled="true"><Icon className="size-5 shrink-0" /><span aria-hidden={collapsed} className={labelTransition}>{itemLabel}</span></div>)}</div>
 }
 
 function MobileNavigationGroup({ label, items, onNavigate, className }: { label: string; items: { label: string; icon: typeof CalendarDays; to?: string }[]; onNavigate(): void; className?: string }) {
@@ -290,7 +311,7 @@ function MobileNavigationGroup({ label, items, onNavigate, className }: { label:
     <div className={className}>
       <p className="px-2 pb-2 text-xs font-medium text-slate-400">{label}</p>
       {items.map(({ label: itemLabel, icon: Icon, to }) => to ? (
-        <NavLink key={itemLabel} to={to === "/manager/reports" ? getSavedReportsHref() : to} onClick={onNavigate} className={({ isActive }) => cn("mb-1 flex h-11 items-center gap-3 rounded-md px-3 text-sm font-medium", isActive ? "bg-blue-600 text-white shadow-sm" : "text-slate-300 hover:bg-slate-800 hover:text-white")}>
+        <NavLink key={itemLabel} to={to.endsWith("/reports") ? getSavedReportsHref(to.slice(0, -"/reports".length)) : to} onClick={onNavigate} className={({ isActive }) => cn("mb-1 flex h-11 items-center gap-3 rounded-md px-3 text-sm font-medium", isActive ? "bg-blue-600 text-white shadow-sm" : "text-slate-300 hover:bg-slate-800 hover:text-white")}>
           <Icon className="size-5 shrink-0" />
           <span className="truncate">{itemLabel}</span>
         </NavLink>

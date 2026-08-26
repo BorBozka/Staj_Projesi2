@@ -29,4 +29,24 @@ describe("Manager sidebar transition", () => {
     expect(componentSource).toContain("transition-[opacity,transform] duration-150")
     expect(componentSource).not.toContain("{!collapsed && <span className=\"truncate\">{itemLabel}</span>}")
   })
+
+  it("keeps the collapse control visible and the desktop navigation unscrollable", () => {
+    expect(componentSource).toContain("onClick={() => onCollapsedChange(!collapsed)}")
+    expect(componentSource).not.toContain("ChevronLeft")
+    expect(componentSource).not.toContain("ChevronRight")
+    expect(componentSource).toContain('className="flex min-h-0 flex-1 cursor-pointer flex-col overflow-hidden px-2 py-1"')
+    expect(componentSource).not.toContain("overflow-x-hidden overflow-y-auto px-2 py-1.5")
+    expect(componentSource).not.toContain("mt-2 flex-1 cursor-pointer")
+  })
+})
+
+describe("Role-aware navigation", () => {
+  it("uses one shell and exposes system management only to the Admin role", () => {
+    expect(componentSource).toContain('role === "ADMIN"')
+    expect(componentSource).toContain('label="Sistem Yönetimi"')
+    expect(componentSource).toContain('label: "Kullanıcılar"')
+    expect(componentSource).toContain('label: "Organizasyon"')
+    expect(componentSource).toContain('label: "Sistem Ayarları"')
+    expect(componentSource).toContain('basePath = isAdmin ? "/admin" : "/manager"')
+  })
 })

@@ -24,10 +24,24 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+    // For a dialog that stays mounted and visible behind another dialog opened on top of it (e.g.
+    // a confirmation/sub-action dialog): skip this instance's own overlay so the two don't stack
+    // into a doubly-dark backdrop. The topmost dialog still renders its own overlay as usual.
+    hideOverlay?: boolean
+  }
+>(({ className, children, hideOverlay, ...props }, ref) => (
   <DialogPortal>
-    <DialogOverlay />
+    {/*
+      Always mounted, never conditionally rendered: Radix's Portal appends each of its children
+      directly to document.body via createPortal, with no shared wrapper element. Unmounting and
+      remounting this Overlay (e.g. by writing `{!hideOverlay && <DialogOverlay />}`) makes React
+      re-append it as body's *last* child on remount, after this dialog's own Content — which
+      then paints the overlay on top of the dialog instead of behind it. Toggling visibility
+      instead of presence keeps its DOM position (and paint order) stable for the dialog's
+      lifetime, however many times a nested dialog opens and closes on top of it.
+    */}
+    <DialogOverlay className={hideOverlay ? "pointer-events-none opacity-0" : undefined} />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(

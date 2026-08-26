@@ -264,10 +264,10 @@ export function saveReportsSearch(searchParams: URLSearchParams) {
   else window.sessionStorage.removeItem(REPORTS_SESSION_SEARCH_KEY)
 }
 
-export function getSavedReportsHref() {
-  if (typeof window === "undefined") return "/manager/reports"
+export function getSavedReportsHref(basePath = "/manager") {
+  if (typeof window === "undefined") return `${basePath}/reports`
   const value = window.sessionStorage.getItem(REPORTS_SESSION_SEARCH_KEY)
-  return value ? `/manager/reports?${value}` : "/manager/reports"
+  return value ? `${basePath}/reports?${value}` : `${basePath}/reports`
 }
 
 export function matchesQuickRange(filters: Pick<ReportsScopeFilters, "startDate" | "endDate">, option: QuickRangeOption) {

@@ -17,3 +17,23 @@ describe("global dialog scroll-lock", () => {
     expect(dialogSource).toContain('InternalDialogContent.displayName = "InternalDialogContent"')
   })
 })
+
+describe("DialogContent hideOverlay opt-in", () => {
+  it("only skips the overlay when a caller explicitly opts in, for a dialog that stays visible behind another one opened on top of it", () => {
+    expect(dialogSource).toContain("hideOverlay?: boolean")
+    expect(dialogSource).toContain("({ className, children, hideOverlay, ...props }, ref)")
+  })
+
+  it("keeps the Overlay permanently mounted and toggles visibility with a class, instead of conditionally rendering it", () => {
+    // Root cause of a real nested-dialog bug: Radix's Portal appends each of its children
+    // directly to document.body with no shared wrapper, so unmounting/remounting the Overlay
+    // (e.g. `{!hideOverlay && <DialogOverlay />}`) makes React re-append it as body's *last*
+    // child on remount — after this dialog's own Content — painting the overlay on top of the
+    // dialog instead of behind it. The fix keeps the Overlay's DOM node stable for the dialog's
+    // whole lifetime and only ever toggles its opacity/pointer-events.
+    expect(dialogSource).toContain('<DialogOverlay className={hideOverlay ? "pointer-events-none opacity-0" : undefined} />')
+    // The old buggy pattern may still be named in an explanatory comment, but must not appear as
+    // live JSX (i.e. not immediately followed by the Content element on the next line).
+    expect(dialogSource).not.toMatch(/^\s*\{!hideOverlay && <DialogOverlay \/>\}\s*$/m)
+  })
+})
