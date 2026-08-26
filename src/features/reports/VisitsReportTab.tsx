@@ -33,6 +33,7 @@ import {
   paginateReportVisits,
   searchVisitsReportRecords,
   sortVisitsReportRecords,
+  VISITS_REPORT_PAGE_SIZE,
   VISITS_REPORT_STATUS_COLORS,
   VISITS_REPORT_STATUS_LABELS,
   type VisitsReportDailyTrendGroupedPoint,
@@ -161,7 +162,7 @@ export const VisitsReportTab = forwardRef<ReportExportHandle, VisitsReportTabPro
           <>
             <div className="min-h-0 flex-1 overflow-hidden">
               <div className="h-full overflow-x-auto overflow-y-hidden scrollbar-thin">
-                <table className="w-full min-w-[980px] table-fixed text-left text-xs">
+                <table className="h-full w-full min-w-[980px] table-fixed text-left text-xs">
                   <thead className="border-b bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                     <tr>
                       <SortableHeader className="w-[10%]" label="Tarih" field="date" sort={recordsSort} onChange={onRecordsSortChange} />
@@ -176,7 +177,7 @@ export const VisitsReportTab = forwardRef<ReportExportHandle, VisitsReportTabPro
                   </thead>
                   <tbody>
                     {paginatedVisits.map((visit) => (
-                      <tr key={visit.id} role="button" tabIndex={0} aria-label={`${visit.visitor.firstName} ${visit.visitor.lastName} ziyaret detaylarını görüntüle`} className="record-row-hover h-[3.125rem] cursor-pointer border-b transition-colors hover:bg-slate-50 focus-visible:bg-blue-50 focus-visible:outline-none" onClick={() => setSelectedVisit(visit)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedVisit(visit) } }}>
+                      <tr key={visit.id} role="button" tabIndex={0} aria-label={`${visit.visitor.firstName} ${visit.visitor.lastName} ziyaret detaylarını görüntüle`} className="record-row-hover h-[3.375rem] cursor-pointer border-b last:border-b-0 transition-colors hover:bg-slate-50 focus-visible:bg-blue-50 focus-visible:outline-none" onClick={() => setSelectedVisit(visit)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedVisit(visit) } }}>
                         <td className="px-3 py-1 tabular-nums">{formatTr(new Date(visit.plannedStart), "d MMM yyyy")}</td>
                         <td className="px-3 py-1"><p className="truncate font-medium text-slate-900" title={`${visit.visitor.firstName} ${visit.visitor.lastName}`}>{visit.visitor.firstName} {visit.visitor.lastName}</p></td>
                         <td className="px-3 py-1"><p className="truncate" title={visit.visitor.company}>{visit.visitor.company}</p></td>
@@ -187,6 +188,7 @@ export const VisitsReportTab = forwardRef<ReportExportHandle, VisitsReportTabPro
                         <td className="px-3 py-1"><VisitsReportStatusPill status={visit.status} /></td>
                       </tr>
                     ))}
+                    {Array.from({ length: Math.max(0, VISITS_REPORT_PAGE_SIZE - paginatedVisits.length) }).map((_, index) => <VisitsReportFillerRow key={`visit-filler-${index}`} />)}
                   </tbody>
                 </table>
               </div>
@@ -295,6 +297,10 @@ function SortableHeader({ className, label, field, sort, onChange }: { className
   const active = sort?.field === field
   const Icon = sort?.direction === "asc" ? ArrowUp : ArrowDown
   return <th className={`${className} px-3 py-1.5`} aria-sort={active ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}><button type="button" className="inline-flex cursor-pointer items-center gap-1 rounded-sm transition-colors hover:text-slate-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-blue-300" aria-label={active ? `${label} sütunu sıralamasını kaldır` : `${label} sütununu artan sırala`} onClick={() => onChange(toggleSingleSort(sort, field))}>{label}{active && <Icon className="size-3" aria-hidden="true" />}</button></th>
+}
+
+function VisitsReportFillerRow() {
+  return <tr aria-hidden="true" className="pointer-events-none h-[3.375rem] select-none border-b border-transparent last:border-b-0"><td className="px-3 py-1" /><td className="px-3 py-1" /><td className="px-3 py-1" /><td className="px-3 py-1" /><td className="px-3 py-1" /><td className="px-3 py-1" /><td className="px-3 py-1" /><td className="px-3 py-1" /></tr>
 }
 
 function ActualTimesCell({ visit }: { visit: Visit }) {

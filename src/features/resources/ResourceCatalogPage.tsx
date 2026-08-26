@@ -274,7 +274,6 @@ export function ResourceCatalogPage() {
                     <tr key={`filler-${index}`} aria-hidden="true" className={cn("pointer-events-none select-none", index > 0 && "border-transparent")}>
                       <td className="px-3 py-1.5 sm:py-2">
                         <p className="truncate font-semibold text-transparent">&nbsp;</p>
-                        <p className="mt-0.5 truncate text-[11px] text-transparent">&nbsp;</p>
                       </td>
                       <td className="px-3 py-1.5 sm:py-2 text-transparent">&nbsp;</td>
                       <td className="px-3 py-1.5 sm:py-2 text-transparent">&nbsp;</td>
@@ -304,7 +303,6 @@ export function ResourceCatalogPage() {
                     <div className="min-w-0">
                       <h3 className="truncate text-sm font-semibold text-slate-900">{getResourceDisplayName(resource)}</h3>
                       <p className="mt-0.5 text-xs text-slate-600">{resourceTypeLabels[resource.type]}</p>
-                      {getResourceDetail(resource) && <p className="mt-0.5 truncate text-[11px] text-slate-500">{getResourceDetail(resource)}</p>}
                     </div>
                     <ResourceStatus active={resource.isActive} />
                   </div>
@@ -413,12 +411,10 @@ function SortButton({ label, field, sorts, onToggle }: {
 
 function ResourceIdentity({ resource }: { resource: FacilityResource }) {
   const displayName = getResourceDisplayName(resource)
-  const detail = getResourceDetail(resource)
 
   return (
     <div>
       <p className="truncate font-semibold text-slate-900" title={displayName}>{displayName}</p>
-      {detail && <p className="mt-0.5 truncate text-[11px] text-slate-500" title={detail}>{detail}</p>}
     </div>
   )
 }
@@ -446,17 +442,6 @@ function formatQuantity(resource: FacilityResource) {
       return resource.licenseClasses.join(", ") || "—"
     case "ROOM":
       return "1 oda"
-  }
-}
-
-function getResourceDetail(resource: FacilityResource) {
-  switch (resource.type) {
-    case "VEHICLE":
-      return resource.licensePlate
-    case "DRIVER":
-      return resource.licenseClasses.join(", ") || null
-    default:
-      return null
   }
 }
 

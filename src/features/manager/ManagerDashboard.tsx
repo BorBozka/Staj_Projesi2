@@ -135,7 +135,7 @@ export function ManagerDashboard() {
                   <RefreshCw className={cn("size-3.5", isRefreshing && "animate-spin")} />
                   <span className="tabular-nums">{formatTr(lastUpdated, "HH:mm")}</span>
                 </Button>
-                <Link to="/manager/all-visits" className="shrink-0 text-xs font-semibold text-blue-600 hover:text-blue-700">
+                <Link to="../all-visits" relative="path" className="shrink-0 text-xs font-semibold text-blue-600 hover:text-blue-700">
                   Tüm ziyaretleri gör
                 </Link>
               </div>

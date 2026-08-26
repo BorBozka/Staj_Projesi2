@@ -179,16 +179,16 @@ describe("calculateVisitsReportDailyTrend", () => {
 })
 
 describe("report pagination", () => {
-  it("uses a fixed nine-record page size with stable ranges", () => {
+  it("uses a fixed eight-record page size with stable ranges", () => {
     const records = Array.from({ length: 24 }, (_, index) => ({ id: String(index) }))
-    expect(VISITS_REPORT_PAGE_SIZE).toBe(9)
+    expect(VISITS_REPORT_PAGE_SIZE).toBe(8)
     expect(getReportPageCount(records.length)).toBe(3)
-    expect(paginateReportVisits(records as Visit[], 1)).toHaveLength(9)
-    expect(paginateReportVisits(records as Visit[], 2)).toHaveLength(9)
-    expect(paginateReportVisits(records as Visit[], 3)).toHaveLength(6)
-    expect(getReportPageRange(24, 1)).toEqual({ start: 1, end: 9 })
-    expect(getReportPageRange(24, 2)).toEqual({ start: 10, end: 18 })
-    expect(getReportPageRange(24, 3)).toEqual({ start: 19, end: 24 })
+    expect(paginateReportVisits(records as Visit[], 1)).toHaveLength(8)
+    expect(paginateReportVisits(records as Visit[], 2)).toHaveLength(8)
+    expect(paginateReportVisits(records as Visit[], 3)).toHaveLength(8)
+    expect(getReportPageRange(24, 1)).toEqual({ start: 1, end: 8 })
+    expect(getReportPageRange(24, 2)).toEqual({ start: 9, end: 16 })
+    expect(getReportPageRange(24, 3)).toEqual({ start: 17, end: 24 })
   })
 })
 

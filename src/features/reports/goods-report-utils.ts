@@ -8,7 +8,7 @@ import { getPageCount as getPageCountShared, paginate } from "@/lib/pagination"
 import { matchesReportSearch, sortReportRecords } from "@/features/reports/report-records-utils"
 import type { SingleSortState } from "@/lib/sort"
 
-export const GOODS_REPORT_PAGE_SIZE = 10
+export const GOODS_REPORT_PAGE_SIZE = 8
 export type GoodsReportView = "analysis" | "records"
 export type GoodsReportGranularity = "daily" | "weekly"
 export type GoodsTrendGranularity = GoodsReportGranularity | "hourly"

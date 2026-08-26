@@ -18,7 +18,7 @@ const previousYear = filterAssignmentsForReport(initialMockTransportAssignments,
 
 describe("deterministic mock transport report dataset", () => {
   it("supplies realistic assignment volume for all comparison periods", () => {
-    expect(initialMockTransportAssignments).toHaveLength(151)
+    expect(initialMockTransportAssignments).toHaveLength(153)
     expect(current).toHaveLength(64)
     expect(previous).toHaveLength(40)
     expect(previousYear).toHaveLength(45)

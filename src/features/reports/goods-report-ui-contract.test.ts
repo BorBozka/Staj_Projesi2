@@ -32,13 +32,14 @@ describe("Goods report workspace UI contract", () => {
     expect(tabSource).toContain("returnFocusRef={detailTriggerRef}")
   })
 
-  it("keeps data rows fixed-size instead of stretching sparse records into the table area", () => {
-    expect(tabSource).toContain('className="w-full min-w-[1100px] table-fixed text-left text-xs"')
-    expect(tabSource).not.toContain('className="h-full w-full min-w-[1100px]')
-    expect(tabSource).toContain('h-[3.125rem] cursor-pointer border-b')
+  it("fills the records area so the final row meets the pagination footer", () => {
+    expect(tabSource).toContain('className="h-full w-full min-w-[1100px] table-fixed text-left text-xs"')
+    expect(tabSource).toContain("GoodsReportFillerRow")
+    expect(tabSource).toContain("border-transparent")
+    expect(tabSource).toContain('h-[3.375rem] cursor-pointer border-b')
     expect(tabSource).toContain('<SortableHeader className="w-[9%]" label="Yön"')
-    expect(tabSource).toContain('h-[3.125rem] cursor-pointer border-b transition-colors')
-    expect(tabSource).not.toContain("last:border-b-0")
+    expect(tabSource).toContain('h-[3.375rem] cursor-pointer border-b last:border-b-0 transition-colors')
+    expect(tabSource).toContain("last:border-b-0")
   })
 
   it("waits for movements before normalizing a restored records page", () => {

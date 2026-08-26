@@ -198,6 +198,24 @@ const upcomingAssignments: PlannedTransportAssignment[] = [
     status: "ACTIVE",
     createdAt: scenarioCreatedAt(-2),
   },
+  {
+    id: "transport-upcoming-production-transfer",
+    ...pairs.dailySelin,
+    plannedStart: scenarioAt(7, 8, 30),
+    plannedEnd: scenarioAt(7, 10),
+    purpose: "Üretim hattı numune toplama",
+    status: "ACTIVE",
+    createdAt: scenarioCreatedAt(-2),
+  },
+  {
+    id: "transport-upcoming-service-equipment",
+    ...pairs.kangooEmre,
+    plannedStart: scenarioAt(9, 13),
+    plannedEnd: scenarioAt(9, 14, 30),
+    purpose: "Servis ekibi için teknik ekipman sevki",
+    status: "ACTIVE",
+    createdAt: scenarioCreatedAt(-3),
+  },
 ]
 
 export const initialMockTransportAssignments: PlannedTransportAssignment[] = [

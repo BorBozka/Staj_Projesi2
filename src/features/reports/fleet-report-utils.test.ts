@@ -167,11 +167,11 @@ describe("fleet report URL state and pagination", () => {
     expect(parseFleetReportWorkspace(new URLSearchParams("view=records&page=4&fleetView=records&fleetPage=3"))).toEqual({ view: "records", dimension: "vehicles", page: 3, search: "", sort: null })
   })
 
-  it("uses the fixed nine-row records page size", () => {
+  it("uses the fixed eight-row records page size", () => {
     const records = Array.from({ length: 25 }, (_, index) => ({ id: String(index) }))
-    expect(FLEET_REPORT_PAGE_SIZE).toBe(9)
-    expect(getFleetReportPageCount(records.length)).toBe(3)
-    expect(paginateFleetReport(records as PlannedTransportAssignment[], 3)).toHaveLength(7)
+    expect(FLEET_REPORT_PAGE_SIZE).toBe(8)
+    expect(getFleetReportPageCount(records.length)).toBe(4)
+    expect(paginateFleetReport(records as PlannedTransportAssignment[], 4)).toHaveLength(1)
   })
 })
 

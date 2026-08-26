@@ -257,8 +257,8 @@ export function AllVisitsPage() {
             {activeFilters && <Button variant="outline" size="sm" className="mt-4" onClick={clearFilters}>Filtreleri temizle</Button>}
           </div>
         ) : (
-          <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden scrollbar-thin">
-            <table className="h-full w-full min-w-[1220px] table-fixed text-left text-xs">
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <table className="h-full w-full table-fixed text-left text-xs">
               <thead className="sticky top-0 z-10 border-b bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="w-[14%] px-3 py-2">
@@ -289,7 +289,7 @@ export function AllVisitsPage() {
                   <tr
                     key={visit.id}
                     tabIndex={0}
-                    className="record-row-hover cursor-pointer select-none transition-colors hover:bg-slate-50 focus-visible:bg-blue-50/60 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-blue-500"
+                    className="record-row-hover h-[50px] cursor-pointer select-none transition-colors hover:bg-slate-50 focus-visible:bg-blue-50/60 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-blue-500"
                     onClick={(event) => openVisit(visit, event.currentTarget)}
                     onKeyDown={(event) => {
                       if (event.key === "Enter" || event.key === " ") {
@@ -312,7 +312,7 @@ export function AllVisitsPage() {
                   </tr>
                 ))}
                 {Array.from({ length: Math.max(0, ALL_VISITS_PAGE_SIZE - paginatedVisits.length) }).map((_, index) => (
-                  <tr key={`filler-${index}`} aria-hidden="true" className={cn("pointer-events-none select-none", index > 0 && "border-transparent")}>
+                  <tr key={`filler-${index}`} aria-hidden="true" className={cn("h-[50px] pointer-events-none select-none", index > 0 && "border-transparent")}>
                     <td className="px-3 py-1.5 sm:py-2">
                       <p className="truncate font-semibold text-transparent">&nbsp;</p>
                     </td>

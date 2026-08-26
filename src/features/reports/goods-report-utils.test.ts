@@ -142,10 +142,10 @@ describe("goods workspace and summary helpers", () => {
 describe("goods report pagination", () => {
   it("paginates using the shared pagination helpers", () => {
     const records = Array.from({ length: 25 }, (_, index) => ({ id: String(index) }))
-    expect(GOODS_REPORT_PAGE_SIZE).toBe(10)
-    expect(getGoodsReportPageCount(records.length)).toBe(3)
-    expect(paginateGoodsReport(records as GoodsMovement[], 1)).toHaveLength(10)
-    expect(paginateGoodsReport(records as GoodsMovement[], 3)).toHaveLength(5)
+    expect(GOODS_REPORT_PAGE_SIZE).toBe(8)
+    expect(getGoodsReportPageCount(records.length)).toBe(4)
+    expect(paginateGoodsReport(records as GoodsMovement[], 1)).toHaveLength(8)
+    expect(paginateGoodsReport(records as GoodsMovement[], 4)).toHaveLength(1)
   })
 })
 

@@ -6,3 +6,4 @@ dist
 *.local
 *.log
 package-lock.json
+artifacts/

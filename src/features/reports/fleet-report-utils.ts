@@ -11,7 +11,7 @@ import type { SingleSortState } from "@/lib/sort"
 // The records workspace has a deliberately fixed page size. Nine compact, two-line rows fit
 // the viewport-filling report card at the manager shell's normal desktop height without giving
 // the table body its own vertical scrollbar.
-export const FLEET_REPORT_PAGE_SIZE = 9
+export const FLEET_REPORT_PAGE_SIZE = 8
 export const MAX_FLEET_LOAD_RESOURCES = 10
 export const FLEET_CATEGORY_AXIS_WIDTH = 164
 

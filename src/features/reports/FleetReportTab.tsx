@@ -124,7 +124,7 @@ export const FleetReportTab = forwardRef<ReportExportHandle, { meetings: Meeting
           <>
             <div className="min-h-0 flex-1 overflow-hidden">
               <div className="h-full overflow-x-auto overflow-y-hidden scrollbar-thin">
-                <table className="w-full min-w-[900px] table-fixed text-left text-xs">
+                <table className="h-full w-full min-w-[900px] table-fixed text-left text-xs">
                   <thead className="border-b bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                     <tr>
                       <SortableHeader className="w-[11%]" label="Tarih" field="date" sort={workspace.sort} onChange={(sort) => setSearchParams(setFleetReportWorkspace(searchParams, { sort }))} />
@@ -138,6 +138,7 @@ export const FleetReportTab = forwardRef<ReportExportHandle, { meetings: Meeting
                   </thead>
                   <tbody>
                     {paginatedAssignments.map((assignment) => <FleetRecordRow key={assignment.id} assignment={assignment} meetings={meetings} visits={visits} onOpen={(row) => { detailTriggerRef.current = row; setSelectedAssignment(assignment) }} />)}
+                    {Array.from({ length: Math.max(0, FLEET_REPORT_PAGE_SIZE - paginatedAssignments.length) }).map((_, index) => <FleetReportFillerRow key={`fleet-filler-${index}`} />)}
                   </tbody>
                 </table>
               </div>
@@ -177,7 +178,7 @@ function FleetRecordRow({ assignment, meetings, visits, onOpen }: { assignment: 
       tabIndex={0}
       aria-haspopup="dialog"
       aria-label={`${assignment.purpose} görev detayını aç`}
-      className="record-row-hover h-[3.125rem] cursor-pointer border-b transition-colors hover:bg-slate-50/80 focus-visible:bg-blue-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
+      className="record-row-hover h-[3.375rem] cursor-pointer border-b last:border-b-0 transition-colors hover:bg-slate-50/80 focus-visible:bg-blue-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
       onClick={(event) => openDetails(event.currentTarget)}
       onKeyDown={(event) => {
         if (!isFleetRecordActivationKey(event.key)) return
@@ -199,6 +200,10 @@ function FleetRecordRow({ assignment, meetings, visits, onOpen }: { assignment: 
 function FleetStatusPill({ status }: { status: PlannedTransportAssignment["status"] }) {
   const planned = status === "ACTIVE"
   return <span className={planned ? "inline-flex rounded-full border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700" : "inline-flex rounded-full border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600"}>{planned ? "Planlandı" : "İptal"}</span>
+}
+
+function FleetReportFillerRow() {
+  return <tr aria-hidden="true" className="pointer-events-none h-[3.375rem] select-none border-b border-transparent last:border-b-0"><td className="px-3 py-1" /><td className="px-3 py-1" /><td className="px-3 py-1" /><td className="px-3 py-1" /><td className="px-3 py-1" /><td className="px-3 py-1" /><td className="px-3 py-1" /></tr>
 }
 
 function EmptyState({ title, description, showSearch = false }: { title: string; description: string; showSearch?: boolean }) {

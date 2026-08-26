@@ -24,15 +24,16 @@ describe("Fleet report records UI contract", () => {
   })
 
   it("draws row separators without duplicating the pagination divider", () => {
-    expect(tabSource).toContain("border-b transition-colors")
-    expect(tabSource).not.toContain("last:border-b-0")
+    expect(tabSource).toContain("border-b last:border-b-0 transition-colors")
+    expect(tabSource).toContain("last:border-b-0")
     expect(tabSource).not.toContain('<tbody className="divide-y">')
   })
 
-  it("uses the visits records geometry without a height-stretched table", () => {
-    expect(tabSource).toContain('className="w-full min-w-[900px] table-fixed text-left text-xs"')
-    expect(tabSource).not.toContain('className="h-full w-full min-w-[900px]')
-    expect(tabSource).toContain('h-[3.125rem] cursor-pointer border-b')
+  it("uses the visits records geometry with a height-filling table", () => {
+    expect(tabSource).toContain('className="h-full w-full min-w-[900px] table-fixed text-left text-xs"')
+    expect(tabSource).toContain("FleetReportFillerRow")
+    expect(tabSource).toContain("border-transparent")
+    expect(tabSource).toContain('h-[3.375rem] cursor-pointer border-b')
     expect(tabSource).toContain('<SortableHeader className="w-[11%]" label="Tarih"')
   })
 

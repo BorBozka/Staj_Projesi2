@@ -8,7 +8,7 @@ import { getPageCount as getPageCountShared, paginate } from "@/lib/pagination"
 import { sortReportRecords, matchesReportSearch } from "@/features/reports/report-records-utils"
 import type { SingleSortState } from "@/lib/sort"
 
-export const VISITS_REPORT_PAGE_SIZE = 9
+export const VISITS_REPORT_PAGE_SIZE = 8
 export type VisitsReportSortField = "date" | "visitor" | "company" | "host" | "planned" | "duration" | "status"
 
 const VISITS_STATUS_SORT_ORDER: Record<VisitStatus, number> = { PLANNED: 0, CHECKED_IN: 1, CHECKED_OUT: 2, NO_SHOW: 3, CANCELLED: 4 }
