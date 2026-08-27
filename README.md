@@ -2,7 +2,7 @@
 
 Çok şirketli ve çok tesisli yapılarda ziyaret planlama, giriş-çıkış operasyonları, kaynak atama ve yönetici raporlamasını ortak bir çalışma alanında birleştiren rol tabanlı web uygulaması.
 
-[Canlı uygulamayı görüntüle](https://staj-projesi2.vercel.app)
+[Canlı uygulamayı görüntüle](https://visitor-operations-platform.vercel.app)
 
 ![Admin dashboard; aktif ziyaretler, durum dağılımı ve günlük operasyon görünümü](visitor-operations-dashboard.jpg)
 
