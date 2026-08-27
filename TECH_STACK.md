@@ -1,4 +1,4 @@
-# TECH_STACK.md
+# docs/TECH_STACK.md
 
 # Visitor Management System — Technical Stack
 
