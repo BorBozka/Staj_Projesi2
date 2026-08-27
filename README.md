@@ -69,11 +69,11 @@ Temel doğrulama komutları:
 
 ## Proje Dokümantasyonu
 
-- [Ürün kapsamı ve davranışları](PRODUCT_SPEC.md)
-- [Arayüz ilkeleri](UI_SPEC.md)
-- [Teknoloji yığını](TECH_STACK.md)
-- [Geliştirme planı](DEVELOPMENT_PLAN.md)
-- [Paydaş notları](STAKEHOLDER_NOTES.md)
+- [Ürün kapsamı ve davranışları](docs/PRODUCT_SPEC.md)
+- [Arayüz ilkeleri](docs/UI_SPEC.md)
+- [Teknoloji yığını](docs/TECH_STACK.md)
+- [Geliştirme planı](docs/DEVELOPMENT_PLAN.md)
+- [Paydaş notları](docs/STAKEHOLDER_NOTES.md)
 
 ## Kapsam Notları
 
