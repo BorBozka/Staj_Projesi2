@@ -107,6 +107,9 @@ export interface EmployeeOption {
   companyId: string
   facilityIds: string[]
   name: string
+  departmentId: string
+  // Compatibility display projection. Its value is always resolved from the canonical
+  // Department entity by the reference-data factory, never maintained independently.
   department: string
 }
 

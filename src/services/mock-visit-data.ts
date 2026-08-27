@@ -1,26 +1,17 @@
+import type { OrganizationSnapshot } from "@/domain/organization"
 import type { InvitationStatus, Meeting, VisitRecord, VisitReferenceData, VisitStatus } from "@/domain/visits"
+import { initialMockOrganizationSnapshot } from "@/services/mock-organization-store"
 import { scenarioAt, scenarioCreatedAt, scenarioMoment } from "@/services/mock-scenario"
 
-export const mockVisitReferenceData: VisitReferenceData = {
-  companies: [
-    { id: "bplas", name: "BPLAS A.Ş." },
-    { id: "bplas-otomotiv", name: "BPLAS Otomotiv A.Ş." },
-    { id: "anadolu-lojistik", name: "Anadolu Lojistik A.Ş." },
-  ],
-  facilities: [
-    { id: "bplas-merkez", companyId: "bplas", name: "Merkez Tesis" },
-    { id: "bplas-arge", companyId: "bplas", name: "Ar-Ge Merkezi" },
-    { id: "otomotiv-uretim", companyId: "bplas-otomotiv", name: "Üretim Tesisi" },
-    { id: "anadolu-lojistik-merkez", companyId: "anadolu-lojistik", name: "Lojistik Merkezi" },
-  ],
-  employees: [
-    { id: "eda-karaca", companyId: "bplas", facilityIds: ["bplas-merkez", "bplas-arge", "otomotiv-uretim", "anadolu-lojistik-merkez"], name: "Eda Karaca", department: "Yönetim" },
-    { id: "maya-kara", companyId: "bplas", facilityIds: ["bplas-merkez"], name: "Maya Kara", department: "Satın Alma" },
-    { id: "emre-yilmaz", companyId: "bplas", facilityIds: ["bplas-merkez", "bplas-arge"], name: "Emre Yılmaz", department: "Mühendislik" },
-    { id: "selin-aydin", companyId: "bplas-otomotiv", facilityIds: ["otomotiv-uretim"], name: "Selin Aydın", department: "Üretim" },
-    { id: "kerem-demir", companyId: "anadolu-lojistik", facilityIds: ["anadolu-lojistik-merkez"], name: "Kerem Demir", department: "Operasyon" },
-  ],
-  visitTypes: [
+const employeeDefinitions = [
+  { id: "eda-karaca", companyId: "bplas", facilityIds: ["bplas-merkez", "bplas-arge", "otomotiv-uretim", "anadolu-lojistik-merkez"], name: "Eda Karaca", departmentId: "department-bplas-yonetim" },
+  { id: "maya-kara", companyId: "bplas", facilityIds: ["bplas-merkez"], name: "Maya Kara", departmentId: "department-bplas-satin-alma" },
+  { id: "emre-yilmaz", companyId: "bplas", facilityIds: ["bplas-merkez", "bplas-arge"], name: "Emre Yılmaz", departmentId: "department-bplas-muhendislik" },
+  { id: "selin-aydin", companyId: "bplas-otomotiv", facilityIds: ["otomotiv-uretim"], name: "Selin Aydın", departmentId: "department-bplas-otomotiv-uretim" },
+  { id: "kerem-demir", companyId: "anadolu-lojistik", facilityIds: ["anadolu-lojistik-merkez"], name: "Kerem Demir", departmentId: "department-anadolu-lojistik-operasyon" },
+] as const
+
+const visitTypes = [
     { id: "meeting", name: "Toplantı" },
     { id: "technical-service", name: "Teknik Servis / Bakım" },
     { id: "supplier", name: "Tedarikçi" },
@@ -28,9 +19,31 @@ export const mockVisitReferenceData: VisitReferenceData = {
     { id: "audit", name: "Denetim" },
     { id: "customer", name: "Müşteri Ziyareti" },
     { id: "training", name: "Eğitim" },
-  ],
-  currentEmployee: { employeeId: "eda-karaca", companyId: "bplas", facilityId: "bplas-merkez", role: "MANAGER" },
+]
+
+/** Compatibility projection for Visit UI. Company, facility, and department labels are
+ * always resolved from the canonical organization snapshot; this function owns no state. */
+export function createMockVisitReferenceData(organization: OrganizationSnapshot): VisitReferenceData {
+  const companies = organization.companies.filter((company) => company.active).map(({ id, name }) => ({ id, name }))
+  const facilities = organization.facilities
+    .filter((facility) => facility.active && organization.companies.some((company) => company.id === facility.parentId && company.active))
+    .map(({ id, parentId, name }) => ({ id, companyId: parentId, name }))
+  const employees = employeeDefinitions.map((employee) => {
+    const department = organization.departments.find((item) => item.id === employee.departmentId)
+    return { ...employee, facilityIds: [...employee.facilityIds], department: department?.name ?? "—" }
+  })
+  return {
+    companies,
+    facilities,
+    employees,
+    visitTypes,
+    currentEmployee: { employeeId: "eda-karaca", companyId: "bplas", facilityId: "bplas-merkez", role: "MANAGER" },
+  }
 }
+
+// Legacy tests and pure UI utilities can use the initial projection. Runtime services never
+// read this constant; they request a fresh projection from MockOrganizationStore.
+export const mockVisitReferenceData = createMockVisitReferenceData(initialMockOrganizationSnapshot)
 
 interface SeedVisit {
   id: string

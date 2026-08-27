@@ -25,6 +25,16 @@ export interface AdminUser {
   active: boolean
 }
 
+export type {
+  Company,
+  Department,
+  Facility,
+  OrganizationEntity,
+  OrganizationKind,
+  OrganizationSnapshot,
+  SecurityGate,
+} from "@/domain/organization"
+
 // Every role in the system today is company-scoped; a future global/system-wide role would be
 // added to this list instead of that assumption being duplicated at every call site (Admin is
 // explicitly NOT exempt — it stays company-scoped like every other role in this phase).
@@ -75,22 +85,6 @@ export function wouldRemoveLastActiveAdmin(users: AdminUser[], target: Pick<Admi
   const wasActiveAdmin = target.role === "ADMIN" && target.active
   if (!wasActiveAdmin) return false
   return !users.some((user) => user.id !== target.id && user.role === "ADMIN" && user.active)
-}
-
-export interface OrganizationEntity {
-  id: string
-  parentId?: string
-  name: string
-  active: boolean
-}
-
-export type OrganizationKind = "COMPANY" | "FACILITY" | "DEPARTMENT" | "SECURITY_GATE"
-
-export interface OrganizationSnapshot {
-  companies: OrganizationEntity[]
-  facilities: OrganizationEntity[]
-  departments: OrganizationEntity[]
-  securityGates: OrganizationEntity[]
 }
 
 export interface VisitTypeDefinition {

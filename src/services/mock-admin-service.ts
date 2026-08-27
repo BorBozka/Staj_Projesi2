@@ -9,35 +9,31 @@ import {
   type OperationalSettings,
   type OrganizationEntity,
   type OrganizationKind,
-  type OrganizationSnapshot,
   type VisitTypeDefinition,
   type VisitorCardInventoryItem,
   type VisitorCardStatus,
   type VisitorRuleVersion,
 } from "@/domain/admin"
 import type { AdminService, SaveAdminUserOptions } from "@/services/admin-service"
+import { MockOrganizationStore } from "@/services/mock-organization-store"
 
 const clone = <T,>(value: T): T => structuredClone(value)
 const id = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 9)}`
 
 export class MockAdminService implements AdminService {
   private users: AdminUser[] = [
-    { id: "user-1", fullName: "Atahan Bozkurt", username: "atahan.bozkurt", email: "atahan.bozkurt@bplas.com", authenticationSource: "ACTIVE_DIRECTORY", role: "ADMIN", authorizationScope: { companyIds: ["company-1", "company-2"], facilityIds: [], securityGateIds: [] }, active: true },
-    { id: "user-2", fullName: "Maya Kara", username: "maya.kara", email: "maya.kara@bplas.com", authenticationSource: "ACTIVE_DIRECTORY", role: "MANAGER", authorizationScope: { companyIds: ["company-1"], facilityIds: [], securityGateIds: [] }, active: true },
-    { id: "user-3", fullName: "Selin Demir", username: "selin.demir", email: "selin.demir@bplas.com", authenticationSource: "LOCAL", role: "SECURITY", authorizationScope: { companyIds: ["company-1"], facilityIds: [], securityGateIds: [] }, active: true },
-    { id: "user-4", fullName: "Orhan Yalçın", username: "orhan.yalcin", email: "orhan.yalcin@bplas.com", authenticationSource: "LOCAL", role: "EMPLOYEE", authorizationScope: { companyIds: ["company-2"], facilityIds: [], securityGateIds: [] }, active: false },
-    { id: "user-5", fullName: "Deniz Acar", username: "deniz.acar", email: "deniz.acar@bplas.com", authenticationSource: "ACTIVE_DIRECTORY", role: "EMPLOYEE", authorizationScope: { companyIds: ["company-1"], facilityIds: [], securityGateIds: [] }, active: true },
+    { id: "user-1", fullName: "Atahan Bozkurt", username: "atahan.bozkurt", email: "atahan.bozkurt@bplas.com", authenticationSource: "ACTIVE_DIRECTORY", role: "ADMIN", authorizationScope: { companyIds: ["bplas", "bplas-otomotiv"], facilityIds: [], securityGateIds: [] }, active: true },
+    { id: "user-2", fullName: "Maya Kara", username: "maya.kara", email: "maya.kara@bplas.com", authenticationSource: "ACTIVE_DIRECTORY", role: "MANAGER", authorizationScope: { companyIds: ["bplas"], facilityIds: [], securityGateIds: [] }, active: true },
+    { id: "user-3", fullName: "Selin Demir", username: "selin.demir", email: "selin.demir@bplas.com", authenticationSource: "LOCAL", role: "SECURITY", authorizationScope: { companyIds: ["bplas"], facilityIds: [], securityGateIds: [] }, active: true },
+    { id: "user-4", fullName: "Orhan Yalçın", username: "orhan.yalcin", email: "orhan.yalcin@bplas.com", authenticationSource: "LOCAL", role: "EMPLOYEE", authorizationScope: { companyIds: ["bplas-otomotiv"], facilityIds: [], securityGateIds: [] }, active: false },
+    { id: "user-5", fullName: "Deniz Acar", username: "deniz.acar", email: "deniz.acar@bplas.com", authenticationSource: "ACTIVE_DIRECTORY", role: "EMPLOYEE", authorizationScope: { companyIds: ["bplas"], facilityIds: [], securityGateIds: [] }, active: true },
   ]
-  private organization: OrganizationSnapshot = {
-    companies: [{ id: "company-1", name: "BPLAS A.Ş.", active: true }, { id: "company-2", name: "BPLAS Otomotiv", active: true }],
-    facilities: [{ id: "facility-1", parentId: "company-1", name: "Merkez Tesis", active: true }, { id: "facility-2", parentId: "company-1", name: "Gebze Tesisi", active: true }, { id: "facility-3", parentId: "company-2", name: "Bursa Tesisi", active: false }],
-    departments: [{ id: "department-1", parentId: "company-1", name: "İnsan Kaynakları", active: true }, { id: "department-2", parentId: "company-1", name: "Satın Alma", active: true }],
-    securityGates: [{ id: "gate-1", parentId: "facility-1", name: "Ana Giriş", active: true }, { id: "gate-2", parentId: "facility-1", name: "Lojistik Kapısı", active: true }, { id: "gate-3", parentId: "facility-2", name: "Ziyaretçi Girişi", active: true }],
-  }
   private visitTypes: VisitTypeDefinition[] = [{ id: "type-1", name: "Toplantı", active: true }, { id: "type-2", name: "Teknik Servis / Bakım", active: true }, { id: "type-3", name: "Tedarikçi", active: true }, { id: "type-4", name: "İş Görüşmesi", active: false }]
   private cards: VisitorCardInventoryItem[] = [{ id: "card-1", cardNumber: "001", status: "AVAILABLE" }, { id: "card-2", cardNumber: "002", status: "IN_USE", assignedVisitorName: "Ece Korkmaz" }, { id: "card-3", cardNumber: "003", status: "NOT_RETURNED", assignedVisitorName: "Can Uslu" }, { id: "card-4", cardNumber: "004", status: "LOST" }, { id: "card-5", cardNumber: "005", status: "DISABLED" }]
   private rules: VisitorRuleVersion[] = [{ id: "rule-2", version: 2, content: "Ziyaretçiler tesis güvenlik kurallarına ve yönlendirmelerine uymayı kabul eder.", createdAt: "2026-08-01T09:00:00.000Z", publishedAt: "2026-08-01T09:30:00.000Z", active: true }, { id: "rule-1", version: 1, content: "Ziyaretçiler tesis kurallarına uyacağını kabul eder.", createdAt: "2026-02-01T09:00:00.000Z", publishedAt: "2026-02-01T09:20:00.000Z", active: false }]
   private settings: OperationalSettings = { overdueToleranceMinutes: 15, overdueAlertRepeatMinutes: 10 }
+
+  constructor(private readonly organizationStore = new MockOrganizationStore()) {}
 
   async getUsers() { return clone(this.users) }
   async saveUser(input: Omit<AdminUser, "id"> & { id?: string }, options: SaveAdminUserOptions = {}) {
@@ -67,12 +63,9 @@ export class MockAdminService implements AdminService {
     if (!newPassword.trim()) throw new Error("Geçici parola boş olamaz.")
     // Never stored: a real backend would hash newPassword and forward it to an auth service.
   }
-  async getOrganization() { return clone(this.organization) }
+  async getOrganization() { return this.organizationStore.getSnapshot() }
   async saveOrganizationEntity(kind: OrganizationKind, input: Omit<OrganizationEntity, "id"> & { id?: string }) {
-    const key = this.keyFor(kind)
-    const entity: OrganizationEntity = { ...input, id: input.id ?? id(kind.toLowerCase()) }
-    this.organization[key] = input.id ? this.organization[key].map((item) => item.id === input.id ? entity : item) : [...this.organization[key], entity]
-    return clone(entity)
+    return this.organizationStore.save(kind, input)
   }
   async getVisitTypes() { return clone(this.visitTypes) }
   async saveVisitType(input: Omit<VisitTypeDefinition, "id"> & { id?: string }) {
@@ -103,8 +96,4 @@ export class MockAdminService implements AdminService {
   }
   async getOperationalSettings() { return clone(this.settings) }
   async saveOperationalSettings(settings: OperationalSettings) { this.settings = clone(settings); return clone(this.settings) }
-
-  private keyFor(kind: OrganizationKind): keyof OrganizationSnapshot {
-    return kind === "COMPANY" ? "companies" : kind === "FACILITY" ? "facilities" : kind === "DEPARTMENT" ? "departments" : "securityGates"
-  }
 }

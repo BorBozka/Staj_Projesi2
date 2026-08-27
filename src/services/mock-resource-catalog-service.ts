@@ -1,12 +1,15 @@
 import { getResourceDisplayName, type FacilityResource, type ResourceInput } from "@/domain/resources"
 import { initialMockResources } from "@/services/mock-resource-data"
-import { mockVisitReferenceData } from "@/services/mock-visit-data"
+import { createMockVisitReferenceData } from "@/services/mock-visit-data"
+import { MockOrganizationStore } from "@/services/mock-organization-store"
 import type { ResourceCatalogService } from "@/services/resource-catalog-service"
 
 const clone = <T,>(value: T): T => structuredClone(value)
 
 export class MockResourceCatalogService implements ResourceCatalogService {
   private resources = clone(initialMockResources)
+
+  constructor(private readonly organizationStore = new MockOrganizationStore()) {}
 
   async listResources(): Promise<FacilityResource[]> {
     return clone(this.resources).sort((a, b) =>
@@ -56,8 +59,9 @@ export class MockResourceCatalogService implements ResourceCatalogService {
     createdAt: string,
     updatedAt: string,
   ): FacilityResource {
-    const company = mockVisitReferenceData.companies.find((item) => item.id === input.companyId)
-    const facility = mockVisitReferenceData.facilities.find(
+    const referenceData = createMockVisitReferenceData(this.organizationStore.getSnapshot())
+    const company = referenceData.companies.find((item) => item.id === input.companyId)
+    const facility = referenceData.facilities.find(
       (item) => item.id === input.facilityId && item.companyId === input.companyId,
     )
     if (!company || !facility) throw new Error("Şirket ve tesis eşleşmesi geçersiz.")

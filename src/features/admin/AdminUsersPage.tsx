@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 
 import { PaginationFooter } from "@/components/common/PaginationFooter"
+import { ActiveStatusPill } from "@/components/common/ActiveStatusPill"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -134,7 +135,7 @@ export function AdminUsersPage() {
                     <td className="px-3">{companyDisplay.truncated
                       ? <span tabIndex={0} title={companyDisplay.full} aria-label={companyDisplay.full} className="cursor-default rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-blue-500">{companyDisplay.compact}</span>
                       : <span>{companyDisplay.compact}</span>}</td>
-                    <td className="px-3"><StatusPill active={user.active} /></td>
+                    <td className="px-3"><ActiveStatusPill active={user.active} /></td>
                   </tr>
                 )
               })}
@@ -149,7 +150,6 @@ export function AdminUsersPage() {
 }
 
 function SortableHeader({ label, field, sort, onClick }: { label: string; field: AdminUserSortField; sort: ReturnType<typeof toggleAdminUserSort>; onClick(field: AdminUserSortField): void }) { const active = sort?.field === field ? sort : null; return <th className="px-3 py-2"><button type="button" className="inline-flex items-center gap-1 hover:text-slate-900" onClick={() => onClick(field)}>{label}{active && (active.direction === "asc" ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />)}</button></th> }
-function StatusPill({ active }: { active: boolean }) { return <span className={active ? "rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700" : "rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600"}>{active ? "Aktif" : "Pasif"}</span> }
 function AuthSourceBadge({ source }: { source: AuthenticationSource }) { return <span className={cn("rounded-full border px-1.5 py-0.5 text-[10px] font-medium", source === "LOCAL" ? "border-slate-200 bg-slate-100 text-slate-600" : "border-blue-200 bg-blue-50 text-blue-700")}>{authenticationSourceLabels[source]}</span> }
 
 function EmptyAdminUsersState({ hasFilters }: { hasFilters: boolean }) {

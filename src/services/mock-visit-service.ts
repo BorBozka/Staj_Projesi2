@@ -11,7 +11,8 @@ import type {
   VisitReferenceData,
 } from "@/domain/visits"
 import { computeExtendedPlannedEnd, getManualMeetingLifecycleBlockReason, isMeetingExplicitlyClosed } from "@/lib/meeting-lifecycle"
-import { initialMockMeetings, initialMockVisitRecords, mockVisitReferenceData } from "@/services/mock-visit-data"
+import { createMockVisitReferenceData, initialMockMeetings, initialMockVisitRecords } from "@/services/mock-visit-data"
+import { MockOrganizationStore } from "@/services/mock-organization-store"
 import type { VisitService } from "@/services/visit-service"
 
 
@@ -21,7 +22,10 @@ export class MockVisitService implements VisitService {
   private meetings = clone(initialMockMeetings)
   private visits = clone(initialMockVisitRecords)
 
-  constructor(private readonly shouldFailInvitation: (visit: Visit) => boolean = () => false) {}
+  constructor(
+    private readonly shouldFailInvitation: (visit: Visit) => boolean = () => false,
+    private readonly organizationStore = new MockOrganizationStore(),
+  ) {}
 
   async listMeetings(): Promise<Meeting[]> {
     return clone(this.meetings).sort((a, b) => a.plannedStart.localeCompare(b.plannedStart))
@@ -33,7 +37,7 @@ export class MockVisitService implements VisitService {
   }
 
   async getReferenceData(): Promise<VisitReferenceData> {
-    return clone(mockVisitReferenceData)
+    return clone(this.getReferenceDataSnapshot())
   }
 
   async createMeeting(input: MeetingInput): Promise<MeetingWithVisits> {
@@ -328,7 +332,7 @@ export class MockVisitService implements VisitService {
   }
 
   private fromMeetingInput(id: string, input: MeetingInput, existing?: Meeting): Meeting {
-    const reference = mockVisitReferenceData
+    const reference = this.getReferenceDataSnapshot()
     const visitType = reference.visitTypes.find((item) => item.id === input.visitTypeId)
     const company = reference.companies.find((item) => item.id === input.hostCompanyId)
     const facility = reference.facilities.find((item) => item.id === input.facilityId && item.companyId === input.hostCompanyId)
@@ -388,5 +392,9 @@ export class MockVisitService implements VisitService {
     if (visitors.length === 0) throw new Error("En az bir ziyaretçi zorunludur.")
     const visitIds = visitors.flatMap((visitor) => visitor.visitId ? [visitor.visitId] : [])
     if (new Set(visitIds).size !== visitIds.length) throw new Error("Aynı ziyaretçi kaydı birden fazla kez gönderilemez.")
+  }
+
+  private getReferenceDataSnapshot() {
+    return createMockVisitReferenceData(this.organizationStore.getSnapshot())
   }
 }
