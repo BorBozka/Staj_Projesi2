@@ -1,4 +1,4 @@
-# docs/PRODUCT_SPEC.md
+# PRODUCT_SPEC.md
 
 # Visitor Management System — Product Specification
 
