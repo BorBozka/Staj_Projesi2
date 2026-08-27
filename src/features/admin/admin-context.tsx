@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components -- context hook belongs beside its provider. */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 
-import type { AdminUser, OperationalSettings, OrganizationSnapshot, VisitTypeDefinition, VisitorCardInventoryItem, VisitorRuleVersion } from "@/domain/admin"
+import type { AdminUser, OperationalSettings, OrganizationEntity, OrganizationKind, OrganizationSnapshot, VisitTypeDefinition, VisitorCardInventoryItem, VisitorRuleVersion } from "@/domain/admin"
 import type { AdminService } from "@/services/admin-service"
 
 interface AdminContextValue {
@@ -12,6 +12,7 @@ interface AdminContextValue {
   visitorRules: VisitorRuleVersion[]
   settings: OperationalSettings | null
   reload(): Promise<void>
+  saveOrganizationEntity(kind: OrganizationKind, entity: Omit<OrganizationEntity, "id"> & { id?: string }): Promise<OrganizationEntity>
 }
 
 const AdminContext = createContext<AdminContextValue | null>(null)
@@ -32,7 +33,12 @@ export function AdminProvider({ service, children }: { service: AdminService; ch
   }, [service])
 
   useEffect(() => { void reload() }, [reload])
-  const value = useMemo(() => ({ users, organization, visitTypes, visitorCards, visitorRules, settings, reload }), [users, organization, visitTypes, visitorCards, visitorRules, settings, reload])
+  const saveOrganizationEntity = useCallback(async (kind: OrganizationKind, entity: Omit<OrganizationEntity, "id"> & { id?: string }) => {
+    const saved = await service.saveOrganizationEntity(kind, entity)
+    setOrganization(await service.getOrganization())
+    return saved
+  }, [service])
+  const value = useMemo(() => ({ users, organization, visitTypes, visitorCards, visitorRules, settings, reload, saveOrganizationEntity }), [users, organization, visitTypes, visitorCards, visitorRules, settings, reload, saveOrganizationEntity])
   return <AdminContext.Provider value={value}>{children}</AdminContext.Provider>
 }
 

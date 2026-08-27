@@ -86,6 +86,14 @@ export function getExpansionKeysForSelection(organization: OrganizationSnapshot,
   return keys
 }
 
+export function getExpansionKeysForNewEntity(organization: OrganizationSnapshot, kind: OrganizationKind, parentId: string | undefined) {
+  if (kind === "COMPANY" || !parentId) return []
+  if (kind === "FACILITY") return [companyNodeKey(parentId), facilitiesGroupKey(parentId)]
+  if (kind === "DEPARTMENT") return [companyNodeKey(parentId), departmentsGroupKey(parentId)]
+  const facility = organization.facilities.find((item) => item.id === parentId)
+  return facility ? [companyNodeKey(facility.parentId), facilitiesGroupKey(facility.parentId), facilityNodeKey(facility.id)] : []
+}
+
 export function findSelectedOrganizationEntity(organization: OrganizationSnapshot, selection: OrganizationSelection | null) {
   if (!selection) return null
   const source = selection.kind === "COMPANY" ? organization.companies : selection.kind === "FACILITY" ? organization.facilities : selection.kind === "DEPARTMENT" ? organization.departments : organization.securityGates
