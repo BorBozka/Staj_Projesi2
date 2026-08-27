@@ -1,4 +1,4 @@
-# docs/UI_SPEC.md
+# UI_SPEC.md
 
 # Visitor Management System — UI / UX Specification
 
