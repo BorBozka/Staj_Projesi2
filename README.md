@@ -1,4 +1,4 @@
-# Ziyaretçi Yönetim Sistemi
+# Kurumsal Ziyaretçi ve Operasyon Yönetim Sistemi
 
 Çok şirketli ve çok tesisli yapılar için geliştirilen, rol odaklı ziyaret planlama ve operasyon arayüzü. Bu repo şu anda React tabanlı, gerçek API'lerle değiştirilebilecek mock servis katmanına sahip bir frontend uygulamasını içerir.
 
