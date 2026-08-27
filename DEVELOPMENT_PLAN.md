@@ -1,4 +1,4 @@
-# DEVELOPMENT_PLAN.md
+# docs/DEVELOPMENT_PLAN.md
 
 # Visitor Management System — Development Plan
 
