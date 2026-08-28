@@ -32,6 +32,9 @@ describe("Manager sidebar transition", () => {
 
   it("keeps the collapse control visible and the desktop navigation unscrollable", () => {
     expect(componentSource).toContain("onClick={() => onCollapsedChange(!collapsed)}")
+    expect(componentSource).toContain("onToggleCollapsed={() => onCollapsedChange(!collapsed)}")
+    expect(componentSource).toContain("if (onToggleCollapsed) return")
+    expect(componentSource).toContain("onClick={onToggleCollapsed}")
     expect(componentSource).not.toContain("ChevronLeft")
     expect(componentSource).not.toContain("ChevronRight")
     expect(componentSource).toContain('className="flex min-h-0 flex-1 cursor-pointer flex-col overflow-hidden px-2 py-1"')

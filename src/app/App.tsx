@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom"
 
 import { AppShell } from "@/components/app-shell/AppShell"
 import { ManagerShell } from "@/components/app-shell/ManagerShell"
+import { SecurityShell } from "@/components/app-shell/SecurityShell"
 
 const MyVisitsPage = lazy(() =>
   import("@/features/visits/MyVisitsPage").then((module) => ({ default: module.MyVisitsPage })),
@@ -34,6 +35,12 @@ const OrganizationPage = lazy(() =>
 const SystemSettingsPage = lazy(() =>
   import("@/features/admin/SystemSettingsPage").then((module) => ({ default: module.SystemSettingsPage })),
 )
+const SecurityOperationsPage = lazy(() =>
+  import("@/features/security/SecurityOperationsPage").then((module) => ({ default: module.SecurityOperationsPage })),
+)
+const SecurityGoodsMovementsPage = lazy(() =>
+  import("@/features/security/SecurityGoodsMovementsPage").then((module) => ({ default: module.SecurityGoodsMovementsPage })),
+)
 
 export function App() {
   const { pathname } = useLocation()
@@ -52,6 +59,8 @@ export function App() {
       "/admin/users": "BPLAS — Kullanıcılar",
       "/admin/organization": "BPLAS — Organizasyon",
       "/admin/system-settings": "BPLAS — Sistem Ayarları",
+      "/security/operations": "BPLAS — Güvenlik Operasyonu",
+      "/security/goods-movements": "BPLAS — Güvenlik Mal Hareketleri",
       "/my-visits": "BPLAS — Ziyaretlerim",
     }
     document.title = pageTitles[pathname] ?? "BPLAS — Ziyaret Yönetimi"
@@ -70,6 +79,11 @@ export function App() {
         />
       </Route>
       <Route path="/manager/*" element={<ManagerRouteRedirect />} />
+      <Route path="/security" element={<SecurityShell />}>
+        <Route index element={<Navigate to="operations" replace />} />
+        <Route path="operations" element={<Suspense fallback={<RouteSkeleton />}><SecurityOperationsPage /></Suspense>} />
+        <Route path="goods-movements" element={<Suspense fallback={<RouteSkeleton />}><SecurityGoodsMovementsPage /></Suspense>} />
+      </Route>
       <Route path="/admin" element={<ManagerShell role="ADMIN" />}>
         <Route path="my-visits" element={<Suspense fallback={<RouteSkeleton />}><MyVisitsPage /></Suspense>} />
         <Route path="dashboard" element={<Suspense fallback={<RouteSkeleton />}><ManagerDashboard /></Suspense>} />

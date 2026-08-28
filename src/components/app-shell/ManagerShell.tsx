@@ -142,7 +142,7 @@ function ManagerSidebar({ collapsed, onCollapsedChange, role, basePath }: { coll
         onClick={(event) => { if (event.target === event.currentTarget) onCollapsedChange(!collapsed) }}
       >
         <ManagerNotifications collapsed={collapsed} />
-        <ManagerProfile collapsed={collapsed} role={role} />
+        <ManagerProfile collapsed={collapsed} role={role} onToggleCollapsed={() => onCollapsedChange(!collapsed)} />
       </div>
     </aside>
   )
@@ -251,19 +251,36 @@ function InvitationNotificationStatus({ status }: { status: InvitationStatus }) 
   return <span className={cn("mt-1 inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium", statusClass)}>{statusContent}</span>
 }
 
-function ManagerProfile({ collapsed = false, role = "MANAGER" }: { collapsed?: boolean; role?: "MANAGER" | "ADMIN" }) {
+function ManagerProfile({ collapsed = false, role = "MANAGER", onToggleCollapsed }: { collapsed?: boolean; role?: "MANAGER" | "ADMIN"; onToggleCollapsed?(): void }) {
   const title = role === "ADMIN" ? "Admin" : "Yönetici"
+  const profileContent = <>
+    <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">AB</div>
+    <div aria-hidden={collapsed} className={cn("min-w-0 shrink-0 leading-tight transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-none", collapsed ? "translate-x-1 opacity-0" : "translate-x-0 opacity-100 delay-100")}>
+        <p className="truncate text-sm font-semibold text-white">Atahan Bozkurt</p>
+        <p className="mt-0.5 truncate text-xs text-slate-400">{title}</p>
+    </div>
+  </>
+  const profileClassName = "flex min-w-0 items-center gap-2.5 rounded-md px-1 py-2"
+
+  if (onToggleCollapsed) return (
+    <button
+      type="button"
+      className={`${profileClassName} w-full cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500`}
+      onClick={onToggleCollapsed}
+      aria-label={`Oturum açan kullanıcı: Atahan Bozkurt, ${title}. Menüyü ${collapsed ? "genişlet" : "daralt"}`}
+      title={collapsed ? `Atahan Bozkurt · ${title}` : undefined}
+    >
+      {profileContent}
+    </button>
+  )
+
   return (
     <div
       className="flex min-w-0 items-center gap-2.5 rounded-md px-1 py-2"
       aria-label={`Oturum açan kullanıcı: Atahan Bozkurt, ${title}`}
       title={collapsed ? `Atahan Bozkurt · ${title}` : undefined}
     >
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">AB</div>
-      <div aria-hidden={collapsed} className={cn("min-w-0 shrink-0 leading-tight transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-none", collapsed ? "translate-x-1 opacity-0" : "translate-x-0 opacity-100 delay-100")}>
-          <p className="truncate text-sm font-semibold text-white">Atahan Bozkurt</p>
-          <p className="mt-0.5 truncate text-xs text-slate-400">{title}</p>
-      </div>
+      {profileContent}
     </div>
   )
 }
