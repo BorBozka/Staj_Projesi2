@@ -4,6 +4,8 @@ import {
   isAdminEmailTaken,
   isAdminUsernameTaken,
   isAuthorizationScopeValid,
+  isVisitTypeNameTaken,
+  normalizeVisitTypeName,
   isSelfAdminDemotionAttempt,
   isSelfDeactivationAttempt,
   requiresCompanyScope,
@@ -50,6 +52,21 @@ describe("Username/email uniqueness", () => {
   it("allows a genuinely new username/email", () => {
     expect(isAdminUsernameTaken(users, null, "yeni.kullanici")).toBe(false)
     expect(isAdminEmailTaken(users, null, "yeni.kullanici@bplas.com")).toBe(false)
+  })
+})
+
+describe("Visit type uniqueness", () => {
+  const visitTypes = [{ id: "type-1", name: "Toplantı", active: true }]
+
+  it("normalizes Turkish natural-language text for duplicate comparison", () => {
+    expect(normalizeVisitTypeName(" Toplantı ")).toBe("toplantı")
+    expect(isVisitTypeNameTaken(visitTypes, null, "Toplantı")).toBe(true)
+    expect(isVisitTypeNameTaken(visitTypes, null, "TOPLANTI")).toBe(true)
+    expect(isVisitTypeNameTaken(visitTypes, null, " toplantı ")).toBe(true)
+  })
+
+  it("does not treat an edited record as its own duplicate", () => {
+    expect(isVisitTypeNameTaken(visitTypes, "type-1", "Toplantı")).toBe(false)
   })
 })
 

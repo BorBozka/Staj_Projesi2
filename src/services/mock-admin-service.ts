@@ -2,6 +2,7 @@ import {
   isAdminEmailTaken,
   isAdminUsernameTaken,
   isAuthorizationScopeValid,
+  isVisitTypeNameTaken,
   isSelfAdminDemotionAttempt,
   isSelfDeactivationAttempt,
   wouldRemoveLastActiveAdmin,
@@ -69,8 +70,13 @@ export class MockAdminService implements AdminService {
   }
   async getVisitTypes() { return clone(this.visitTypes) }
   async saveVisitType(input: Omit<VisitTypeDefinition, "id"> & { id?: string }) {
-    const entity: VisitTypeDefinition = { ...input, id: input.id ?? id("type") }
-    this.visitTypes = input.id ? this.visitTypes.map((item) => item.id === input.id ? entity : item) : [...this.visitTypes, entity]
+    const name = input.name.trim()
+    if (!name) throw new Error("Ziyaret türü adı boş olamaz.")
+    const existing = input.id ? this.visitTypes.find((item) => item.id === input.id) : undefined
+    if (input.id && !existing) throw new Error("Ziyaret türü bulunamadı.")
+    if (isVisitTypeNameTaken(this.visitTypes, existing?.id ?? null, name)) throw new Error("Bu ziyaret türü zaten tanımlı.")
+    const entity: VisitTypeDefinition = { ...input, name, id: input.id || id("type") }
+    this.visitTypes = existing ? this.visitTypes.map((item) => item.id === entity.id ? entity : item) : [...this.visitTypes, entity]
     return clone(entity)
   }
   async getVisitorCards() { return clone(this.cards) }

@@ -93,6 +93,18 @@ export interface VisitTypeDefinition {
   active: boolean
 }
 
+// Visit type names are natural-language Turkish text, so lowercase comparison must preserve
+// Turkish dotted/dotless-I semantics. The service uses this same canonical form for storage
+// and duplicate enforcement rather than relying solely on the UI.
+export function normalizeVisitTypeName(value: string): string {
+  return value.trim().toLocaleLowerCase("tr-TR")
+}
+
+export function isVisitTypeNameTaken(visitTypes: VisitTypeDefinition[], excludeId: string | null, name: string): boolean {
+  const normalized = normalizeVisitTypeName(name)
+  return visitTypes.some((visitType) => visitType.id !== excludeId && normalizeVisitTypeName(visitType.name) === normalized)
+}
+
 export const visitorCardStatuses = ["AVAILABLE", "IN_USE", "NOT_RETURNED", "LOST", "DISABLED"] as const
 export type VisitorCardStatus = (typeof visitorCardStatuses)[number]
 

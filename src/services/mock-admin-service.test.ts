@@ -120,6 +120,19 @@ describe("MockAdminService local password reset", () => {
 })
 
 describe("MockAdminService other admin resources", () => {
+  it("enforces normalized visit type uniqueness at the service boundary", async () => {
+    const service = new MockAdminService()
+    const existing = (await service.getVisitTypes()).find((item) => item.name === "Toplantı")!
+
+    await expect(service.saveVisitType({ name: "Toplantı", active: true })).rejects.toThrow("Bu ziyaret türü zaten tanımlı.")
+    await expect(service.saveVisitType({ name: "TOPLANTI", active: true })).rejects.toThrow("Bu ziyaret türü zaten tanımlı.")
+    await expect(service.saveVisitType({ name: " toplantı ", active: true })).rejects.toThrow("Bu ziyaret türü zaten tanımlı.")
+    await expect(service.saveVisitType({ ...existing, active: false })).resolves.toMatchObject({ id: existing.id, active: false })
+
+    const created = await service.saveVisitType({ name: "  Resmi ziyaret  ", active: true })
+    expect(created.name).toBe("Resmi ziyaret")
+  })
+
   it("publishes new immutable visitor-rule versions instead of mutating history", async () => {
     const service = new MockAdminService()
     const before = await service.getVisitorRuleVersions()
