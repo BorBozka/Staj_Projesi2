@@ -152,6 +152,12 @@ describe("Organization navigation persistence", () => {
     expect(pageSource).not.toContain("organization-workspace-mode")
     expect(pageSource).not.toContain("organization-form-draft")
   })
+
+  it("does not let an internal tree selection be overwritten by the preceding URL render", () => {
+    expect(pageSource).toContain("pendingSelectionRef")
+    expect(pageSource).toContain("!sameSelection(requestedSelection, pendingSelectionRef.current)")
+    expect(pageSource).toContain("applySelectionToUrl(next)")
+  })
 })
 
 describe("Organization contextual actions and headers", () => {

@@ -49,6 +49,7 @@ export function OrganizationPage() {
   const [workspaceMode, setWorkspaceMode] = useState<OrganizationWorkspaceMode>(viewOrganizationWorkspace)
   const [formDirty, setFormDirty] = useState(false)
   const hasRestoredNavigation = useRef(false)
+  const pendingSelectionRef = useRef<OrganizationSelection | null>(null)
 
   const updateSelectionQuery = useCallback((nextSelection: OrganizationSelection | null, replace = false) => {
     const nextParams = new URLSearchParams(searchParams)
@@ -71,12 +72,21 @@ export function OrganizationPage() {
     return window.confirm("Kaydedilmemiş değişiklikler silinecek. Devam etmek istiyor musunuz?")
   }, [formDirty, workspaceMode.type])
 
+  const applySelectionToUrl = useCallback((next: OrganizationSelection) => {
+    pendingSelectionRef.current = next
+    applySelection(next)
+    updateSelectionQuery(next)
+  }, [applySelection, updateSelectionQuery])
+
   useEffect(() => {
     if (!organization) return
     const requestedSelection = getOrganizationSelectionFromNodeParam(searchParams.get("node"))
     const defaultNavigation = getDefaultOrganizationNavigation(organization)
     const fallback = defaultNavigation.selection
     const nextSelection = findSelectedOrganizationEntity(organization, requestedSelection) ? requestedSelection : fallback
+
+    if (pendingSelectionRef.current && !sameSelection(requestedSelection, pendingSelectionRef.current)) return
+    if (pendingSelectionRef.current && sameSelection(requestedSelection, pendingSelectionRef.current)) pendingSelectionRef.current = null
 
     if (!hasRestoredNavigation.current) {
       hasRestoredNavigation.current = true
@@ -123,9 +133,8 @@ export function OrganizationPage() {
     if (sameSelection(selection, next)) return
     setWorkspaceMode(viewOrganizationWorkspace())
     setFormDirty(false)
-    applySelection(next)
-    updateSelectionQuery(next)
-  }, [applySelection, confirmDiscard, selection, updateSelectionQuery])
+    applySelectionToUrl(next)
+  }, [applySelectionToUrl, confirmDiscard, selection])
 
   const beginCreate = useCallback((kind: OrganizationKind, parentId: string | undefined, returnSelection: OrganizationSelection | null) => {
     if (!confirmDiscard()) return
@@ -153,9 +162,9 @@ export function OrganizationPage() {
   const saveForm = async (kind: OrganizationKind, input: Omit<OrganizationEntity, "id"> & { id?: string }) => {
     const saved = await saveOrganizationEntity(kind, input)
     const nextSelection = { kind, id: saved.id } satisfies OrganizationSelection
-    applySelection(nextSelection)
+    if (input.id) applySelection(nextSelection)
+    else applySelectionToUrl(nextSelection)
     setExpandedKeys((current) => new Set([...current, ...getExpansionKeysForNewEntity(organization, kind, saved.parentId)]))
-    if (!input.id) updateSelectionQuery(nextSelection)
     setWorkspaceMode(viewOrganizationWorkspace())
     setFormDirty(false)
   }
