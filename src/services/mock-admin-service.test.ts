@@ -120,27 +120,105 @@ describe("MockAdminService local password reset", () => {
 })
 
 describe("MockAdminService other admin resources", () => {
+  it("enforces normalized visit type uniqueness at the service boundary", async () => {
+    const service = new MockAdminService()
+    const existing = (await service.getVisitTypes()).find((item) => item.name === "Toplantı")!
+
+    await expect(service.saveVisitType({ name: "Toplantı", active: true })).rejects.toThrow("Bu ziyaret türü zaten tanımlı.")
+    await expect(service.saveVisitType({ name: "TOPLANTI", active: true })).rejects.toThrow("Bu ziyaret türü zaten tanımlı.")
+    await expect(service.saveVisitType({ name: " toplantı ", active: true })).rejects.toThrow("Bu ziyaret türü zaten tanımlı.")
+    await expect(service.saveVisitType({ ...existing, active: false })).resolves.toMatchObject({ id: existing.id, active: false })
+
+    const created = await service.saveVisitType({ name: "  Resmi ziyaret  ", active: true })
+    expect(created.name).toBe("Resmi ziyaret")
+  })
+
   it("publishes new immutable visitor-rule versions instead of mutating history", async () => {
     const service = new MockAdminService()
     const before = await service.getVisitorRuleVersions()
+    const active = before.find((rule) => rule.active)!
     const historical = before.find((rule) => !rule.active)!
-    const published = await service.publishVisitorRule("Yeni ziyaretçi kuralı")
+    const published = await service.publishVisitorRule("  Yeni ziyaretçi kuralı  ")
     const after = await service.getVisitorRuleVersions()
-    expect(published.version).toBeGreaterThan(before[0].version)
+    expect(published).toMatchObject({ version: 3, content: "Yeni ziyaretçi kuralı", active: true })
     expect(after.find((rule) => rule.id === historical.id)).toEqual(historical)
-    expect(after.find((rule) => rule.id === before.find((rule) => rule.active)?.id)?.active).toBe(false)
+    expect(after.find((rule) => rule.id === active.id)).toEqual({ ...active, active: false })
     expect(after.find((rule) => rule.id === published.id)?.active).toBe(true)
+    expect(after.filter((rule) => rule.active)).toHaveLength(1)
   })
 
-  it("rejects manual release of an in-use card", async () => {
+  it("rejects blank visitor rules at the service boundary", async () => {
     const service = new MockAdminService()
-    const card = (await service.getVisitorCards()).find((item) => item.status === "IN_USE")!
-    await expect(service.changeVisitorCardStatus(card.id, "AVAILABLE")).rejects.toThrow("operasyonel iade")
+    await expect(service.publishVisitorRule("")).rejects.toThrow("Ziyaretçi kuralı boş bırakılamaz.")
+    await expect(service.publishVisitorRule("   ")).rejects.toThrow("Ziyaretçi kuralı boş bırakılamaz.")
   })
 
-  it("leaves not-returned cards to the Security return workflow", async () => {
+  it("starts an empty rule repository at v1 and calculates later versions from the maximum version", async () => {
+    const emptyService = new MockAdminService(undefined, [])
+    await expect(emptyService.publishVisitorRule("İlk kural")).resolves.toMatchObject({ version: 1, active: true })
+
+    const unordered: import("@/domain/admin").VisitorRuleVersion[] = [
+      { id: "rule-4", version: 4, content: "v4", createdAt: "2026-04-01", publishedAt: "2026-04-01", active: false },
+      { id: "rule-2", version: 2, content: "v2", createdAt: "2026-02-01", publishedAt: "2026-02-01", active: true },
+    ]
+    const service = new MockAdminService(undefined, unordered)
+    await expect(service.publishVisitorRule("Yeni kural")).resolves.toMatchObject({ version: 5, active: true })
+  })
+
+  it("persists only valid operational settings at the service boundary", async () => {
     const service = new MockAdminService()
-    const card = (await service.getVisitorCards()).find((item) => item.status === "NOT_RETURNED")!
-    await expect(service.changeVisitorCardStatus(card.id, "AVAILABLE")).rejects.toThrow("Security operasyonu")
+    await expect(service.saveOperationalSettings({ overdueToleranceMinutes: 0, overdueAlertRepeatMinutes: 1 })).resolves.toEqual({ overdueToleranceMinutes: 0, overdueAlertRepeatMinutes: 1 })
+    await expect(service.saveOperationalSettings({ overdueToleranceMinutes: -1, overdueAlertRepeatMinutes: 10 })).rejects.toThrow("Operasyon parametreleri geçersiz.")
+    await expect(service.saveOperationalSettings({ overdueToleranceMinutes: 15, overdueAlertRepeatMinutes: 0 })).rejects.toThrow("Operasyon parametreleri geçersiz.")
+    await expect(service.saveOperationalSettings({ overdueToleranceMinutes: 1.5, overdueAlertRepeatMinutes: 10 })).rejects.toThrow("Operasyon parametreleri geçersiz.")
+    await expect(service.saveOperationalSettings({ overdueToleranceMinutes: 15, overdueAlertRepeatMinutes: 2.5 })).rejects.toThrow("Operasyon parametreleri geçersiz.")
+  })
+
+  it("keeps card inventory creation and editing inside the Admin-owned lifecycle", async () => {
+    const service = new MockAdminService()
+    const created = await service.createVisitorCard({ cardNumber: " 006 ", status: "LOST" } as never)
+    expect(created).toMatchObject({ cardNumber: "006", status: "AVAILABLE" })
+
+    const available = (await service.getVisitorCards()).find((item) => item.cardNumber === "001")!
+    const disabled = await service.updateVisitorCardInventory(available.id, { cardNumber: available.cardNumber, active: false })
+    expect(disabled.status).toBe("DISABLED")
+    await expect(service.updateVisitorCardInventory(disabled.id, { cardNumber: disabled.cardNumber, active: true })).resolves.toMatchObject({ status: "AVAILABLE" })
+  })
+
+  it("rejects duplicate card numbers while preserving distinct leading-zero identifiers", async () => {
+    const service = new MockAdminService()
+    await expect(service.createVisitorCard({ cardNumber: " 001 " })).rejects.toThrow("Bu kart numarası zaten tanımlı.")
+    await expect(service.createVisitorCard({ cardNumber: "ABC-01" })).resolves.toMatchObject({ cardNumber: "ABC-01" })
+    await expect(service.createVisitorCard({ cardNumber: "abc-01" })).rejects.toThrow("Bu kart numarası zaten tanımlı.")
+    await expect(service.createVisitorCard({ cardNumber: "01" })).resolves.toMatchObject({ cardNumber: "01" })
+    const existing = (await service.getVisitorCards()).find((item) => item.cardNumber === "001")!
+    await expect(service.updateVisitorCardInventory(existing.id, { cardNumber: "001", active: true })).resolves.toMatchObject({ id: existing.id })
+  })
+
+  it("rejects every operational-card mutation through the Admin inventory boundary", async () => {
+    const service = new MockAdminService()
+    const cards = await service.getVisitorCards()
+    const available = cards.find((card) => card.status === "AVAILABLE")!
+    const inUse = cards.find((card) => card.status === "IN_USE")!
+    const notReturned = cards.find((card) => card.status === "NOT_RETURNED")!
+    const lost = cards.find((card) => card.status === "LOST")!
+
+    await expect(service.updateVisitorCardInventory(available.id, { cardNumber: available.cardNumber, active: true, status: "IN_USE" } as never)).resolves.toMatchObject({ status: "AVAILABLE" })
+    await expect(service.updateVisitorCardInventory(available.id, { cardNumber: available.cardNumber, active: true, status: "NOT_RETURNED" } as never)).resolves.toMatchObject({ status: "AVAILABLE" })
+    await expect(service.updateVisitorCardInventory(available.id, { cardNumber: available.cardNumber, active: true, status: "LOST" } as never)).resolves.toMatchObject({ status: "AVAILABLE" })
+    await expect(service.updateVisitorCardInventory(inUse.id, { cardNumber: inUse.cardNumber, active: true })).rejects.toThrow("Security operasyonu")
+    await expect(service.updateVisitorCardInventory(notReturned.id, { cardNumber: notReturned.cardNumber, active: true })).rejects.toThrow("Security operasyonu")
+    await expect(service.updateVisitorCardInventory(lost.id, { cardNumber: lost.cardNumber, active: false })).rejects.toThrow("Security operasyonu")
+  })
+
+  it("preserves operational visitor assignments and isolates inventory edits", async () => {
+    const service = new MockAdminService()
+    const before = await service.getVisitorCards()
+    const operational = before.find((card) => card.status === "IN_USE")!
+    const available = before.find((card) => card.status === "AVAILABLE")!
+    await service.updateVisitorCardInventory(available.id, { cardNumber: "010", active: false })
+    const after = await service.getVisitorCards()
+    expect(after.find((card) => card.id === operational.id)).toEqual(operational)
+    expect(after.find((card) => card.id === available.id)).toMatchObject({ cardNumber: "010", status: "DISABLED" })
   })
 })

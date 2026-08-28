@@ -1,210 +1,134 @@
 # AGENTS.md
 
-# Visitor Management System — Codex Instructions
-
-## Mandatory Reading Order
-
-Before making changes, read:
-
-1. `PRODUCT_SPEC.md`
-2. `UI_SPEC.md`
-3. `TECH_STACK.md`
-4. `DEVELOPMENT_PLAN.md`
-
-These files define the project.
-
-`PRODUCT_SPEC.md` is authoritative for business behavior.
-
-`UI_SPEC.md` is authoritative for interface direction.
-
-`TECH_STACK.md` is authoritative for technology choices.
-
-If older chat/discovery material conflicts with repository documentation, follow the repository documentation.
-
----
-
-## Fixed Frontend Stack
-
-Use:
-
-- React
-- TypeScript
-- Vite
-- Tailwind CSS
-- shadcn/ui
-- TanStack Table when table functionality requires it
-- React Hook Form for non-trivial forms
-- Zod for form/data validation
-- date-fns for date/time utilities
-
-Do not replace this stack without explicit user approval.
-
-Do not add Redux.
-
-Do not add Zustand, TanStack Query, Recharts, or a Gantt library until a current requirement actually needs them.
-
-The initial visit timeline should be a focused custom React component, not a general-purpose project-management Gantt implementation.
-
----
-
-## Development Mode
-
-This project is developed incrementally.
-
-Never implement future phases unless the user explicitly requests them.
-
-When asked to implement one phase:
-
-- implement only that phase,
-- do not proactively begin the next phase,
-- do not add future backend functionality "for completeness",
-- stop when the requested phase is complete.
-
----
-
-## Requirements Discipline
-
-Do not invent business requirements.
-
-Do not add features merely because they are common in visitor-management software.
-
-If a missing detail would cause a consequential architecture or business-rule decision, ask before making the assumption.
-
-Small implementation details may use reasonable defaults when they do not alter business behavior.
-
----
-
-## Frontend Rule
-
-The frontend created during UI phases is the real production frontend.
-
-It is not a disposable prototype.
-
-Until backend phases begin:
-
-- use mock data through replaceable service/repository abstractions,
-- do not scatter hardcoded mock objects throughout components,
-- keep data access isolated,
-- keep domain types centralized,
-- design service interfaces so real APIs can replace mocks later,
-- use in-memory mock mutations only for demonstration of current-phase workflows.
-
-Do not create a fake Express/Node backend during frontend phases unless explicitly requested.
-
----
-
-## Modularity
-
-Prefer domain-oriented boundaries such as:
-
-- app shell
-- organization
-- visits
-- visitors
-- security
-- visitor cards
-- deliveries
-- reporting
-- administration
-- public pre-registration
-
-Shared components belong in a deliberate shared/common layer.
-
-Avoid circular dependencies between domains.
-
-Avoid a single oversized global state object.
-
----
-
-## UI Requirements
-
-Follow `docs/UI_SPEC.md`.
-
-Key direction:
-
-- modern
-- compact
-- minimalist
-- enterprise
-- desktop-first internally
-- mobile-first for public visitor registration
-- high information density without clutter
-- neutral palette with restrained accent color
-- compact tables
-- subtle borders and shadows
-- role-specific dashboards
-- drawers for fast operational actions
-
-Avoid:
-
-- glassmorphism
-- excessive gradients
-- oversized KPI cards
-- decorative dashboards
-- excessive charting
-- unnecessary animations
-- excessive whitespace
-- a generic admin-template appearance
-
----
-
-## Business Rules That Must Not Be Reinterpreted
-
-- Visitor cards are physical numbered cards only.
-- Visitor cards are not integrated with Starkom/access-control hardware.
-- Security manually performs check-in and check-out.
-- No internal approval workflow exists for planned visits.
-- Host employee is mandatory for normal visits.
-- Rule acceptance is mandatory before check-in.
-- National identity number is not required.
-- Each individual visitor has a separate visit record.
-- Employees may create visits at other companies/facilities.
-- Security cannot delete visit records.
-- Overdue is calculated, not a permanent stored visit status.
-- No overdue email is sent to the host employee.
-- Goods delivery is a separate module.
-- Gate-only delivery drivers are not visitors.
-- Drivers entering the facility must use the visitor process.
-- Actual goods-delivery arrival and departure times are tracked.
-
----
-
-## Phase Completion Report
-
-At the end of every requested phase, stop and provide:
-
-1. Summary of implementation
-2. Files changed
-3. UI/technical decisions made
-4. Known limitations
-5. Items that need user/stakeholder review
-6. Tests/checks performed
-
-Do not continue to another phase automatically.
-
----
-
-## Quality
-
-Prefer maintainable code over clever code.
-
-Use:
-
-- clear domain naming
-- consistent component structure
-- reusable UI primitives
-- predictable state management
-- TypeScript domain models
-- validation close to domain boundaries
-- accessible labels and keyboard behavior
-
-Do not over-engineer infrastructure during early UI phases.
-
-Before finishing a phase, run the relevant available checks such as:
-
-- typecheck
-- lint
-- build
-- targeted tests if any exist
-
-Do not claim a check passed if it was not run successfully.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project
+
+A role-focused visitor management frontend (Turkish UI) for multi-company, multi-facility
+operations — visit planning/timeline, a Manager dashboard, resource/fleet/goods-movement
+planning, and reporting. Frontend-only for now: all data comes from an in-memory mock service
+layer designed to be swapped for a real API later without rewriting the UI. See `README.md` for
+a feature overview.
+
+**Authoritative docs — read before non-trivial changes:**
+- `AGENTS.md` — stack constraints, phased-development rules, business rules that must not be
+  reinterpreted, and the required phase-completion report format. Read this first.
+- `PRODUCT_SPEC.md` — business behavior.
+- `UI_SPEC.md` — interface direction.
+- `TECH_STACK.md` — technology choices and dependency discipline.
+- `DEVELOPMENT_PLAN.md` — phase-by-phase status; check this to know what's actually built vs. planned.
+
+## Commands
+
+Package manager is **pnpm** (`pnpm-lock.yaml` is canonical; there is no `package-lock.json`).
+
+```bash
+pnpm install              # install deps
+pnpm dev                  # Vite dev server
+pnpm build                # tsc -b && vite build
+pnpm typecheck             # tsc -b --pretty false (no emit)
+pnpm lint                  # eslint .
+pnpm test                  # vitest run (whole suite)
+pnpm test -- <name-or-path> # vitest run, filtered (e.g. `pnpm test -- visits-report-utils`)
+```
+
+After any dependency change in `package.json`, run `pnpm install --lockfile-only` (or a normal
+install) so `pnpm-lock.yaml` stays in sync — Vercel deploys with `pnpm install --frozen-lockfile`
+and will hard-fail the build if the lockfile drifts (this has happened before, see PR history).
+
+Vitest has no separate config file and no jsdom/`@testing-library` setup — see Testing below.
+
+## Architecture
+
+### Layering
+
+- `src/domain/*` — plain TypeScript types shared across the app (`visits.ts`, `resources.ts`,
+  `transport-assignments.ts`, `goods-movements.ts`). No logic beyond small label/derivation
+  helpers (e.g. `getGoodsMovementDisplayStatus`).
+- `src/services/*` — one interface + one `Mock*` implementation per domain (e.g.
+  `visit-service.ts` / `mock-visit-service.ts`). `src/services/index.ts` instantiates and wires
+  them (including resolving the deliberate `visitService` ↔ `resourceAssignmentService`
+  circular dependency) and exports singletons. Swapping mocks for real API clients later should
+  not require touching `src/features`.
+- `src/features/<domain>/*` — UI + feature-local logic (filtering, sorting, pagination,
+  export), grouped by domain: `visits`, `manager`, `resources`, `transport`, `goods`, `reports`.
+- `src/components/app-shell/*` — the two route shells (see Routing).
+- `src/components/ui/*` — shadcn/ui primitives (`style: new-york`, see `components.json`),
+  adapted to the app's compact density.
+- `src/lib/*` — cross-domain utilities with no domain dependency: `sort.ts` (generic 3-state
+  sort toggle), `pagination.ts` (generic paginate/page-count), `date.ts` (see Timestamps below),
+  `meeting-lifecycle.ts`, `utils.ts` (`cn`).
+- Path alias `@/` → `src/` (see `vite.config.ts`).
+
+### Meeting vs. Visit — the core domain model
+
+A **Meeting** is one planned event (host, company, facility, time window, one record). Each
+individual visitor invited to it gets a separate **VisitRecord** (check-in/out, status,
+invitation state). The **`Visit`** type used almost everywhere in the UI (`domain/visits.ts`)
+is `VisitRecord & MeetingDetails` — a flattened read-model the service layer projects by
+joining a VisitRecord with its parent Meeting's details, purely for convenience so screens don't
+need a second fetch. When changing Meeting-level fields (time, host, company/facility), remember
+every Visit sharing that Meeting reflects the change; don't treat `Visit` fields as independently
+editable per-visitor unless they belong to `VisitRecord` (check-in/out, status, invitation).
+Meeting lifecycle rules (extend/close, auto-close on last checkout) live in
+`src/lib/meeting-lifecycle.ts` and `VisitService`'s lifecycle methods — read the JSDoc on
+`visit-service.ts` before touching close/extend/checkout flows.
+
+### Routing and shells
+
+`src/app/App.tsx` defines two route trees under two different shells:
+- `AppShell` (`src/components/app-shell/AppShell.tsx`) — employee-facing, currently just
+  `/my-visits`.
+- `ManagerShell` (`src/components/app-shell/ManagerShell.tsx`) — `/manager/*`, holds the
+  collapsible sidebar, company/facility scope selector, notifications, and the per-minute clock
+  (`manager-clock.ts`) driving live dashboard indicators.
+
+All route pages are lazy-loaded (`React.lazy`). `useVisits()` (`features/visits/visit-context.tsx`)
+is the shared context providing `meetings`, `visits`, `referenceData`, load/reload state to
+everything under both shells. `useManagerRefresh()` (`features/manager/manager-refresh-context.ts`)
+carries the Manager area's company/facility scope and refresh state separately.
+
+### Reports feature
+
+`src/features/reports/` is a tabbed page (`Ziyaretler` / `Araç-Şoför` / `Mal Hareketi`) sharing
+one filter bar (date range + company/facility, URL-persisted like All Visits), one
+`ReportKpiCard` component, and one CSV/Excel/PDF export layer (`report-export.ts` —
+`downloadReportCsv/Excel/Pdf`, each tab supplies its own `ReportColumn[]` + row builder). xlsx
+and jspdf/jspdf-autotable are dynamically imported only when an export button is clicked, so
+viewing the Reports page doesn't pull their weight into the initial bundle. Each tab has its own
+`*-report-utils.ts` for domain-specific filtering/KPI calculation — follow that split (shared
+mechanics in `report-export.ts`/`reports-filters.ts`, domain logic in the tab-specific utils
+file) rather than growing one tab's file to do another tab's job.
+
+### Timestamps and timezones
+
+Some ISO timestamps in this codebase encode a wall-clock time meant to be read literally
+regardless of the runtime's system timezone (e.g. dashboard/timeline data seeded with explicit
+`+03:00` fixtures); others (e.g. transport assignment planning, built from
+`new Date(...).toISOString()`) are genuine instants meant to be read via normal `Date` semantics
+and compared with `isAfter`/`isSameDay`/etc. These are **not interchangeable** — converting a
+"real instant" field to literal-digit reading (or vice versa) breaks correctness for whichever
+runtime timezone doesn't match. `src/lib/date.ts` (`getIsoWallClockTime`, `getIsoHour`,
+`getIsoWallClockMinutes`, `formatIsoWallClockTime`) is for the literal-digit case only. Before
+changing how a timestamp field is read, check how it's *written* elsewhere in the codebase first.
+
+### Testing conventions
+
+No jsdom, no `@testing-library/react` — not installed, not needed for how tests here work:
+- Most logic (filtering, KPI calc, sort/pagination, formatting) is tested as plain functions via
+  `vitest`.
+- Many `*.test.tsx` files test JSX/structural facts by reading the component file as a **raw
+  source string** (`readFileSync` + `toContain`/`not.toContain`) rather than rendering it — this
+  locks in specific className/structure/prop decisions cheaply without a DOM. Follow this pattern
+  for that kind of test; don't introduce a rendering-library dependency to do the same thing.
+- When actual rendering is needed, tests use `renderToStaticMarkup` from `react-dom/server`
+  (SSR-style static render), not jsdom-based mounting.
+
+### Shared helpers worth reusing instead of reimplementing
+
+- `src/lib/sort.ts` (`toggleSort`) and `src/lib/pagination.ts` (`paginate`, `getPageCount`) —
+  every list/table's 3-state column-sort toggle and page-slicing logic should delegate to these
+  rather than reimplementing the same `find`/`map`/`filter` or `slice` inline.
+- Domain-specific comparator functions (`compareVisits`, `compareGoodsMovements`,
+  `compareResources`, etc.) intentionally stay local to their feature file — only the generic
+  toggle/paginate mechanics are shared.

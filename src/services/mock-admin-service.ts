@@ -1,17 +1,22 @@
 import {
   isAdminEmailTaken,
   isAdminUsernameTaken,
+  isAdminManagedVisitorCard,
+  isOperationalSettingsValid,
   isAuthorizationScopeValid,
+  isVisitorCardNumberTaken,
+  isVisitTypeNameTaken,
   isSelfAdminDemotionAttempt,
   isSelfDeactivationAttempt,
   wouldRemoveLastActiveAdmin,
   type AdminUser,
+  type CreateVisitorCardInput,
   type OperationalSettings,
   type OrganizationEntity,
   type OrganizationKind,
+  type UpdateVisitorCardInventoryInput,
   type VisitTypeDefinition,
   type VisitorCardInventoryItem,
-  type VisitorCardStatus,
   type VisitorRuleVersion,
 } from "@/domain/admin"
 import type { AdminService, SaveAdminUserOptions } from "@/services/admin-service"
@@ -30,10 +35,10 @@ export class MockAdminService implements AdminService {
   ]
   private visitTypes: VisitTypeDefinition[] = [{ id: "type-1", name: "Toplantı", active: true }, { id: "type-2", name: "Teknik Servis / Bakım", active: true }, { id: "type-3", name: "Tedarikçi", active: true }, { id: "type-4", name: "İş Görüşmesi", active: false }]
   private cards: VisitorCardInventoryItem[] = [{ id: "card-1", cardNumber: "001", status: "AVAILABLE" }, { id: "card-2", cardNumber: "002", status: "IN_USE", assignedVisitorName: "Ece Korkmaz" }, { id: "card-3", cardNumber: "003", status: "NOT_RETURNED", assignedVisitorName: "Can Uslu" }, { id: "card-4", cardNumber: "004", status: "LOST" }, { id: "card-5", cardNumber: "005", status: "DISABLED" }]
-  private rules: VisitorRuleVersion[] = [{ id: "rule-2", version: 2, content: "Ziyaretçiler tesis güvenlik kurallarına ve yönlendirmelerine uymayı kabul eder.", createdAt: "2026-08-01T09:00:00.000Z", publishedAt: "2026-08-01T09:30:00.000Z", active: true }, { id: "rule-1", version: 1, content: "Ziyaretçiler tesis kurallarına uyacağını kabul eder.", createdAt: "2026-02-01T09:00:00.000Z", publishedAt: "2026-02-01T09:20:00.000Z", active: false }]
+  private rules: VisitorRuleVersion[]
   private settings: OperationalSettings = { overdueToleranceMinutes: 15, overdueAlertRepeatMinutes: 10 }
 
-  constructor(private readonly organizationStore = new MockOrganizationStore()) {}
+  constructor(private readonly organizationStore = new MockOrganizationStore(), initialRules: VisitorRuleVersion[] = [{ id: "rule-2", version: 2, content: "Ziyaretçiler tesis güvenlik kurallarına ve yönlendirmelerine uymayı kabul eder.", createdAt: "2026-08-01T09:00:00.000Z", publishedAt: "2026-08-01T09:30:00.000Z", active: true }, { id: "rule-1", version: 1, content: "Ziyaretçiler tesis kurallarına uyacağını kabul eder.", createdAt: "2026-02-01T09:00:00.000Z", publishedAt: "2026-02-01T09:20:00.000Z", active: false }]) { this.rules = clone(initialRules) }
 
   async getUsers() { return clone(this.users) }
   async saveUser(input: Omit<AdminUser, "id"> & { id?: string }, options: SaveAdminUserOptions = {}) {
@@ -69,31 +74,49 @@ export class MockAdminService implements AdminService {
   }
   async getVisitTypes() { return clone(this.visitTypes) }
   async saveVisitType(input: Omit<VisitTypeDefinition, "id"> & { id?: string }) {
-    const entity: VisitTypeDefinition = { ...input, id: input.id ?? id("type") }
-    this.visitTypes = input.id ? this.visitTypes.map((item) => item.id === input.id ? entity : item) : [...this.visitTypes, entity]
+    const name = input.name.trim()
+    if (!name) throw new Error("Ziyaret türü adı boş olamaz.")
+    const existing = input.id ? this.visitTypes.find((item) => item.id === input.id) : undefined
+    if (input.id && !existing) throw new Error("Ziyaret türü bulunamadı.")
+    if (isVisitTypeNameTaken(this.visitTypes, existing?.id ?? null, name)) throw new Error("Bu ziyaret türü zaten tanımlı.")
+    const entity: VisitTypeDefinition = { ...input, name, id: input.id || id("type") }
+    this.visitTypes = existing ? this.visitTypes.map((item) => item.id === entity.id ? entity : item) : [...this.visitTypes, entity]
     return clone(entity)
   }
   async getVisitorCards() { return clone(this.cards) }
-  async saveVisitorCard(input: Omit<VisitorCardInventoryItem, "id"> & { id?: string }) {
-    const entity: VisitorCardInventoryItem = { ...input, id: input.id ?? id("card") }
-    this.cards = input.id ? this.cards.map((item) => item.id === input.id ? entity : item) : [...this.cards, entity]
+  async createVisitorCard(input: CreateVisitorCardInput) {
+    const cardNumber = input.cardNumber.trim()
+    if (!cardNumber) throw new Error("Kart numarası boş olamaz.")
+    if (isVisitorCardNumberTaken(this.cards, null, cardNumber)) throw new Error("Bu kart numarası zaten tanımlı.")
+    const entity: VisitorCardInventoryItem = { id: id("card"), cardNumber, status: "AVAILABLE" }
+    this.cards = [...this.cards, entity]
     return clone(entity)
   }
-  async changeVisitorCardStatus(idValue: string, status: VisitorCardStatus) {
-    const card = this.cards.find((item) => item.id === idValue)
-    if (!card) throw new Error("Kart bulunamadı.")
-    if (card.status === "IN_USE" && status !== "IN_USE") throw new Error("Kullanımdaki kart operasyonel iade olmadan değiştirilemez.")
-    if (card.status === "NOT_RETURNED" && status !== "NOT_RETURNED") throw new Error("İade edilmemiş kart yalnızca Security operasyonu ile çözülebilir.")
-    if (status === "AVAILABLE" && (card.status === "LOST" || card.status === "DISABLED")) card.assignedVisitorName = undefined
-    card.status = status
-    return clone(card)
+  async updateVisitorCardInventory(idValue: string, input: UpdateVisitorCardInventoryInput) {
+    const existing = this.cards.find((card) => card.id === idValue)
+    if (!existing) throw new Error("Kart bulunamadı.")
+    if (!isAdminManagedVisitorCard(existing)) throw new Error("Bu kartın durumu Security operasyonu tarafından yönetilir.")
+    const cardNumber = input.cardNumber.trim()
+    if (!cardNumber) throw new Error("Kart numarası boş olamaz.")
+    if (isVisitorCardNumberTaken(this.cards, existing.id, cardNumber)) throw new Error("Bu kart numarası zaten tanımlı.")
+    const entity: VisitorCardInventoryItem = { ...existing, cardNumber, status: input.active ? "AVAILABLE" : "DISABLED" }
+    this.cards = this.cards.map((card) => card.id === existing.id ? entity : card)
+    return clone(entity)
   }
   async getVisitorRuleVersions() { return clone(this.rules) }
   async publishVisitorRule(content: string) {
-    const next: VisitorRuleVersion = { id: id("rule"), version: Math.max(...this.rules.map((item) => item.version)) + 1, content, createdAt: new Date().toISOString(), publishedAt: new Date().toISOString(), active: true }
+    const normalizedContent = content.trim()
+    if (!normalizedContent) throw new Error("Ziyaretçi kuralı boş bırakılamaz.")
+    const nextVersion = this.rules.reduce((maximum, item) => Math.max(maximum, item.version), 0) + 1
+    const now = new Date().toISOString()
+    const next: VisitorRuleVersion = { id: id("rule"), version: nextVersion, content: normalizedContent, createdAt: now, publishedAt: now, active: true }
     this.rules = [next, ...this.rules.map((item) => ({ ...item, active: false }))]
     return clone(next)
   }
   async getOperationalSettings() { return clone(this.settings) }
-  async saveOperationalSettings(settings: OperationalSettings) { this.settings = clone(settings); return clone(this.settings) }
+  async saveOperationalSettings(settings: OperationalSettings) {
+    if (!isOperationalSettingsValid(settings)) throw new Error("Operasyon parametreleri geçersiz.")
+    this.settings = clone(settings)
+    return clone(this.settings)
+  }
 }

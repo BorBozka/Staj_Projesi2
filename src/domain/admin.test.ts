@@ -4,6 +4,10 @@ import {
   isAdminEmailTaken,
   isAdminUsernameTaken,
   isAuthorizationScopeValid,
+  isVisitTypeNameTaken,
+  isVisitorCardNumberTaken,
+  normalizeVisitorCardNumber,
+  normalizeVisitTypeName,
   isSelfAdminDemotionAttempt,
   isSelfDeactivationAttempt,
   requiresCompanyScope,
@@ -50,6 +54,36 @@ describe("Username/email uniqueness", () => {
   it("allows a genuinely new username/email", () => {
     expect(isAdminUsernameTaken(users, null, "yeni.kullanici")).toBe(false)
     expect(isAdminEmailTaken(users, null, "yeni.kullanici@bplas.com")).toBe(false)
+  })
+})
+
+describe("Visit type uniqueness", () => {
+  const visitTypes = [{ id: "type-1", name: "Toplantı", active: true }]
+
+  it("normalizes Turkish natural-language text for duplicate comparison", () => {
+    expect(normalizeVisitTypeName(" Toplantı ")).toBe("toplantı")
+    expect(isVisitTypeNameTaken(visitTypes, null, "Toplantı")).toBe(true)
+    expect(isVisitTypeNameTaken(visitTypes, null, "TOPLANTI")).toBe(true)
+    expect(isVisitTypeNameTaken(visitTypes, null, " toplantı ")).toBe(true)
+  })
+
+  it("does not treat an edited record as its own duplicate", () => {
+    expect(isVisitTypeNameTaken(visitTypes, "type-1", "Toplantı")).toBe(false)
+  })
+})
+
+describe("Visitor card number uniqueness", () => {
+  const cards = [{ id: "card-1", cardNumber: "001", status: "AVAILABLE" as const }, { id: "card-2", cardNumber: "ABC-01", status: "DISABLED" as const }]
+
+  it("trims and compares identifiers case-insensitively without changing leading-zero meaning", () => {
+    expect(normalizeVisitorCardNumber(" 001 ")).toBe("001")
+    expect(isVisitorCardNumberTaken(cards, null, " 001 ")).toBe(true)
+    expect(isVisitorCardNumberTaken(cards, null, "abc-01")).toBe(true)
+    expect(isVisitorCardNumberTaken(cards, null, "01")).toBe(false)
+  })
+
+  it("does not treat the card being edited as its own duplicate", () => {
+    expect(isVisitorCardNumberTaken(cards, "card-1", "001")).toBe(false)
   })
 })
 

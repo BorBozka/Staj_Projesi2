@@ -1,4 +1,4 @@
-import type { AdminUser, OperationalSettings, OrganizationEntity, OrganizationKind, OrganizationSnapshot, VisitTypeDefinition, VisitorCardInventoryItem, VisitorCardStatus, VisitorRuleVersion } from "@/domain/admin"
+import type { AdminUser, CreateVisitorCardInput, OperationalSettings, OrganizationEntity, OrganizationKind, OrganizationSnapshot, UpdateVisitorCardInventoryInput, VisitTypeDefinition, VisitorCardInventoryItem, VisitorRuleVersion } from "@/domain/admin"
 
 export interface SaveAdminUserOptions {
   // The id of the currently signed-in Admin performing this save, used to enforce the
@@ -18,8 +18,8 @@ export interface AdminService {
   getVisitTypes(): Promise<VisitTypeDefinition[]>
   saveVisitType(visitType: Omit<VisitTypeDefinition, "id"> & { id?: string }): Promise<VisitTypeDefinition>
   getVisitorCards(): Promise<VisitorCardInventoryItem[]>
-  saveVisitorCard(card: Omit<VisitorCardInventoryItem, "id"> & { id?: string }): Promise<VisitorCardInventoryItem>
-  changeVisitorCardStatus(id: string, status: VisitorCardStatus): Promise<VisitorCardInventoryItem>
+  createVisitorCard(input: CreateVisitorCardInput): Promise<VisitorCardInventoryItem>
+  updateVisitorCardInventory(id: string, input: UpdateVisitorCardInventoryInput): Promise<VisitorCardInventoryItem>
   getVisitorRuleVersions(): Promise<VisitorRuleVersion[]>
   publishVisitorRule(content: string): Promise<VisitorRuleVersion>
   getOperationalSettings(): Promise<OperationalSettings>

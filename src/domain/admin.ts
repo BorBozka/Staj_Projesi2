@@ -93,6 +93,18 @@ export interface VisitTypeDefinition {
   active: boolean
 }
 
+// Visit type names are natural-language Turkish text, so lowercase comparison must preserve
+// Turkish dotted/dotless-I semantics. The service uses this same canonical form for storage
+// and duplicate enforcement rather than relying solely on the UI.
+export function normalizeVisitTypeName(value: string): string {
+  return value.trim().toLocaleLowerCase("tr-TR")
+}
+
+export function isVisitTypeNameTaken(visitTypes: VisitTypeDefinition[], excludeId: string | null, name: string): boolean {
+  const normalized = normalizeVisitTypeName(name)
+  return visitTypes.some((visitType) => visitType.id !== excludeId && normalizeVisitTypeName(visitType.name) === normalized)
+}
+
 export const visitorCardStatuses = ["AVAILABLE", "IN_USE", "NOT_RETURNED", "LOST", "DISABLED"] as const
 export type VisitorCardStatus = (typeof visitorCardStatuses)[number]
 
@@ -101,6 +113,31 @@ export interface VisitorCardInventoryItem {
   cardNumber: string
   status: VisitorCardStatus
   assignedVisitorName?: string
+}
+
+export interface CreateVisitorCardInput {
+  cardNumber: string
+}
+
+export interface UpdateVisitorCardInventoryInput {
+  cardNumber: string
+  active: boolean
+}
+
+// Visitor card numbers are identifiers rather than natural-language text. Preserve their
+// original spelling (including leading zeros) for display, but compare trimmed ASCII case-folded
+// values so inventory records cannot be duplicated through casing or surrounding whitespace.
+export function normalizeVisitorCardNumber(value: string): string {
+  return value.trim().toLowerCase()
+}
+
+export function isVisitorCardNumberTaken(cards: VisitorCardInventoryItem[], excludeId: string | null, cardNumber: string): boolean {
+  const normalized = normalizeVisitorCardNumber(cardNumber)
+  return cards.some((card) => card.id !== excludeId && normalizeVisitorCardNumber(card.cardNumber) === normalized)
+}
+
+export function isAdminManagedVisitorCard(card: Pick<VisitorCardInventoryItem, "status">): boolean {
+  return card.status === "AVAILABLE" || card.status === "DISABLED"
 }
 
 export interface VisitorRuleVersion {
@@ -115,6 +152,11 @@ export interface VisitorRuleVersion {
 export interface OperationalSettings {
   overdueToleranceMinutes: number
   overdueAlertRepeatMinutes: number
+}
+
+export function isOperationalSettingsValid(settings: OperationalSettings): boolean {
+  return Number.isInteger(settings.overdueToleranceMinutes) && settings.overdueToleranceMinutes >= 0
+    && Number.isInteger(settings.overdueAlertRepeatMinutes) && settings.overdueAlertRepeatMinutes >= 1
 }
 
 export const authenticationSourceLabels: Record<AuthenticationSource, string> = {
