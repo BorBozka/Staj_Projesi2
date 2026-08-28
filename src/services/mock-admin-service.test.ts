@@ -165,6 +165,15 @@ describe("MockAdminService other admin resources", () => {
     await expect(service.publishVisitorRule("Yeni kural")).resolves.toMatchObject({ version: 5, active: true })
   })
 
+  it("persists only valid operational settings at the service boundary", async () => {
+    const service = new MockAdminService()
+    await expect(service.saveOperationalSettings({ overdueToleranceMinutes: 0, overdueAlertRepeatMinutes: 1 })).resolves.toEqual({ overdueToleranceMinutes: 0, overdueAlertRepeatMinutes: 1 })
+    await expect(service.saveOperationalSettings({ overdueToleranceMinutes: -1, overdueAlertRepeatMinutes: 10 })).rejects.toThrow("Operasyon parametreleri geçersiz.")
+    await expect(service.saveOperationalSettings({ overdueToleranceMinutes: 15, overdueAlertRepeatMinutes: 0 })).rejects.toThrow("Operasyon parametreleri geçersiz.")
+    await expect(service.saveOperationalSettings({ overdueToleranceMinutes: 1.5, overdueAlertRepeatMinutes: 10 })).rejects.toThrow("Operasyon parametreleri geçersiz.")
+    await expect(service.saveOperationalSettings({ overdueToleranceMinutes: 15, overdueAlertRepeatMinutes: 2.5 })).rejects.toThrow("Operasyon parametreleri geçersiz.")
+  })
+
   it("keeps card inventory creation and editing inside the Admin-owned lifecycle", async () => {
     const service = new MockAdminService()
     const created = await service.createVisitorCard({ cardNumber: " 006 ", status: "LOST" } as never)

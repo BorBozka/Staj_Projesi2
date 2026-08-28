@@ -1,4 +1,4 @@
-import { applicationRoles, authenticationSources, type AdminUser, type ApplicationRole, type AuthenticationSource, type OperationalSettings } from "@/domain/admin"
+import { applicationRoles, authenticationSources, isOperationalSettingsValid, type AdminUser, type ApplicationRole, type AuthenticationSource } from "@/domain/admin"
 import { getPageCount as getPageCountShared, paginate } from "@/lib/pagination"
 import { toggleSingleSort, type SingleSortState } from "@/lib/sort"
 
@@ -182,7 +182,4 @@ export function shouldConfirmAnotherAdminDeactivation(actingUserId: string, targ
   return actingUserId !== target.id && target.role === "ADMIN" && target.active && !nextActive
 }
 
-export function isOperationalSettingsValid(settings: OperationalSettings) {
-  return Number.isInteger(settings.overdueToleranceMinutes) && settings.overdueToleranceMinutes >= 0
-    && Number.isInteger(settings.overdueAlertRepeatMinutes) && settings.overdueAlertRepeatMinutes >= 1
-}
+export { isOperationalSettingsValid }

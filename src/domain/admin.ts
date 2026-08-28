@@ -154,6 +154,11 @@ export interface OperationalSettings {
   overdueAlertRepeatMinutes: number
 }
 
+export function isOperationalSettingsValid(settings: OperationalSettings): boolean {
+  return Number.isInteger(settings.overdueToleranceMinutes) && settings.overdueToleranceMinutes >= 0
+    && Number.isInteger(settings.overdueAlertRepeatMinutes) && settings.overdueAlertRepeatMinutes >= 1
+}
+
 export const authenticationSourceLabels: Record<AuthenticationSource, string> = {
   ACTIVE_DIRECTORY: "Active Directory",
   LOCAL: "Local",

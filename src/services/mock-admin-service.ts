@@ -2,6 +2,7 @@ import {
   isAdminEmailTaken,
   isAdminUsernameTaken,
   isAdminManagedVisitorCard,
+  isOperationalSettingsValid,
   isAuthorizationScopeValid,
   isVisitorCardNumberTaken,
   isVisitTypeNameTaken,
@@ -113,5 +114,9 @@ export class MockAdminService implements AdminService {
     return clone(next)
   }
   async getOperationalSettings() { return clone(this.settings) }
-  async saveOperationalSettings(settings: OperationalSettings) { this.settings = clone(settings); return clone(this.settings) }
+  async saveOperationalSettings(settings: OperationalSettings) {
+    if (!isOperationalSettingsValid(settings)) throw new Error("Operasyon parametreleri geçersiz.")
+    this.settings = clone(settings)
+    return clone(this.settings)
+  }
 }
