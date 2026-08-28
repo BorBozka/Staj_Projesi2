@@ -1,5 +1,6 @@
 import { Building2, ChevronDown, ChevronRight, DoorOpen, FolderTree, Pencil, Plus, UsersRound, Warehouse } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react"
+import { useSearchParams } from "react-router-dom"
 
 import { ActiveStatusPill } from "@/components/common/ActiveStatusPill"
 import { Button } from "@/components/ui/button"
@@ -14,8 +15,11 @@ import {
   getDefaultOrganizationNavigation,
   getExpansionKeysForSelection,
   getExpansionKeysForNewEntity,
+  getOrganizationNodeParam,
+  getOrganizationSelectionFromNodeParam,
   getOrganizationTreeKeyboardAction,
   getVisibleOrganizationTreeItems,
+  restoreOrganizationExpandedKeys,
   type OrganizationSelection,
   type VisibleOrganizationTreeItem,
 } from "@/features/admin/organization-tree"
@@ -34,22 +38,26 @@ import { cn } from "@/lib/utils"
 const entityIcons: Record<OrganizationKind, typeof Building2> = { COMPANY: Building2, FACILITY: Warehouse, DEPARTMENT: UsersRound, SECURITY_GATE: DoorOpen }
 const entityLabels: Record<OrganizationKind, string> = { COMPANY: "Şirket", FACILITY: "Tesis", DEPARTMENT: "Departman", SECURITY_GATE: "Güvenlik kapısı" }
 const entityNameLabels: Record<OrganizationKind, string> = { COMPANY: "Şirket adı", FACILITY: "Tesis adı", DEPARTMENT: "Departman adı", SECURITY_GATE: "Kapı adı" }
+const organizationExpansionStorageKey = "admin-organization-expanded-nodes"
 
 export function OrganizationPage() {
   const { organization, saveOrganizationEntity } = useAdmin()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [selection, setSelection] = useState<OrganizationSelection | null>(null)
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => new Set())
   const [focusKey, setFocusKey] = useState("")
   const [workspaceMode, setWorkspaceMode] = useState<OrganizationWorkspaceMode>(viewOrganizationWorkspace)
   const [formDirty, setFormDirty] = useState(false)
+  const hasRestoredNavigation = useRef(false)
 
-  useEffect(() => {
-    if (!organization || selection) return
-    const initial = getDefaultOrganizationNavigation(organization)
-    setSelection(initial.selection)
-    setExpandedKeys(initial.expandedKeys)
-    setFocusKey(initial.focusKey)
-  }, [organization, selection])
+  const updateSelectionQuery = useCallback((nextSelection: OrganizationSelection | null, replace = false) => {
+    const nextParams = new URLSearchParams(searchParams)
+    const nextNode = nextSelection ? getOrganizationNodeParam(nextSelection) : null
+    if (nextNode === searchParams.get("node")) return
+    if (nextNode) nextParams.set("node", nextNode)
+    else nextParams.delete("node")
+    setSearchParams(nextParams, { replace })
+  }, [searchParams, setSearchParams])
 
   const applySelection = useCallback((next: OrganizationSelection) => {
     if (!organization) return
@@ -63,12 +71,61 @@ export function OrganizationPage() {
     return window.confirm("Kaydedilmemiş değişiklikler silinecek. Devam etmek istiyor musunuz?")
   }, [formDirty, workspaceMode.type])
 
+  useEffect(() => {
+    if (!organization) return
+    const requestedSelection = getOrganizationSelectionFromNodeParam(searchParams.get("node"))
+    const defaultNavigation = getDefaultOrganizationNavigation(organization)
+    const fallback = defaultNavigation.selection
+    const nextSelection = findSelectedOrganizationEntity(organization, requestedSelection) ? requestedSelection : fallback
+
+    if (!hasRestoredNavigation.current) {
+      hasRestoredNavigation.current = true
+      setSelection(nextSelection)
+      setFocusKey(nextSelection ? entityNodeKey(nextSelection) : "")
+      setExpandedKeys(restoreOrganizationExpandedKeys(organization, readOrganizationExpandedKeys() ?? defaultNavigation.expandedKeys, nextSelection))
+      if (!sameSelection(requestedSelection, nextSelection)) updateSelectionQuery(nextSelection, true)
+      return
+    }
+
+    if (sameSelection(selection, nextSelection)) {
+      setExpandedKeys((current) => {
+        const restored = restoreOrganizationExpandedKeys(organization, current, nextSelection)
+        return sameExpansionKeys(current, restored) ? current : restored
+      })
+      return
+    }
+
+    if (!confirmDiscard()) {
+      updateSelectionQuery(selection, true)
+      return
+    }
+
+    setWorkspaceMode(viewOrganizationWorkspace())
+    setFormDirty(false)
+    if (nextSelection) applySelection(nextSelection)
+    else {
+      setSelection(null)
+      setFocusKey("")
+    }
+  }, [applySelection, confirmDiscard, organization, searchParams, selection, updateSelectionQuery])
+
+  useEffect(() => {
+    if (!organization || !hasRestoredNavigation.current) return
+    try {
+      window.sessionStorage.setItem(organizationExpansionStorageKey, JSON.stringify([...expandedKeys]))
+    } catch {
+      // Session storage can be unavailable in privacy-restricted browser contexts.
+    }
+  }, [expandedKeys, organization])
+
   const selectEntity = useCallback((next: OrganizationSelection) => {
     if (!confirmDiscard()) return
+    if (sameSelection(selection, next)) return
     setWorkspaceMode(viewOrganizationWorkspace())
     setFormDirty(false)
     applySelection(next)
-  }, [applySelection, confirmDiscard])
+    updateSelectionQuery(next)
+  }, [applySelection, confirmDiscard, selection, updateSelectionQuery])
 
   const beginCreate = useCallback((kind: OrganizationKind, parentId: string | undefined, returnSelection: OrganizationSelection | null) => {
     if (!confirmDiscard()) return
@@ -85,7 +142,10 @@ export function OrganizationPage() {
   const effectiveSelection = findSelectedOrganizationEntity(organization, selection) ? selection : getDefaultOrganizationNavigation(organization).selection
 
   const cancelForm = () => {
-    if (workspaceMode.type === "create" && workspaceMode.returnSelection) applySelection(workspaceMode.returnSelection)
+    if (workspaceMode.type === "create" && workspaceMode.returnSelection) {
+      applySelection(workspaceMode.returnSelection)
+      updateSelectionQuery(workspaceMode.returnSelection)
+    }
     setWorkspaceMode(viewOrganizationWorkspace())
     setFormDirty(false)
   }
@@ -93,9 +153,9 @@ export function OrganizationPage() {
   const saveForm = async (kind: OrganizationKind, input: Omit<OrganizationEntity, "id"> & { id?: string }) => {
     const saved = await saveOrganizationEntity(kind, input)
     const nextSelection = { kind, id: saved.id } satisfies OrganizationSelection
-    setSelection(nextSelection)
-    setFocusKey(entityNodeKey(nextSelection))
+    applySelection(nextSelection)
     setExpandedKeys((current) => new Set([...current, ...getExpansionKeysForNewEntity(organization, kind, saved.parentId)]))
+    if (!input.id) updateSelectionQuery(nextSelection)
     setWorkspaceMode(viewOrganizationWorkspace())
     setFormDirty(false)
   }
@@ -190,7 +250,7 @@ export function OrganizationHierarchy({ organization, selection, expandedKeys, f
             >
               {item.expandable ? <button type="button" tabIndex={-1} aria-label={`${item.label} ${isExpanded ? "daralt" : "genişlet"}`} className="flex size-5 shrink-0 items-center justify-center rounded text-slate-400 hover:bg-slate-200 hover:text-slate-700" onClick={(event) => { event.stopPropagation(); updateExpansion(item.key) }}>{isExpanded ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}</button> : <span className="size-5 shrink-0" aria-hidden="true" />}
               <Icon className={cn("size-3.5 shrink-0", isSelected ? "text-blue-600" : "text-slate-400")} aria-hidden="true" />
-              <span className="min-w-0 flex-1 truncate">{item.label}</span>
+              <span className="min-w-0 flex-1 truncate" title={item.label}>{item.label}</span>
               {item.entity && !item.entity.active && <span className="shrink-0 rounded-full bg-slate-200 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">Pasif</span>}
               {item.nodeType === "GROUP" && <span className="shrink-0 text-[10px] tabular-nums text-slate-400">{getGroupCount(organization, item)}</span>}
             </div>
@@ -297,7 +357,7 @@ function OrganizationForm({ organization, mode, entity, onDirtyChange, onSave, o
           <Input id="organization-name" autoFocus value={draft.name} onChange={(event) => { setDraft((current) => ({ ...current, name: event.target.value })); setServiceError("") }} onBlur={() => setNameTouched(true)} aria-invalid={Boolean(nameError && (nameTouched || submitAttempted))} aria-describedby={nameError && (nameTouched || submitAttempted) ? "organization-name-error" : undefined} />
           {nameError && (nameTouched || submitAttempted) && <p id="organization-name-error" role="alert" className="text-xs font-medium text-red-600">{nameError}</p>}
         </div>
-        {parentContext.map((row) => <div key={row.label} className="space-y-1.5"><Label htmlFor={row.id}>{row.label}</Label><Input id={row.id} value={row.value} readOnly aria-readonly="true" /></div>)}
+        {parentContext.map((row) => <div key={row.label} className="space-y-1.5"><p id={row.id} className="text-xs font-medium leading-none text-slate-700">{row.label}</p><div aria-labelledby={row.id} className="flex h-9 items-center rounded-md border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-700">{row.value}</div></div>)}
         <div className="flex items-center justify-between rounded-md border bg-slate-50 px-3 py-2.5">
           <Label htmlFor="organization-active" className="cursor-pointer">Aktif</Label>
           <Switch id="organization-active" checked={draft.active} onCheckedChange={(active) => { setDraft((current) => ({ ...current, active })); setServiceError("") }} aria-label="Aktif" />
@@ -339,7 +399,26 @@ function ChildList({ title, actionLabel, items, emptyMessage, onAction, onSelect
 }
 
 function DetailGrid({ rows }: { rows: { label: string; value: string }[] }) {
-  return <dl className="grid max-w-2xl overflow-hidden rounded-md border sm:grid-cols-2">{rows.map((row) => <div key={row.label} className="border-b px-3 py-3 last:border-b-0 sm:border-r sm:[&:nth-last-child(-n+2)]:border-b-0 sm:[&:nth-child(even)]:border-r-0"><dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{row.label}</dt><dd className="mt-1 text-xs font-medium text-slate-900">{row.value}</dd></div>)}</dl>
+  return <dl className="grid max-w-2xl overflow-hidden rounded-md border bg-slate-50/30 sm:grid-cols-2">{rows.map((row) => <div key={row.label} className="border-b px-3 py-3 last:border-b-0 sm:border-r sm:[&:nth-last-child(-n+2)]:border-b-0 sm:[&:nth-child(even)]:border-r-0"><dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{row.label}</dt><dd className="mt-1 break-words text-xs font-medium text-slate-900">{row.value}</dd></div>)}</dl>
+}
+
+function sameSelection(left: OrganizationSelection | null, right: OrganizationSelection | null) {
+  return left?.kind === right?.kind && left?.id === right?.id
+}
+
+function sameExpansionKeys(left: ReadonlySet<string>, right: ReadonlySet<string>) {
+  return left.size === right.size && [...left].every((key) => right.has(key))
+}
+
+function readOrganizationExpandedKeys() {
+  try {
+    const value = window.sessionStorage.getItem(organizationExpansionStorageKey)
+    if (value === null) return null
+    const parsed: unknown = JSON.parse(value)
+    return Array.isArray(parsed) && parsed.every((key) => typeof key === "string") ? parsed : []
+  } catch {
+    return null
+  }
 }
 
 function getCreateContextLabel(organization: OrganizationSnapshot, mode: Extract<OrganizationWorkspaceMode, { type: "create" }>) {

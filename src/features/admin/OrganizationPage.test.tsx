@@ -10,7 +10,10 @@ import {
   facilitiesGroupKey,
   facilityNodeKey,
   getDefaultOrganizationNavigation,
+  getOrganizationNodeParam,
+  getOrganizationSelectionFromNodeParam,
   getOrganizationTreeKeyboardAction,
+  restoreOrganizationExpandedKeys,
   getVisibleOrganizationTreeItems,
   type OrganizationSelection,
 } from "@/features/admin/organization-tree"
@@ -117,6 +120,40 @@ describe("Organization hierarchy projection", () => {
   })
 })
 
+describe("Organization navigation persistence", () => {
+  it("serializes every selectable entity type using canonical IDs", () => {
+    expect(getOrganizationNodeParam({ kind: "COMPANY", id: "bplas" })).toBe("company:bplas")
+    expect(getOrganizationNodeParam({ kind: "FACILITY", id: "bplas-merkez" })).toBe("facility:bplas-merkez")
+    expect(getOrganizationNodeParam({ kind: "DEPARTMENT", id: "department-bplas-satin-alma" })).toBe("department:department-bplas-satin-alma")
+    expect(getOrganizationNodeParam({ kind: "SECURITY_GATE", id: "gate-bplas-merkez-ana-giris" })).toBe("gate:gate-bplas-merkez-ana-giris")
+  })
+
+  it("parses valid URL selections and safely rejects grouping or malformed values", () => {
+    expect(getOrganizationSelectionFromNodeParam("company:bplas")).toEqual({ kind: "COMPANY", id: "bplas" })
+    expect(getOrganizationSelectionFromNodeParam("facility:bplas-merkez")).toEqual({ kind: "FACILITY", id: "bplas-merkez" })
+    expect(getOrganizationSelectionFromNodeParam("department:department-bplas-satin-alma")).toEqual({ kind: "DEPARTMENT", id: "department-bplas-satin-alma" })
+    expect(getOrganizationSelectionFromNodeParam("gate:gate-bplas-merkez-ana-giris")).toEqual({ kind: "SECURITY_GATE", id: "gate-bplas-merkez-ana-giris" })
+    expect(getOrganizationSelectionFromNodeParam("group:bplas:facilities")).toBeNull()
+    expect(getOrganizationSelectionFromNodeParam("facility:")).toBeNull()
+    expect(getOrganizationSelectionFromNodeParam("unknown:record")).toBeNull()
+  })
+
+  it("restores only existing expansion keys and always exposes selected ancestors", () => {
+    const selectedGate = { kind: "SECURITY_GATE", id: "gate-bplas-merkez-ana-giris" } satisfies OrganizationSelection
+    const restored = restoreOrganizationExpandedKeys(organization, [companyNodeKey("missing"), facilityNodeKey("missing"), companyNodeKey("bplas")], selectedGate)
+    expect(restored).toEqual(new Set([companyNodeKey("bplas"), facilitiesGroupKey("bplas"), facilityNodeKey("bplas-merkez")]))
+  })
+
+  it("keeps URL selection, expansion storage, and form mode responsibilities separate", () => {
+    expect(pageSource).toContain('useSearchParams')
+    expect(pageSource).toContain('"admin-organization-expanded-nodes"')
+    expect(pageSource).toContain("restoreOrganizationExpandedKeys")
+    expect(pageSource).toContain("setWorkspaceMode(viewOrganizationWorkspace())")
+    expect(pageSource).not.toContain("organization-workspace-mode")
+    expect(pageSource).not.toContain("organization-form-draft")
+  })
+})
+
 describe("Organization contextual actions and headers", () => {
   it("shows Company Düzenle, Tesis ekle, and Departman ekle actions", () => {
     const markup = workspaceMarkup("COMPANY", "bplas")
@@ -193,11 +230,13 @@ describe("Organization inline create and edit forms", () => {
     expect(markup).not.toContain("Departman ekle")
   })
 
-  it("renders existing parent context as read-only", () => {
+  it("renders existing parent context as static, non-editable presentation", () => {
     const markup = workspaceMarkup("FACILITY", "bplas-merkez", facilityEdit)
     expect(markup).toContain("Bağlı şirket")
-    expect(markup).toContain("readOnly")
+    expect(markup).toContain('aria-labelledby="organization-parent-company"')
+    expect(markup).toContain("bg-slate-50")
     expect(markup).not.toContain("<select")
+    expect(markup).not.toContain('id="organization-parent-company" value=')
   })
 
   it("builds contextual create input with the correct parentId", () => {
@@ -278,11 +317,9 @@ describe("Organization dirty navigation and phase boundary", () => {
     expect(contextSource).toContain("service.saveOrganizationEntity")
   })
 
-  it("does not introduce delete, Dialog, URL persistence, search, or filtering", () => {
+  it("does not introduce delete, Dialog, search, or filtering", () => {
     expect(pageSource).not.toContain("Sil")
     expect(pageSource).not.toContain("Dialog")
-    expect(pageSource).not.toContain("sessionStorage")
-    expect(pageSource).not.toContain("useSearchParams")
     expect(pageSource).not.toContain("searchTerm")
   })
 })

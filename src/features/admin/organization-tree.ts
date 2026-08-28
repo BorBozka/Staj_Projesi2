@@ -26,11 +26,33 @@ export const securityGateNodeKey = (gateId: string) => `security-gate:${gateId}`
 export const facilitiesGroupKey = (companyId: string) => `group:${companyId}:facilities`
 export const departmentsGroupKey = (companyId: string) => `group:${companyId}:departments`
 
+const selectionNodePrefixes: Record<OrganizationKind, string> = {
+  COMPANY: "company",
+  FACILITY: "facility",
+  DEPARTMENT: "department",
+  SECURITY_GATE: "gate",
+}
+
 export function entityNodeKey(selection: OrganizationSelection) {
   if (selection.kind === "COMPANY") return companyNodeKey(selection.id)
   if (selection.kind === "FACILITY") return facilityNodeKey(selection.id)
   if (selection.kind === "DEPARTMENT") return departmentNodeKey(selection.id)
   return securityGateNodeKey(selection.id)
+}
+
+export function getOrganizationSelectionFromNodeParam(value: string | null): OrganizationSelection | null {
+  if (!value) return null
+  const separatorIndex = value.indexOf(":")
+  if (separatorIndex < 1 || separatorIndex === value.length - 1) return null
+
+  const prefix = value.slice(0, separatorIndex)
+  const id = value.slice(separatorIndex + 1)
+  const kind = (Object.entries(selectionNodePrefixes).find(([, nodePrefix]) => nodePrefix === prefix)?.[0] ?? null) as OrganizationKind | null
+  return kind ? { kind, id } : null
+}
+
+export function getOrganizationNodeParam(selection: OrganizationSelection) {
+  return `${selectionNodePrefixes[selection.kind]}:${selection.id}`
 }
 
 export function getDefaultOrganizationNavigation(organization: OrganizationSnapshot) {
@@ -92,6 +114,30 @@ export function getExpansionKeysForNewEntity(organization: OrganizationSnapshot,
   if (kind === "DEPARTMENT") return [companyNodeKey(parentId), departmentsGroupKey(parentId)]
   const facility = organization.facilities.find((item) => item.id === parentId)
   return facility ? [companyNodeKey(facility.parentId), facilitiesGroupKey(facility.parentId), facilityNodeKey(facility.id)] : []
+}
+
+export function getOrganizationPersistableExpansionKeys(organization: OrganizationSnapshot) {
+  const keys = new Set<string>()
+  for (const company of organization.companies) {
+    keys.add(companyNodeKey(company.id))
+    keys.add(facilitiesGroupKey(company.id))
+    keys.add(departmentsGroupKey(company.id))
+  }
+  for (const facility of organization.facilities) {
+    if (organization.securityGates.some((gate) => gate.parentId === facility.id)) keys.add(facilityNodeKey(facility.id))
+  }
+  return keys
+}
+
+export function restoreOrganizationExpandedKeys(
+  organization: OrganizationSnapshot,
+  persistedKeys: Iterable<string>,
+  selection: OrganizationSelection | null,
+) {
+  const validKeys = getOrganizationPersistableExpansionKeys(organization)
+  const restored = new Set(Array.from(persistedKeys).filter((key) => validKeys.has(key)))
+  if (selection) getExpansionKeysForSelection(organization, selection).forEach((key) => restored.add(key))
+  return restored
 }
 
 export function findSelectedOrganizationEntity(organization: OrganizationSnapshot, selection: OrganizationSelection | null) {
