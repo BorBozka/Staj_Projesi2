@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest"
 
 import type { AdminUser } from "@/domain/admin"
 import {
-  canTransitionVisitorCard,
   clearAdminUsersSearchParams,
   defaultAdminUserFilters,
   doPasswordsMatch,
@@ -217,12 +216,6 @@ describe("Edit dialog dirty-state", () => {
 })
 
 describe("Admin configuration rules", () => {
-  it("does not allow an in-use card to be released from inventory", () => {
-    expect(canTransitionVisitorCard("IN_USE", "AVAILABLE")).toBe(false)
-    expect(canTransitionVisitorCard("NOT_RETURNED", "AVAILABLE")).toBe(false)
-    expect(canTransitionVisitorCard("LOST", "AVAILABLE")).toBe(true)
-  })
-
   it("validates only the two defined operational parameters", () => {
     expect(isOperationalSettingsValid({ overdueToleranceMinutes: 15, overdueAlertRepeatMinutes: 10 })).toBe(true)
     expect(isOperationalSettingsValid({ overdueToleranceMinutes: -1, overdueAlertRepeatMinutes: 10 })).toBe(false)

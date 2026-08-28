@@ -115,6 +115,31 @@ export interface VisitorCardInventoryItem {
   assignedVisitorName?: string
 }
 
+export interface CreateVisitorCardInput {
+  cardNumber: string
+}
+
+export interface UpdateVisitorCardInventoryInput {
+  cardNumber: string
+  active: boolean
+}
+
+// Visitor card numbers are identifiers rather than natural-language text. Preserve their
+// original spelling (including leading zeros) for display, but compare trimmed ASCII case-folded
+// values so inventory records cannot be duplicated through casing or surrounding whitespace.
+export function normalizeVisitorCardNumber(value: string): string {
+  return value.trim().toLowerCase()
+}
+
+export function isVisitorCardNumberTaken(cards: VisitorCardInventoryItem[], excludeId: string | null, cardNumber: string): boolean {
+  const normalized = normalizeVisitorCardNumber(cardNumber)
+  return cards.some((card) => card.id !== excludeId && normalizeVisitorCardNumber(card.cardNumber) === normalized)
+}
+
+export function isAdminManagedVisitorCard(card: Pick<VisitorCardInventoryItem, "status">): boolean {
+  return card.status === "AVAILABLE" || card.status === "DISABLED"
+}
+
 export interface VisitorRuleVersion {
   id: string
   version: number

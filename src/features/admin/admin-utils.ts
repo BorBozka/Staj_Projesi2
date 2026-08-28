@@ -1,4 +1,4 @@
-import { applicationRoles, authenticationSources, type AdminUser, type ApplicationRole, type AuthenticationSource, type OperationalSettings, type VisitorCardStatus } from "@/domain/admin"
+import { applicationRoles, authenticationSources, type AdminUser, type ApplicationRole, type AuthenticationSource, type OperationalSettings } from "@/domain/admin"
 import { getPageCount as getPageCountShared, paginate } from "@/lib/pagination"
 import { toggleSingleSort, type SingleSortState } from "@/lib/sort"
 
@@ -180,12 +180,6 @@ export function shouldConfirmAnotherAdminDemotion(actingUserId: string, target: 
 
 export function shouldConfirmAnotherAdminDeactivation(actingUserId: string, target: Pick<AdminUser, "id" | "role" | "active">, nextActive: boolean): boolean {
   return actingUserId !== target.id && target.role === "ADMIN" && target.active && !nextActive
-}
-
-export function canTransitionVisitorCard(current: VisitorCardStatus, next: VisitorCardStatus) {
-  if (current === "IN_USE" || current === "NOT_RETURNED") return next === current
-  if (current === "AVAILABLE") return next === "AVAILABLE" || next === "LOST" || next === "DISABLED"
-  return next === "AVAILABLE" || next === "LOST" || next === "DISABLED"
 }
 
 export function isOperationalSettingsValid(settings: OperationalSettings) {

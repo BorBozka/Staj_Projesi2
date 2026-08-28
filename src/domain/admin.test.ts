@@ -5,6 +5,8 @@ import {
   isAdminUsernameTaken,
   isAuthorizationScopeValid,
   isVisitTypeNameTaken,
+  isVisitorCardNumberTaken,
+  normalizeVisitorCardNumber,
   normalizeVisitTypeName,
   isSelfAdminDemotionAttempt,
   isSelfDeactivationAttempt,
@@ -67,6 +69,21 @@ describe("Visit type uniqueness", () => {
 
   it("does not treat an edited record as its own duplicate", () => {
     expect(isVisitTypeNameTaken(visitTypes, "type-1", "Toplantı")).toBe(false)
+  })
+})
+
+describe("Visitor card number uniqueness", () => {
+  const cards = [{ id: "card-1", cardNumber: "001", status: "AVAILABLE" as const }, { id: "card-2", cardNumber: "ABC-01", status: "DISABLED" as const }]
+
+  it("trims and compares identifiers case-insensitively without changing leading-zero meaning", () => {
+    expect(normalizeVisitorCardNumber(" 001 ")).toBe("001")
+    expect(isVisitorCardNumberTaken(cards, null, " 001 ")).toBe(true)
+    expect(isVisitorCardNumberTaken(cards, null, "abc-01")).toBe(true)
+    expect(isVisitorCardNumberTaken(cards, null, "01")).toBe(false)
+  })
+
+  it("does not treat the card being edited as its own duplicate", () => {
+    expect(isVisitorCardNumberTaken(cards, "card-1", "001")).toBe(false)
   })
 })
 

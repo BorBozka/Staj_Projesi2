@@ -145,15 +145,51 @@ describe("MockAdminService other admin resources", () => {
     expect(after.find((rule) => rule.id === published.id)?.active).toBe(true)
   })
 
-  it("rejects manual release of an in-use card", async () => {
+  it("keeps card inventory creation and editing inside the Admin-owned lifecycle", async () => {
     const service = new MockAdminService()
-    const card = (await service.getVisitorCards()).find((item) => item.status === "IN_USE")!
-    await expect(service.changeVisitorCardStatus(card.id, "AVAILABLE")).rejects.toThrow("operasyonel iade")
+    const created = await service.createVisitorCard({ cardNumber: " 006 ", status: "LOST" } as never)
+    expect(created).toMatchObject({ cardNumber: "006", status: "AVAILABLE" })
+
+    const available = (await service.getVisitorCards()).find((item) => item.cardNumber === "001")!
+    const disabled = await service.updateVisitorCardInventory(available.id, { cardNumber: available.cardNumber, active: false })
+    expect(disabled.status).toBe("DISABLED")
+    await expect(service.updateVisitorCardInventory(disabled.id, { cardNumber: disabled.cardNumber, active: true })).resolves.toMatchObject({ status: "AVAILABLE" })
   })
 
-  it("leaves not-returned cards to the Security return workflow", async () => {
+  it("rejects duplicate card numbers while preserving distinct leading-zero identifiers", async () => {
     const service = new MockAdminService()
-    const card = (await service.getVisitorCards()).find((item) => item.status === "NOT_RETURNED")!
-    await expect(service.changeVisitorCardStatus(card.id, "AVAILABLE")).rejects.toThrow("Security operasyonu")
+    await expect(service.createVisitorCard({ cardNumber: " 001 " })).rejects.toThrow("Bu kart numarası zaten tanımlı.")
+    await expect(service.createVisitorCard({ cardNumber: "ABC-01" })).resolves.toMatchObject({ cardNumber: "ABC-01" })
+    await expect(service.createVisitorCard({ cardNumber: "abc-01" })).rejects.toThrow("Bu kart numarası zaten tanımlı.")
+    await expect(service.createVisitorCard({ cardNumber: "01" })).resolves.toMatchObject({ cardNumber: "01" })
+    const existing = (await service.getVisitorCards()).find((item) => item.cardNumber === "001")!
+    await expect(service.updateVisitorCardInventory(existing.id, { cardNumber: "001", active: true })).resolves.toMatchObject({ id: existing.id })
+  })
+
+  it("rejects every operational-card mutation through the Admin inventory boundary", async () => {
+    const service = new MockAdminService()
+    const cards = await service.getVisitorCards()
+    const available = cards.find((card) => card.status === "AVAILABLE")!
+    const inUse = cards.find((card) => card.status === "IN_USE")!
+    const notReturned = cards.find((card) => card.status === "NOT_RETURNED")!
+    const lost = cards.find((card) => card.status === "LOST")!
+
+    await expect(service.updateVisitorCardInventory(available.id, { cardNumber: available.cardNumber, active: true, status: "IN_USE" } as never)).resolves.toMatchObject({ status: "AVAILABLE" })
+    await expect(service.updateVisitorCardInventory(available.id, { cardNumber: available.cardNumber, active: true, status: "NOT_RETURNED" } as never)).resolves.toMatchObject({ status: "AVAILABLE" })
+    await expect(service.updateVisitorCardInventory(available.id, { cardNumber: available.cardNumber, active: true, status: "LOST" } as never)).resolves.toMatchObject({ status: "AVAILABLE" })
+    await expect(service.updateVisitorCardInventory(inUse.id, { cardNumber: inUse.cardNumber, active: true })).rejects.toThrow("Security operasyonu")
+    await expect(service.updateVisitorCardInventory(notReturned.id, { cardNumber: notReturned.cardNumber, active: true })).rejects.toThrow("Security operasyonu")
+    await expect(service.updateVisitorCardInventory(lost.id, { cardNumber: lost.cardNumber, active: false })).rejects.toThrow("Security operasyonu")
+  })
+
+  it("preserves operational visitor assignments and isolates inventory edits", async () => {
+    const service = new MockAdminService()
+    const before = await service.getVisitorCards()
+    const operational = before.find((card) => card.status === "IN_USE")!
+    const available = before.find((card) => card.status === "AVAILABLE")!
+    await service.updateVisitorCardInventory(available.id, { cardNumber: "010", active: false })
+    const after = await service.getVisitorCards()
+    expect(after.find((card) => card.id === operational.id)).toEqual(operational)
+    expect(after.find((card) => card.id === available.id)).toMatchObject({ cardNumber: "010", status: "DISABLED" })
   })
 })

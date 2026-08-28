@@ -1,18 +1,21 @@
 import {
   isAdminEmailTaken,
   isAdminUsernameTaken,
+  isAdminManagedVisitorCard,
   isAuthorizationScopeValid,
+  isVisitorCardNumberTaken,
   isVisitTypeNameTaken,
   isSelfAdminDemotionAttempt,
   isSelfDeactivationAttempt,
   wouldRemoveLastActiveAdmin,
   type AdminUser,
+  type CreateVisitorCardInput,
   type OperationalSettings,
   type OrganizationEntity,
   type OrganizationKind,
+  type UpdateVisitorCardInventoryInput,
   type VisitTypeDefinition,
   type VisitorCardInventoryItem,
-  type VisitorCardStatus,
   type VisitorRuleVersion,
 } from "@/domain/admin"
 import type { AdminService, SaveAdminUserOptions } from "@/services/admin-service"
@@ -80,19 +83,24 @@ export class MockAdminService implements AdminService {
     return clone(entity)
   }
   async getVisitorCards() { return clone(this.cards) }
-  async saveVisitorCard(input: Omit<VisitorCardInventoryItem, "id"> & { id?: string }) {
-    const entity: VisitorCardInventoryItem = { ...input, id: input.id ?? id("card") }
-    this.cards = input.id ? this.cards.map((item) => item.id === input.id ? entity : item) : [...this.cards, entity]
+  async createVisitorCard(input: CreateVisitorCardInput) {
+    const cardNumber = input.cardNumber.trim()
+    if (!cardNumber) throw new Error("Kart numarası boş olamaz.")
+    if (isVisitorCardNumberTaken(this.cards, null, cardNumber)) throw new Error("Bu kart numarası zaten tanımlı.")
+    const entity: VisitorCardInventoryItem = { id: id("card"), cardNumber, status: "AVAILABLE" }
+    this.cards = [...this.cards, entity]
     return clone(entity)
   }
-  async changeVisitorCardStatus(idValue: string, status: VisitorCardStatus) {
-    const card = this.cards.find((item) => item.id === idValue)
-    if (!card) throw new Error("Kart bulunamadı.")
-    if (card.status === "IN_USE" && status !== "IN_USE") throw new Error("Kullanımdaki kart operasyonel iade olmadan değiştirilemez.")
-    if (card.status === "NOT_RETURNED" && status !== "NOT_RETURNED") throw new Error("İade edilmemiş kart yalnızca Security operasyonu ile çözülebilir.")
-    if (status === "AVAILABLE" && (card.status === "LOST" || card.status === "DISABLED")) card.assignedVisitorName = undefined
-    card.status = status
-    return clone(card)
+  async updateVisitorCardInventory(idValue: string, input: UpdateVisitorCardInventoryInput) {
+    const existing = this.cards.find((card) => card.id === idValue)
+    if (!existing) throw new Error("Kart bulunamadı.")
+    if (!isAdminManagedVisitorCard(existing)) throw new Error("Bu kartın durumu Security operasyonu tarafından yönetilir.")
+    const cardNumber = input.cardNumber.trim()
+    if (!cardNumber) throw new Error("Kart numarası boş olamaz.")
+    if (isVisitorCardNumberTaken(this.cards, existing.id, cardNumber)) throw new Error("Bu kart numarası zaten tanımlı.")
+    const entity: VisitorCardInventoryItem = { ...existing, cardNumber, status: input.active ? "AVAILABLE" : "DISABLED" }
+    this.cards = this.cards.map((card) => card.id === existing.id ? entity : card)
+    return clone(entity)
   }
   async getVisitorRuleVersions() { return clone(this.rules) }
   async publishVisitorRule(content: string) {
