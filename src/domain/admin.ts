@@ -112,6 +112,9 @@ export interface VisitorCardInventoryItem {
   id: string
   cardNumber: string
   status: VisitorCardStatus
+  // Operational identity set by Security when a card moves to IN_USE. Legacy/seeded IN_USE and
+  // NOT_RETURNED cards may carry only assignedVisitorName without a linked visit id.
+  assignedVisitId?: string
   assignedVisitorName?: string
 }
 

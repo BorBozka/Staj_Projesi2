@@ -10,6 +10,7 @@ import type {
   VisitRecord,
   VisitReferenceData,
 } from "@/domain/visits"
+import { hasVisitorEmail } from "@/domain/visits"
 import { computeExtendedPlannedEnd, getManualMeetingLifecycleBlockReason, isMeetingExplicitlyClosed } from "@/lib/meeting-lifecycle"
 import { createMockVisitReferenceData, initialMockMeetings, initialMockVisitRecords } from "@/services/mock-visit-data"
 import { MockOrganizationStore } from "@/services/mock-organization-store"
@@ -93,6 +94,7 @@ export class MockVisitService implements VisitService {
     const pendingVisitIds = this.visits
       .filter((visit) => visit.meetingId === id
         && visit.status === "PLANNED"
+        && hasVisitorEmail(visit.visitor)
         && (visit.invitationStatus === "NOT_SENT" || visit.invitationStatus === "FAILED"))
       .map((visit) => visit.id)
 
@@ -103,6 +105,7 @@ export class MockVisitService implements VisitService {
   async sendVisitInvitation(id: string): Promise<Visit> {
     const current = this.findVisitRecord(id)
     if (current.status !== "PLANNED") throw new Error("Yalnızca planlanmış ziyaretler için davet gönderilebilir.")
+    if (!hasVisitorEmail(current.visitor)) throw new Error("Ziyaretçinin davet gönderilebilecek e-posta adresi bulunmuyor.")
     if (current.invitationStatus === "SENT" || current.invitationStatus === "SENDING") {
       return clone(this.projectVisit(current))
     }
@@ -238,6 +241,46 @@ export class MockVisitService implements VisitService {
     }
 
     return { visit: clone(this.projectVisit(checkedOut)), closedMeeting }
+  }
+
+  // ---- Security-only internal bridge --------------------------------------
+  // Not part of the public VisitService contract: Security's own mutations are kept off
+  // VisitService's/AdminService's public API (see MockSecurityService) rather than spread
+  // across them. This is the minimal composition-root-only bridge that lets MockSecurityService
+  // read and mutate the VisitRecord state this service already owns, mirroring the existing
+  // setResourceAssignmentService wiring used to break another cross-service dependency. Callers
+  // are expected to validate status/eligibility themselves before invoking these.
+
+  getVisitRecordForSecurity(id: string): VisitRecord {
+    return clone(this.findVisitRecord(id))
+  }
+
+  applyCheckIn(visitId: string, checkIn: { visitorCardId: string; visitorCardNumber: string; vehiclePlate?: string }): Visit {
+    const current = this.findVisitRecord(visitId)
+    const now = new Date().toISOString()
+    const updated: VisitRecord = {
+      ...current,
+      status: "CHECKED_IN",
+      actualCheckIn: now,
+      visitorCardId: checkIn.visitorCardId,
+      visitorCardNumber: checkIn.visitorCardNumber,
+      vehiclePlate: checkIn.vehiclePlate,
+      updatedAt: now,
+    }
+    this.visits = this.visits.map((visit) => visit.id === visitId ? updated : visit)
+    return clone(this.projectVisit(updated))
+  }
+
+  applyVisitorCorrection(visitId: string, correction: { firstName: string; lastName: string; company: string; email?: string; phone?: string }): Visit {
+    const current = this.findVisitRecord(visitId)
+    const now = new Date().toISOString()
+    const updated: VisitRecord = {
+      ...current,
+      visitor: { ...current.visitor, ...correction },
+      updatedAt: now,
+    }
+    this.visits = this.visits.map((visit) => visit.id === visitId ? updated : visit)
+    return clone(this.projectVisit(updated))
   }
 
   private async deliverInvitation(id: string): Promise<Visit> {
@@ -385,7 +428,7 @@ export class MockVisitService implements VisitService {
       id,
       firstName: input.firstName.trim(),
       lastName: input.lastName.trim(),
-      email: input.email.trim(),
+      email: input.email?.trim() || undefined,
       company: input.company.trim(),
       phone: input.phone?.trim() || undefined,
     }

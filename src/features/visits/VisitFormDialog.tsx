@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import type { InvitationStatus, Visit } from "@/domain/visits"
+import { hasVisitorEmail, type InvitationStatus, type Visit } from "@/domain/visits"
 import { getInvitationActionLabel } from "@/features/visits/invitation-status"
 import { useVisits } from "@/features/visits/visit-context"
 import { toMeetingInput, visitFormSchema, type VisitFormValues } from "@/features/visits/visit-form-schema"
@@ -76,7 +76,7 @@ function defaultsFor(visits: Visit[] = []): VisitFormValues {
           visitId: item.id,
           visitorFirstName: item.visitor.firstName,
           visitorLastName: item.visitor.lastName,
-          visitorEmail: item.visitor.email,
+          visitorEmail: item.visitor.email ?? "",
           visitorCompany: item.visitor.company,
           ...getPhoneDefaults(item.visitor.phone),
         }))
@@ -250,7 +250,7 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
   }
 
   const invitationTargets = invitationScope === "VISIT" && selectedVisit ? [selectedVisit] : savedVisits
-  const pendingInvitationCount = invitationTargets.filter((item) => item.status === "PLANNED" && (item.invitationStatus === "NOT_SENT" || item.invitationStatus === "FAILED")).length
+  const pendingInvitationCount = invitationTargets.filter((item) => item.status === "PLANNED" && hasVisitorEmail(item.visitor) && (item.invitationStatus === "NOT_SENT" || item.invitationStatus === "FAILED")).length
   const hasPendingInvitation = pendingInvitationCount > 0
   const hasSendingInvitation = invitationTargets.some((item) => item.invitationStatus === "SENDING")
   const canSendInvitation = Boolean(savedMeetingId) && !form.formState.isDirty && hasPendingInvitation && !hasSendingInvitation && !isSendingInvitation
@@ -326,7 +326,7 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
                       <FormField label="Soyad" required error={fieldError(`visitors.${index}.visitorLastName`)}>
                         <Input {...form.register(`visitors.${index}.visitorLastName`)} />
                       </FormField>
-                      <FormField label="E-posta" required error={fieldError(`visitors.${index}.visitorEmail`)}>
+                      <FormField label="E-posta (opsiyonel)" error={fieldError(`visitors.${index}.visitorEmail`)}>
                         <Input type="email" placeholder="ziyaretci@firma.com" {...form.register(`visitors.${index}.visitorEmail`)} />
                       </FormField>
                       <FormField label="Ziyaretçi Şirketi" required error={fieldError(`visitors.${index}.visitorCompany`)}>
@@ -458,9 +458,13 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
                 {savedVisits.map((item) => (
                   <li key={item.id} className="flex items-center justify-between gap-3">
                     <span className="truncate font-medium text-slate-700">{item.visitor.firstName} {item.visitor.lastName}</span>
-                    <span className={item.invitationStatus === "FAILED" ? "font-semibold text-red-700" : item.invitationStatus === "SENT" ? "font-semibold text-emerald-700" : "font-medium text-amber-700"}>
-                      {invitationStatusLabels[item.invitationStatus]}
-                    </span>
+                    {hasVisitorEmail(item.visitor)
+                      ? (
+                        <span className={item.invitationStatus === "FAILED" ? "font-semibold text-red-700" : item.invitationStatus === "SENT" ? "font-semibold text-emerald-700" : "font-medium text-amber-700"}>
+                          {invitationStatusLabels[item.invitationStatus]}
+                        </span>
+                      )
+                      : <span className="font-medium text-slate-500">E-posta yok</span>}
                   </li>
                 ))}
               </ul>

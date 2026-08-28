@@ -1,9 +1,12 @@
-import { Clock3, Search } from "lucide-react"
+import { Building2, Search } from "lucide-react"
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import type { Visit } from "@/domain/visits"
+import { SecurityCheckInDialog } from "@/features/security/SecurityCheckInDialog"
+import { SecurityVisitorCorrectionDialog } from "@/features/security/SecurityVisitorCorrectionDialog"
 import { formatTr } from "@/lib/date"
 import { cn } from "@/lib/utils"
 import { useVisits } from "@/features/visits/visit-context"
@@ -26,10 +29,12 @@ const viewLabels: Record<SecurityOperationView, string> = {
 }
 
 export function SecurityOperationsPage() {
-  const { visits, referenceData, isLoading, error } = useVisits()
+  const { visits, referenceData, isLoading, error, reload } = useVisits()
   const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState("")
   const [now, setNow] = useState(() => new Date())
+  const [checkInTarget, setCheckInTarget] = useState<Visit | null>(null)
+  const [correctingVisit, setCorrectingVisit] = useState<Visit | null>(null)
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
   const activeView = getSecurityOperationView(searchParams)
 
@@ -81,7 +86,7 @@ export function SecurityOperationsPage() {
 
       <div className="flex shrink-0 flex-col gap-2 rounded-lg border bg-white p-2.5 shadow-panel lg:flex-row lg:items-center">
         <div className="flex min-w-0 shrink-0 items-center gap-2 border-b border-slate-100 pb-2 lg:w-[260px] lg:border-b-0 lg:border-r lg:pb-0 lg:pr-3">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-700"><Clock3 className="size-4" aria-hidden="true" /></div>
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-700"><Building2 className="size-4" aria-hidden="true" /></div>
           <div className="min-w-0 leading-tight">
             <p className="truncate text-xs font-semibold text-slate-900">{scope?.companyName ?? "Çalışma bağlamı"}</p>
             <p className="mt-0.5 truncate text-[11px] text-slate-500">{scope?.facilityName ?? "Yükleniyor…"}</p>
@@ -142,19 +147,32 @@ export function SecurityOperationsPage() {
             : error ? <WorkspaceState message={error} tone="error" />
               : activeView === "cards" ? <WorkspaceState message="Kart sorunu bulunan kayıt yok." />
                 : filteredRows.length === 0 ? <WorkspaceState message={search.trim() ? "Aramayla eşleşen kayıt yok." : activeView === "expected" ? "Bugün beklenen ziyaret yok." : "İçeride ziyaretçi yok."} />
-                  : activeView === "expected" ? <ExpectedVisitsTable rows={filteredRows} /> : <InsideVisitsTable rows={filteredRows} />}
+                  : activeView === "expected" ? <ExpectedVisitsTable rows={filteredRows} onCheckIn={setCheckInTarget} /> : <InsideVisitsTable rows={filteredRows} onEdit={setCorrectingVisit} />}
         </div>
       </section>
+
+      <SecurityCheckInDialog
+        visit={checkInTarget}
+        open={Boolean(checkInTarget)}
+        onOpenChange={(next) => { if (!next) setCheckInTarget(null) }}
+        onCheckedIn={() => { setCheckInTarget(null); void reload() }}
+      />
+      <SecurityVisitorCorrectionDialog
+        visit={correctingVisit}
+        open={Boolean(correctingVisit)}
+        onOpenChange={(next) => { if (!next) setCorrectingVisit(null) }}
+        onSaved={() => { setCorrectingVisit(null); void reload() }}
+      />
     </div>
   )
 }
 
-function ExpectedVisitsTable({ rows }: { rows: SecurityVisitRow[] }) {
+function ExpectedVisitsTable({ rows, onCheckIn }: { rows: SecurityVisitRow[]; onCheckIn(visit: Visit): void }) {
   return (
     <div className="h-full min-h-0 overflow-auto scrollbar-thin">
-      <table className="w-full min-w-[860px] border-separate border-spacing-0 text-left">
+      <table className="w-full min-w-[940px] border-separate border-spacing-0 text-left">
         <thead className="sticky top-0 z-10 bg-white text-[10px] uppercase tracking-[0.06em] text-slate-500 shadow-[0_1px_0_0_rgb(226_232_240)]">
-          <tr><TableHeading>Saat</TableHeading><TableHeading>Ziyaretçi</TableHeading><TableHeading>Firma</TableHeading><TableHeading>Ev sahibi</TableHeading><TableHeading>Ziyaret türü</TableHeading><TableHeading>Durum</TableHeading></tr>
+          <tr><TableHeading>Saat</TableHeading><TableHeading>Ziyaretçi</TableHeading><TableHeading>Firma</TableHeading><TableHeading>Ev sahibi</TableHeading><TableHeading>Ziyaret türü</TableHeading><TableHeading>Durum</TableHeading><TableHeading className="w-28 text-right">Aksiyon</TableHeading></tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
           {rows.map(({ visit, isDelayed }) => (
@@ -165,6 +183,9 @@ function ExpectedVisitsTable({ rows }: { rows: SecurityVisitRow[] }) {
               <TableCell>{visit.hostEmployeeName}</TableCell>
               <TableCell>{visit.visitTypeName}</TableCell>
               <TableCell><StatusPill tone={isDelayed ? "warning" : "neutral"}>{isDelayed ? "Gecikti" : "Planlandı"}</StatusPill></TableCell>
+              <TableCell className="w-28 max-w-none text-right">
+                <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[11px]" onClick={() => onCheckIn(visit)}>Giriş yap</Button>
+              </TableCell>
             </tr>
           ))}
         </tbody>
@@ -173,12 +194,12 @@ function ExpectedVisitsTable({ rows }: { rows: SecurityVisitRow[] }) {
   )
 }
 
-function InsideVisitsTable({ rows }: { rows: SecurityVisitRow[] }) {
+function InsideVisitsTable({ rows, onEdit }: { rows: SecurityVisitRow[]; onEdit(visit: Visit): void }) {
   return (
     <div className="h-full min-h-0 overflow-auto scrollbar-thin">
-      <table className="w-full min-w-[860px] border-separate border-spacing-0 text-left">
+      <table className="w-full min-w-[940px] border-separate border-spacing-0 text-left">
         <thead className="sticky top-0 z-10 bg-white text-[10px] uppercase tracking-[0.06em] text-slate-500 shadow-[0_1px_0_0_rgb(226_232_240)]">
-          <tr><TableHeading>Ziyaretçi</TableHeading><TableHeading>Firma</TableHeading><TableHeading>Ev sahibi</TableHeading><TableHeading>Giriş</TableHeading><TableHeading>Planlanan çıkış</TableHeading><TableHeading>Durum</TableHeading></tr>
+          <tr><TableHeading>Ziyaretçi</TableHeading><TableHeading>Firma</TableHeading><TableHeading>Ev sahibi</TableHeading><TableHeading>Giriş</TableHeading><TableHeading>Planlanan çıkış</TableHeading><TableHeading>Durum</TableHeading><TableHeading className="w-24 text-right">Aksiyon</TableHeading></tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
           {rows.map(({ visit, isDelayed, delayMinutes }) => (
@@ -189,6 +210,9 @@ function InsideVisitsTable({ rows }: { rows: SecurityVisitRow[] }) {
               <TableCell className="tabular-nums">{visit.actualCheckIn ? formatVisitTime(visit.actualCheckIn) : "—"}</TableCell>
               <TableCell className="tabular-nums">{formatVisitTime(visit.plannedEnd)}</TableCell>
               <TableCell><StatusPill tone={isDelayed ? "danger" : "success"}>{isDelayed ? `Süre aştı · ${delayMinutes} dk` : "İçeride"}</StatusPill></TableCell>
+              <TableCell className="w-24 max-w-none text-right">
+                <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-[11px]" onClick={() => onEdit(visit)}>Düzenle</Button>
+              </TableCell>
             </tr>
           ))}
         </tbody>
@@ -197,8 +221,8 @@ function InsideVisitsTable({ rows }: { rows: SecurityVisitRow[] }) {
   )
 }
 
-function TableHeading({ children }: { children: React.ReactNode }) {
-  return <th scope="col" className="h-9 whitespace-nowrap px-3 font-semibold">{children}</th>
+function TableHeading({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <th scope="col" className={cn("h-9 whitespace-nowrap px-3 font-semibold", className)}>{children}</th>
 }
 
 function TableCell({ children, className }: { children: React.ReactNode; className?: string }) {

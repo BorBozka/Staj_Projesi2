@@ -19,9 +19,35 @@ export interface Visitor {
   id: string
   firstName: string
   lastName: string
-  email: string
+  email?: string
   company: string
   phone?: string
+}
+
+// Email is optional across the whole visitor model: not every visitor has (or needs) one, and
+// invitation delivery simply skips visitors without one instead of failing the visit.
+export function hasVisitorEmail(visitor: Pick<Visitor, "email">): boolean {
+  return Boolean(visitor.email)
+}
+
+// Blank/whitespace-only input normalizes to undefined rather than being stored as "" — undefined
+// is the canonical "no email" domain state.
+export function normalizeVisitorEmail(value?: string): string | undefined {
+  const trimmed = value?.trim()
+  return trimmed || undefined
+}
+
+const visitorEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+export function isValidVisitorEmail(value: string): boolean {
+  return visitorEmailPattern.test(value)
+}
+
+// Trims and uppercases for consistent display, but applies no country-specific plate format —
+// foreign plates are expected. Blank input normalizes to undefined.
+export function normalizeVehiclePlate(value?: string): string | undefined {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed.toUpperCase() : undefined
 }
 
 export interface MeetingDetails {
@@ -78,6 +104,12 @@ export interface VisitRecord {
   actualCheckIn?: string
   actualCheckOut?: string
   visitorCardReturned?: boolean
+  // Security check-in snapshot. visitorCardNumber is captured at check-in time so the historical
+  // record survives the card later being renumbered in inventory; visitorCardId is the live
+  // inventory link. vehiclePlate is a free-text, unvalidated operational field.
+  visitorCardId?: string
+  visitorCardNumber?: string
+  vehiclePlate?: string
   status: VisitStatus
   invitationStatus: InvitationStatus
   invitationSentAt?: string
@@ -136,7 +168,7 @@ export interface VisitorInput {
   visitId?: string
   firstName: string
   lastName: string
-  email: string
+  email?: string
   company: string
   phone?: string
 }

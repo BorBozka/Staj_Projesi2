@@ -21,6 +21,10 @@ describe("SecurityShell navigation", () => {
     expect(shellSource).not.toContain("ManagerNotifications")
   })
 
+  it("drops the redundant single-group navigation label now that there are only two modules", () => {
+    expect(shellSource).not.toContain("Günlük operasyon")
+  })
+
   it("keeps a Security-specific collapsed state and profile role", () => {
     expect(shellSource).toContain('"security-navigation-collapsed"')
     expect(shellSource).toContain("window.sessionStorage.setItem")

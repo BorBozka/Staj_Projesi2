@@ -67,10 +67,7 @@ function SecuritySidebar({ collapsed, onCollapsedChange }: { collapsed: boolean;
         <span aria-hidden={collapsed} className={cn("text-sm font-semibold text-white", labelTransition)}>Güvenlik</span>
       </button>
 
-      <nav className="min-h-0 flex-1 overflow-hidden px-2 py-1" aria-label="Güvenlik menüsü">
-        <p className="h-5 overflow-hidden px-2 pb-1 text-[10px] font-medium text-slate-400">
-          <span aria-hidden={collapsed} className={cn("inline-block whitespace-nowrap", labelTransition)}>Günlük operasyon</span>
-        </p>
+      <nav className="min-h-0 flex-1 overflow-hidden px-2 pb-1 pt-2" aria-label="Güvenlik menüsü">
         {securityNavigationItems.map(({ label, icon: Icon, to }) => (
           <NavLink
             key={to}

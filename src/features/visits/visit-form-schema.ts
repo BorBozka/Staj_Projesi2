@@ -1,10 +1,14 @@
 import { z } from "zod"
 
+import { isValidVisitorEmail } from "@/domain/visits"
+
 const visitorSchema = z.object({
   visitId: z.string().optional(),
   visitorFirstName: z.string().trim().min(1, "Ad zorunludur."),
   visitorLastName: z.string().trim().min(1, "Soyad zorunludur."),
-  visitorEmail: z.string().trim().email("Geçerli bir e-posta adresi girin."),
+  // Email is optional: blank/whitespace-only is valid, but a non-empty value must be a valid
+  // email format.
+  visitorEmail: z.string().trim().refine((value) => value === "" || isValidVisitorEmail(value), "Geçerli bir e-posta adresi girin."),
   visitorCompany: z.string().trim().min(1, "Ziyaretçi şirketi zorunludur."),
   phoneCountryCode: z.string().default("+90"),
   customPhoneCountryCode: z.string().trim().optional(),
@@ -56,7 +60,7 @@ export function toMeetingInput(values: VisitFormValues) {
       visitId: visitor.visitId,
       firstName: visitor.visitorFirstName,
       lastName: visitor.visitorLastName,
-      email: visitor.visitorEmail,
+      email: visitor.visitorEmail.trim() || undefined,
       company: visitor.visitorCompany,
       phone: visitor.visitorPhone?.trim()
         ? `${visitor.phoneCountryCode === "other" ? visitor.customPhoneCountryCode : visitor.phoneCountryCode} ${visitor.visitorPhone.trim()}`

@@ -1,0 +1,45 @@
+import type { VisitorCardInventoryItem } from "@/domain/admin"
+
+const clone = <T,>(value: T): T => structuredClone(value)
+
+const defaultVisitorCards: VisitorCardInventoryItem[] = [
+  { id: "card-1", cardNumber: "001", status: "AVAILABLE" },
+  { id: "card-2", cardNumber: "002", status: "IN_USE", assignedVisitorName: "Ece Korkmaz" },
+  { id: "card-3", cardNumber: "003", status: "NOT_RETURNED", assignedVisitorName: "Can Uslu" },
+  { id: "card-4", cardNumber: "004", status: "LOST" },
+  { id: "card-5", cardNumber: "005", status: "DISABLED" },
+]
+
+/**
+ * Single source of truth for the physical visitor-card inventory's operational state.
+ * MockAdminService (create/rename/enable/disable) and MockSecurityService (assign/return/lost,
+ * added in a later phase) share one instance of this store instead of maintaining separate
+ * copies that could drift — Admin owns inventory identity, Security owns operational transitions,
+ * but both read and write the same records.
+ */
+export class MockVisitorCardStore {
+  private cards: VisitorCardInventoryItem[]
+
+  constructor(initialCards: VisitorCardInventoryItem[] = defaultVisitorCards) {
+    this.cards = clone(initialCards)
+  }
+
+  list(): VisitorCardInventoryItem[] {
+    return clone(this.cards)
+  }
+
+  get(id: string): VisitorCardInventoryItem | undefined {
+    const card = this.cards.find((item) => item.id === id)
+    return card ? clone(card) : undefined
+  }
+
+  insert(card: VisitorCardInventoryItem): VisitorCardInventoryItem {
+    this.cards = [...this.cards, card]
+    return clone(card)
+  }
+
+  replace(id: string, next: VisitorCardInventoryItem): VisitorCardInventoryItem {
+    this.cards = this.cards.map((card) => (card.id === id ? next : card))
+    return clone(next)
+  }
+}

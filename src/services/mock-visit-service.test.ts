@@ -153,6 +153,43 @@ describe("MockVisitService Meeting–Visit behavior", () => {
     expect(cancelled.map((visit) => visit.status)).toEqual(["CANCELLED", "CHECKED_IN", "CHECKED_OUT"])
   })
 
+  it("accepts a visitor with no email at all", async () => {
+    const service = new MockVisitService()
+    const created = await service.createMeeting({
+      ...meetingInput,
+      visitors: [{ firstName: "Test", lastName: "Ziyaretci", company: "Test A.Ş." }],
+    })
+    expect(created.visits[0].visitor.email).toBeUndefined()
+  })
+
+  it("sends invitations only to email-bearing visitors in a mixed Meeting, without failing the operation", async () => {
+    const service = new MockVisitService()
+    const created = await service.createMeeting({
+      ...meetingInput,
+      visitors: [
+        { firstName: "Ada", lastName: "Ak", email: "ada@example.com", company: "Test A.Ş." },
+        { firstName: "Bora", lastName: "Boz", email: "bora@example.com", company: "Test A.Ş." },
+        { firstName: "Cem", lastName: "Can", company: "Test A.Ş." },
+      ],
+    })
+
+    const results = await service.sendMeetingInvitations(created.meeting.id)
+
+    expect(results).toHaveLength(2)
+    expect(results.map((visit) => visit.visitor.firstName).sort()).toEqual(["Ada", "Bora"])
+    const noEmailVisit = (await service.listVisits()).find((visit) => visit.visitor.firstName === "Cem")!
+    expect(noEmailVisit.invitationStatus).toBe("NOT_SENT")
+  })
+
+  it("rejects an explicit single-visit invitation for a visitor with no email", async () => {
+    const service = new MockVisitService()
+    const created = await service.createMeeting({
+      ...meetingInput,
+      visitors: [{ firstName: "Test", lastName: "Ziyaretci", company: "Test A.Ş." }],
+    })
+    await expect(service.sendVisitInvitation(created.visits[0].id)).rejects.toThrow("e-posta adresi bulunmuyor")
+  })
+
   it("stores bulk invitation success and failure independently and retries one failed Visit", async () => {
     let failAdaOnce = true
     const deliveryAttempts: string[] = []

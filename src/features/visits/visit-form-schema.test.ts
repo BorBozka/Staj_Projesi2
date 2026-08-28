@@ -53,6 +53,16 @@ describe("visitFormSchema", () => {
     if (!result.success) expect(result.error.issues.some((issue) => issue.path.includes("endTime"))).toBe(true)
   })
 
+  it("treats visitor email as optional: blank and whitespace-only pass, invalid non-empty values fail, and blank normalizes to undefined", () => {
+    expect(visitFormSchema.safeParse({ ...validValues, visitors: [{ ...validVisitor, visitorEmail: "" }] }).success).toBe(true)
+    expect(visitFormSchema.safeParse({ ...validValues, visitors: [{ ...validVisitor, visitorEmail: "   " }] }).success).toBe(true)
+    expect(visitFormSchema.safeParse({ ...validValues, visitors: [{ ...validVisitor, visitorEmail: "test@" }] }).success).toBe(false)
+    expect(visitFormSchema.safeParse({ ...validValues, visitors: [{ ...validVisitor, visitorEmail: "user@example.com" }] }).success).toBe(true)
+
+    const parsed = visitFormSchema.parse({ ...validValues, visitors: [{ ...validVisitor, visitorEmail: "   " }] })
+    expect(toMeetingInput(parsed).visitors[0].email).toBeUndefined()
+  })
+
   it("accepts optional and international visitor phone values independently", () => {
     expect(visitFormSchema.safeParse({ ...validValues, visitors: [{ ...validVisitor, visitorPhone: "" }] }).success).toBe(true)
     expect(visitFormSchema.safeParse({ ...validValues, visitors: [{ ...validVisitor, visitorPhone: "532 123 45 67" }] }).success).toBe(true)

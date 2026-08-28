@@ -57,6 +57,10 @@ export function SystemSettingsPage() {
     if (window.confirm("Kaydedilmemiş değişiklikler silinecek. Devam etmek istiyor musunuz?")) blocker.proceed()
     else blocker.reset()
   }, [blocker])
+  // AdminProvider loads once at app start; visitor-card status can change outside the Admin
+  // context entirely (Security check-in mutates the shared MockVisitorCardStore), so re-fetch
+  // whenever this page is visited to reflect that shared state within the session.
+  useEffect(() => { void reload() }, [reload])
   const selectTab = (nextTab: SystemSettingsTab) => setSearchParams(setSystemSettingsTab(searchParams, nextTab))
   const saveSettings = async () => {
     const parsed = settingsDraft && getOperationalSettingsDraftValue(settingsDraft)
