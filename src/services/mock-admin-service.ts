@@ -34,10 +34,10 @@ export class MockAdminService implements AdminService {
   ]
   private visitTypes: VisitTypeDefinition[] = [{ id: "type-1", name: "Toplantı", active: true }, { id: "type-2", name: "Teknik Servis / Bakım", active: true }, { id: "type-3", name: "Tedarikçi", active: true }, { id: "type-4", name: "İş Görüşmesi", active: false }]
   private cards: VisitorCardInventoryItem[] = [{ id: "card-1", cardNumber: "001", status: "AVAILABLE" }, { id: "card-2", cardNumber: "002", status: "IN_USE", assignedVisitorName: "Ece Korkmaz" }, { id: "card-3", cardNumber: "003", status: "NOT_RETURNED", assignedVisitorName: "Can Uslu" }, { id: "card-4", cardNumber: "004", status: "LOST" }, { id: "card-5", cardNumber: "005", status: "DISABLED" }]
-  private rules: VisitorRuleVersion[] = [{ id: "rule-2", version: 2, content: "Ziyaretçiler tesis güvenlik kurallarına ve yönlendirmelerine uymayı kabul eder.", createdAt: "2026-08-01T09:00:00.000Z", publishedAt: "2026-08-01T09:30:00.000Z", active: true }, { id: "rule-1", version: 1, content: "Ziyaretçiler tesis kurallarına uyacağını kabul eder.", createdAt: "2026-02-01T09:00:00.000Z", publishedAt: "2026-02-01T09:20:00.000Z", active: false }]
+  private rules: VisitorRuleVersion[]
   private settings: OperationalSettings = { overdueToleranceMinutes: 15, overdueAlertRepeatMinutes: 10 }
 
-  constructor(private readonly organizationStore = new MockOrganizationStore()) {}
+  constructor(private readonly organizationStore = new MockOrganizationStore(), initialRules: VisitorRuleVersion[] = [{ id: "rule-2", version: 2, content: "Ziyaretçiler tesis güvenlik kurallarına ve yönlendirmelerine uymayı kabul eder.", createdAt: "2026-08-01T09:00:00.000Z", publishedAt: "2026-08-01T09:30:00.000Z", active: true }, { id: "rule-1", version: 1, content: "Ziyaretçiler tesis kurallarına uyacağını kabul eder.", createdAt: "2026-02-01T09:00:00.000Z", publishedAt: "2026-02-01T09:20:00.000Z", active: false }]) { this.rules = clone(initialRules) }
 
   async getUsers() { return clone(this.users) }
   async saveUser(input: Omit<AdminUser, "id"> & { id?: string }, options: SaveAdminUserOptions = {}) {
@@ -104,7 +104,11 @@ export class MockAdminService implements AdminService {
   }
   async getVisitorRuleVersions() { return clone(this.rules) }
   async publishVisitorRule(content: string) {
-    const next: VisitorRuleVersion = { id: id("rule"), version: Math.max(...this.rules.map((item) => item.version)) + 1, content, createdAt: new Date().toISOString(), publishedAt: new Date().toISOString(), active: true }
+    const normalizedContent = content.trim()
+    if (!normalizedContent) throw new Error("Ziyaretçi kuralı boş bırakılamaz.")
+    const nextVersion = this.rules.reduce((maximum, item) => Math.max(maximum, item.version), 0) + 1
+    const now = new Date().toISOString()
+    const next: VisitorRuleVersion = { id: id("rule"), version: nextVersion, content: normalizedContent, createdAt: now, publishedAt: now, active: true }
     this.rules = [next, ...this.rules.map((item) => ({ ...item, active: false }))]
     return clone(next)
   }

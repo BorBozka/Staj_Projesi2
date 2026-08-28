@@ -136,13 +136,33 @@ describe("MockAdminService other admin resources", () => {
   it("publishes new immutable visitor-rule versions instead of mutating history", async () => {
     const service = new MockAdminService()
     const before = await service.getVisitorRuleVersions()
+    const active = before.find((rule) => rule.active)!
     const historical = before.find((rule) => !rule.active)!
-    const published = await service.publishVisitorRule("Yeni ziyaretçi kuralı")
+    const published = await service.publishVisitorRule("  Yeni ziyaretçi kuralı  ")
     const after = await service.getVisitorRuleVersions()
-    expect(published.version).toBeGreaterThan(before[0].version)
+    expect(published).toMatchObject({ version: 3, content: "Yeni ziyaretçi kuralı", active: true })
     expect(after.find((rule) => rule.id === historical.id)).toEqual(historical)
-    expect(after.find((rule) => rule.id === before.find((rule) => rule.active)?.id)?.active).toBe(false)
+    expect(after.find((rule) => rule.id === active.id)).toEqual({ ...active, active: false })
     expect(after.find((rule) => rule.id === published.id)?.active).toBe(true)
+    expect(after.filter((rule) => rule.active)).toHaveLength(1)
+  })
+
+  it("rejects blank visitor rules at the service boundary", async () => {
+    const service = new MockAdminService()
+    await expect(service.publishVisitorRule("")).rejects.toThrow("Ziyaretçi kuralı boş bırakılamaz.")
+    await expect(service.publishVisitorRule("   ")).rejects.toThrow("Ziyaretçi kuralı boş bırakılamaz.")
+  })
+
+  it("starts an empty rule repository at v1 and calculates later versions from the maximum version", async () => {
+    const emptyService = new MockAdminService(undefined, [])
+    await expect(emptyService.publishVisitorRule("İlk kural")).resolves.toMatchObject({ version: 1, active: true })
+
+    const unordered: import("@/domain/admin").VisitorRuleVersion[] = [
+      { id: "rule-4", version: 4, content: "v4", createdAt: "2026-04-01", publishedAt: "2026-04-01", active: false },
+      { id: "rule-2", version: 2, content: "v2", createdAt: "2026-02-01", publishedAt: "2026-02-01", active: true },
+    ]
+    const service = new MockAdminService(undefined, unordered)
+    await expect(service.publishVisitorRule("Yeni kural")).resolves.toMatchObject({ version: 5, active: true })
   })
 
   it("keeps card inventory creation and editing inside the Admin-owned lifecycle", async () => {
