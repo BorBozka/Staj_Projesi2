@@ -219,12 +219,20 @@ function ExpectedRow({ row, onOpenDetail, onCheckIn }: { row: SecurityVisitRow; 
 
 function InsideRow({ row, onOpenDetail, onCheckOut, onEdit }: { row: SecurityVisitRow; onOpenDetail(visit: Visit): void; onCheckOut(visit: Visit): void; onEdit(visit: Visit): void }) {
   const { visit, isDelayed, delayMinutes } = row
+  const checkInLabel = visit.actualCheckIn ? formatVisitTime(visit.actualCheckIn) : "—"
+  const cardLabel = visit.visitorCardNumber ?? "—"
   return (
     <li>
       <RowShell onOpenDetail={() => onOpenDetail(visit)}>
-        <div className="flex h-11 min-w-0 flex-1 items-center gap-2">
-          <span className="truncate text-xs font-semibold text-slate-900">{visit.visitor.firstName} {visit.visitor.lastName}</span>
-          {isDelayed && <StatusPill tone="danger">Süre aştı · {delayMinutes} dk</StatusPill>}
+        <div className="h-14 min-w-0 flex-1 py-2">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-xs font-semibold text-slate-900">{visit.visitor.firstName} {visit.visitor.lastName}</span>
+          </div>
+          <p className="mt-1 truncate text-[11px] text-slate-500">{visit.visitor.company} · {visit.hostEmployeeName}</p>
+          <p className="mt-1 flex items-center gap-2 text-[11px] text-slate-500">
+            <span className="min-w-0 truncate">{checkInLabel} giriş · Kart {cardLabel}</span>
+            {isDelayed && <StatusPill tone="danger">Süre aştı · {delayMinutes} dk</StatusPill>}
+          </p>
         </div>
         <RowActions>
           <Button type="button" size="sm" className="h-7 px-2 text-[11px]" onClick={() => onCheckOut(visit)}>Çıkış yap</Button>

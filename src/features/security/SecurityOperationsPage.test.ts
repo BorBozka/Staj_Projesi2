@@ -68,4 +68,15 @@ describe("SecurityOperationsPage contract", () => {
     expect(pageSource).toContain("Çıkış yap")
     expect(pageSource).toContain("Bilgileri düzelt")
   })
+
+  it("renders the İçeride row as a three-line block matching ExpectedRow's hierarchy", () => {
+    // Line 1: visitor name. Line 2: "{company} · {host}" (identical style to ExpectedRow).
+    // Line 3: "{check-in} giriş · Kart {n}" with the overrun pill moved off the name line.
+    expect(pageSource).toContain('<p className="mt-1 truncate text-[11px] text-slate-500">{visit.visitor.company} · {visit.hostEmployeeName}</p>')
+    expect(pageSource).toContain('{checkInLabel} giriş · Kart {cardLabel}')
+    expect(pageSource).toContain('visit.actualCheckIn ? formatVisitTime(visit.actualCheckIn) : "—"')
+    expect(pageSource).toContain('visit.visitorCardNumber ?? "—"')
+    // The overrun pill is no longer on the name line; the row is the same height as ExpectedRow.
+    expect(pageSource).not.toContain('<div className="flex h-11 min-w-0 flex-1 items-center gap-2">')
+  })
 })
