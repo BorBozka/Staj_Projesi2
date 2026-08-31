@@ -59,7 +59,7 @@ export class MockResourceCatalogService implements ResourceCatalogService {
     createdAt: string,
     updatedAt: string,
   ): FacilityResource {
-    const referenceData = createMockVisitReferenceData(this.organizationStore.getSnapshot(), [])
+    const referenceData = createMockVisitReferenceData(this.organizationStore.getSnapshot())
     const company = referenceData.companies.find((item) => item.id === input.companyId)
     const facility = referenceData.facilities.find(
       (item) => item.id === input.facilityId && item.companyId === input.companyId,

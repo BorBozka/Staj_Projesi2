@@ -18,7 +18,7 @@ const employeeDefinitions = [
  * visit-type store); this function owns no state. */
 export function createMockVisitReferenceData(
   organization: OrganizationSnapshot,
-  visitTypes: VisitTypeDefinition[],
+  visitTypes: VisitTypeDefinition[] = initialMockVisitTypes,
 ): VisitReferenceData {
   const companies = organization.companies.filter((company) => company.active).map(({ id, name }) => ({ id, name }))
   const facilities = organization.facilities
