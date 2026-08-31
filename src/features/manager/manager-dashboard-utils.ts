@@ -1,4 +1,4 @@
-import { differenceInMinutes, format, isAfter, isBefore, isSameDay } from "date-fns"
+import { addMinutes, differenceInMinutes, format, isAfter, isBefore, isSameDay } from "date-fns"
 
 import type { GoodsMovement } from "@/domain/goods-movements"
 import type { PlannedTransportAssignment } from "@/domain/transport-assignments"
@@ -74,28 +74,39 @@ export function getActiveTransportAssignments(assignments: PlannedTransportAssig
   )
 }
 
-export function getDashboardVisitStatus(visit: Visit, now: Date): DashboardVisitStatus | null {
+/**
+ * A checked-in visitor is overdue once the current time passes
+ * `plannedEnd + toleranceMinutes` (the Admin "Ziyaret gecikme toleransı" setting).
+ * Landing exactly on the threshold is not yet overdue.
+ */
+export function isVisitOverdue(visit: Visit, now: Date, toleranceMinutes: number): boolean {
+  return visit.status === "CHECKED_IN"
+    && !visit.actualCheckOut
+    && addMinutes(new Date(visit.plannedEnd), toleranceMinutes) < now
+}
+
+export function getDashboardVisitStatus(visit: Visit, now: Date, toleranceMinutes: number): DashboardVisitStatus | null {
   if (visit.status === "PLANNED") {
     return !visit.actualCheckIn && isBefore(new Date(visit.plannedStart), now) ? "LATE" : "PLANNED"
   }
 
   if (visit.status === "CHECKED_IN") {
-    return !visit.actualCheckOut && isBefore(new Date(visit.plannedEnd), now) ? "OVERDUE" : "CHECKED_IN"
+    return isVisitOverdue(visit, now, toleranceMinutes) ? "OVERDUE" : "CHECKED_IN"
   }
 
   if (visit.status === "CHECKED_OUT" || visit.status === "CANCELLED") return visit.status
   return null
 }
 
-export function getStatusCounts(visits: Visit[], now: Date) {
+export function getStatusCounts(visits: Visit[], now: Date, toleranceMinutes: number) {
   return dashboardVisitStatuses.map((status) => ({
     status,
-    value: visits.filter((visit) => getDashboardVisitStatus(visit, now) === status).length,
+    value: visits.filter((visit) => getDashboardVisitStatus(visit, now, toleranceMinutes) === status).length,
   }))
 }
 
-export function getOverdueVisits(visits: Visit[], now: Date) {
-  return visits.filter((visit) => visit.status === "CHECKED_IN" && isBefore(new Date(visit.plannedEnd), now))
+export function getOverdueVisits(visits: Visit[], now: Date, toleranceMinutes: number) {
+  return visits.filter((visit) => isVisitOverdue(visit, now, toleranceMinutes))
 }
 
 export function getDelayMinutes(visit: Visit, now: Date) {

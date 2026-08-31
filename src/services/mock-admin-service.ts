@@ -8,6 +8,7 @@ import {
   isSelfAdminDemotionAttempt,
   isSelfDeactivationAttempt,
   wouldRemoveLastActiveAdmin,
+  DEFAULT_OVERDUE_TOLERANCE_MINUTES,
   type AdminUser,
   type CreateVisitorCardInput,
   type OperationalSettings,
@@ -35,7 +36,7 @@ export class MockAdminService implements AdminService {
   ]
   private cards: VisitorCardInventoryItem[] = [{ id: "card-1", cardNumber: "001", status: "AVAILABLE" }, { id: "card-2", cardNumber: "002", status: "IN_USE", assignedVisitorName: "Ece Korkmaz" }, { id: "card-3", cardNumber: "003", status: "NOT_RETURNED", assignedVisitorName: "Can Uslu" }, { id: "card-4", cardNumber: "004", status: "LOST" }, { id: "card-5", cardNumber: "005", status: "DISABLED" }]
   private rules: VisitorRuleVersion[]
-  private settings: OperationalSettings = { overdueToleranceMinutes: 15, overdueAlertRepeatMinutes: 10 }
+  private settings: OperationalSettings = { overdueToleranceMinutes: DEFAULT_OVERDUE_TOLERANCE_MINUTES, overdueAlertRepeatMinutes: 10 }
 
   constructor(private readonly organizationStore = new MockOrganizationStore(), initialRules: VisitorRuleVersion[] = [{ id: "rule-2", version: 2, content: "Ziyaretçiler tesis güvenlik kurallarına ve yönlendirmelerine uymayı kabul eder.", createdAt: "2026-08-01T09:00:00.000Z", publishedAt: "2026-08-01T09:30:00.000Z", active: true }, { id: "rule-1", version: 1, content: "Ziyaretçiler tesis kurallarına uyacağını kabul eder.", createdAt: "2026-02-01T09:00:00.000Z", publishedAt: "2026-02-01T09:20:00.000Z", active: false }], private readonly visitTypeStore = new MockVisitTypeStore()) { this.rules = clone(initialRules) }
 

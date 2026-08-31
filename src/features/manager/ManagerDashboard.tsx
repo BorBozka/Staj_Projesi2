@@ -5,6 +5,7 @@ import { Link } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { getGoodsDirectionLabel, type GoodsMovement } from "@/domain/goods-movements"
+import { useOperationalSettings } from "@/features/admin/admin-context"
 import type { PlannedTransportAssignment } from "@/domain/transport-assignments"
 import type { Visit } from "@/domain/visits"
 import { getOperationNowIndicator } from "@/features/manager/manager-clock"
@@ -57,6 +58,7 @@ const statusMeta: { status: DashboardVisitStatus; label: string; color: string }
 export function ManagerDashboard() {
   const { visits, referenceData, isLoading } = useVisits()
   const { companyId, currentTime, facilityId, isRefreshing, refresh, refreshVersion, lastUpdated } = useManagerRefresh()
+  const { overdueToleranceMinutes } = useOperationalSettings()
   const [deliveries, setDeliveries] = useState<GoodsMovement[]>([])
   const [transportAssignments, setTransportAssignments] = useState<PlannedTransportAssignment[]>([])
   const [selection, setSelection] = useState<SelectionDescriptor | null>(null)
@@ -89,9 +91,9 @@ export function ManagerDashboard() {
   const scopedDeliveries = getTodayScopedGoodsMovements(deliveries, { companyId, facilityId }, currentTime)
   const scopedTransportAssignments = getTodayScopedTransportAssignments(transportAssignments, { companyId, facilityId }, currentTime)
   const activeTransportAssignments = getActiveTransportAssignments(transportAssignments, { companyId, facilityId }, currentTime)
-  const counts = getStatusCounts(todayVisits, currentTime)
+  const counts = getStatusCounts(todayVisits, currentTime, overdueToleranceMinutes)
   const nextVisit = visits.find((visit) => visit.id === nextVisitId) ?? null
-  const selectionData = selection ? resolveSelection(selection, todayVisits, scopedDeliveries, scopedTransportAssignments, currentTime) : null
+  const selectionData = selection ? resolveSelection(selection, todayVisits, scopedDeliveries, scopedTransportAssignments, currentTime, overdueToleranceMinutes) : null
 
   function openNextVisit(visit: Visit) {
     returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
@@ -616,9 +618,9 @@ function SelectionPopoverContent({ selection, side, onVisitOpen, onTransportAssi
   )
 }
 
-function resolveSelection(selection: SelectionDescriptor, visits: Visit[], deliveries: GoodsMovement[], transportAssignments: PlannedTransportAssignment[], now: Date): SelectionData {
+function resolveSelection(selection: SelectionDescriptor, visits: Visit[], deliveries: GoodsMovement[], transportAssignments: PlannedTransportAssignment[], now: Date, toleranceMinutes: number): SelectionData {
   if (selection.kind === "status") {
-    const selectedVisits = visits.filter((visit) => getDashboardVisitStatus(visit, now) === selection.status)
+    const selectedVisits = visits.filter((visit) => getDashboardVisitStatus(visit, now, toleranceMinutes) === selection.status)
     const label = statusMeta.find((item) => item.status === selection.status)?.label ?? selection.status
     return { title: `${label} · ${selectedVisits.length}`, visits: selectedVisits, deliveries: [], transportAssignments: [] }
   }

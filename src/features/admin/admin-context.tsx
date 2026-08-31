@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components -- context hook belongs beside its provider. */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 
-import type { AdminUser, OperationalSettings, OrganizationEntity, OrganizationKind, OrganizationSnapshot, VisitTypeDefinition, VisitorCardInventoryItem, VisitorRuleVersion } from "@/domain/admin"
+import { DEFAULT_OVERDUE_TOLERANCE_MINUTES, type AdminUser, type OperationalSettings, type OrganizationEntity, type OrganizationKind, type OrganizationSnapshot, type VisitTypeDefinition, type VisitorCardInventoryItem, type VisitorRuleVersion } from "@/domain/admin"
 import type { AdminService } from "@/services/admin-service"
 
 interface AdminContextValue {
@@ -46,4 +46,17 @@ export function useAdmin() {
   const context = useContext(AdminContext)
   if (!context) throw new Error("useAdmin must be used inside AdminProvider")
   return context
+}
+
+/**
+ * Narrow view for non-Admin screens (e.g. Manager Dashboard) that only need the
+ * operational settings, without exposing the full Admin surface. Falls back to the
+ * seeded defaults until the shared AdminProvider finishes its initial load.
+ */
+export function useOperationalSettings(): OperationalSettings {
+  const { settings } = useAdmin()
+  return useMemo(
+    () => settings ?? { overdueToleranceMinutes: DEFAULT_OVERDUE_TOLERANCE_MINUTES, overdueAlertRepeatMinutes: 10 },
+    [settings],
+  )
 }

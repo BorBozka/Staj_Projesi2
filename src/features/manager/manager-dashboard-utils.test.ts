@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import type { GoodsMovement } from "@/domain/goods-movements"
 import type { Visit, VisitStatus } from "@/domain/visits"
-import { getActiveTransportAssignments, getDashboardVisitStatus, getDelayMinutes, getNextPlannedVisits, getOperationBins, getOtherVisits, getScopedVisits, getStatusCounts, getTodayScopedGoodsMovements, getTodayScopedTransportAssignments, getTodayVisits } from "./manager-dashboard-utils"
+import { getActiveTransportAssignments, getDashboardVisitStatus, getDelayMinutes, getNextPlannedVisits, getOperationBins, getOtherVisits, getScopedVisits, getStatusCounts, getTodayScopedGoodsMovements, getTodayScopedTransportAssignments, getTodayVisits, isVisitOverdue } from "./manager-dashboard-utils"
 
 function makeVisit(id: string, status: VisitStatus, plannedStart: string, overrides: Partial<Visit> = {}): Visit {
   return {
@@ -107,10 +107,10 @@ describe("manager dashboard calculations", () => {
       makeVisit("İptal", "CANCELLED", "2026-08-10T09:00:00+03:00"),
       makeVisit("Gelmedi", "NO_SHOW", "2026-08-10T09:00:00+03:00"),
     ]
-    const counts = getStatusCounts(dashboardVisits, now)
+    const counts = getStatusCounts(dashboardVisits, now, 0)
 
-    expect(getDashboardVisitStatus(dashboardVisits[3], now)).toBe("OVERDUE")
-    expect(getDashboardVisitStatus(dashboardVisits[6], now)).toBeNull()
+    expect(getDashboardVisitStatus(dashboardVisits[3], now, 0)).toBe("OVERDUE")
+    expect(getDashboardVisitStatus(dashboardVisits[6], now, 0)).toBeNull()
     expect(counts).toEqual([
       { status: "PLANNED", value: 1 },
       { status: "LATE", value: 1 },
@@ -144,5 +144,48 @@ describe("manager dashboard calculations", () => {
       makeVisit("Geç", "PLANNED", "2026-08-10T09:00:00+03:00"),
       makeVisit("Şimdi", "PLANNED", "2026-08-10T12:15:00+03:00"),
     ], now)).toEqual([])
+  })
+})
+
+describe("overdue tolerance", () => {
+  const now = new Date("2026-08-10T12:15:00+03:00")
+  // Checked in, planned to end 15 minutes before `now`, still on site.
+  const checkedIn = makeVisit("Tolerans", "CHECKED_IN", "2026-08-10T10:00:00+03:00", {
+    actualCheckIn: "2026-08-10T10:05:00+03:00",
+    plannedEnd: "2026-08-10T12:00:00+03:00",
+  })
+
+  it("treats the visit as overdue only once `now` passes plannedEnd + tolerance", () => {
+    expect(isVisitOverdue(checkedIn, now, 16)).toBe(false) // threshold 12:16 — not reached
+    expect(isVisitOverdue(checkedIn, now, 15)).toBe(false) // threshold 12:15 — exactly now, not yet overdue
+    expect(isVisitOverdue(checkedIn, now, 14)).toBe(true) // threshold 12:14 — passed
+  })
+
+  it("never marks a visitor who has already checked out as overdue", () => {
+    expect(isVisitOverdue({ ...checkedIn, actualCheckOut: "2026-08-10T12:05:00+03:00" }, now, 0)).toBe(false)
+  })
+
+  it("never marks a visit that is not CHECKED_IN as overdue", () => {
+    expect(isVisitOverdue({ ...checkedIn, status: "PLANNED" }, now, 0)).toBe(false)
+    expect(isVisitOverdue({ ...checkedIn, status: "CHECKED_OUT" }, now, 0)).toBe(false)
+    expect(isVisitOverdue({ ...checkedIn, status: "NO_SHOW" }, now, 0)).toBe(false)
+  })
+
+  it("flips getDashboardVisitStatus between OVERDUE and CHECKED_IN with the same visit and `now`", () => {
+    expect(getDashboardVisitStatus(checkedIn, now, 0)).toBe("OVERDUE")
+    expect(getDashboardVisitStatus(checkedIn, now, 60)).toBe("CHECKED_IN")
+  })
+
+  it("shifts getStatusCounts between OVERDUE and CHECKED_IN as the tolerance widens", () => {
+    const visits = [
+      checkedIn,
+      makeVisit("İçeride", "CHECKED_IN", "2026-08-10T11:00:00+03:00", { actualCheckIn: "2026-08-10T11:05:00+03:00", plannedEnd: "2026-08-10T13:00:00+03:00" }),
+    ]
+    const strict = getStatusCounts(visits, now, 0)
+    const lenient = getStatusCounts(visits, now, 120)
+    expect(strict.find((count) => count.status === "OVERDUE")?.value).toBe(1)
+    expect(strict.find((count) => count.status === "CHECKED_IN")?.value).toBe(1)
+    expect(lenient.find((count) => count.status === "OVERDUE")?.value).toBe(0)
+    expect(lenient.find((count) => count.status === "CHECKED_IN")?.value).toBe(2)
   })
 })
