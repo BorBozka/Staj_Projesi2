@@ -42,6 +42,11 @@ export function getInsideSecurityVisits(visits: Visit[], now: Date): SecurityVis
     })
 }
 
+/** Delay pill copy: append the minute count only when it is a positive whole number. */
+export function formatDelayLabel(prefix: string, minutes: number) {
+  return minutes > 0 ? `${prefix} · ${minutes} dk` : prefix
+}
+
 export function filterSecurityVisitRows(rows: SecurityVisitRow[], search: string) {
   const query = normalizeTurkishSearch(search)
   if (!query) return rows

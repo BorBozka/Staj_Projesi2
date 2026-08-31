@@ -17,6 +17,7 @@ import { securityService } from "@/services"
 import type { SecurityCardIssue } from "@/services/security-service"
 import {
   filterSecurityVisitRows,
+  formatDelayLabel,
   getExpectedSecurityVisits,
   getInsideSecurityVisits,
   getSecurityScopedVisits,
@@ -72,6 +73,8 @@ export function SecurityOperationsPage() {
     await reload()
   }
 
+  const searching = search.trim().length > 0
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
       <h1 className="sr-only">Güvenlik Operasyonu</h1>
@@ -85,7 +88,7 @@ export function SecurityOperationsPage() {
           </div>
         </div>
 
-        <label className="relative min-w-0 flex-1">
+        <label className="relative w-full min-w-0 lg:max-w-xs lg:flex-1">
           <span className="sr-only">Beklenen ve içerideki ziyaretlerde ara</span>
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
           <Input
@@ -98,30 +101,42 @@ export function SecurityOperationsPage() {
           />
         </label>
 
-        {scopedCardIssues.length > 0 && (
-          <Button type="button" variant="outline" className="h-9 shrink-0" onClick={() => setCardReturnsOpen(true)}>
-            İade bekleyen kartlar · {scopedCardIssues.length}
-          </Button>
-        )}
+        <div className="flex items-center gap-2 lg:ml-auto">
+          {scopedCardIssues.length > 0 && (
+            <Button type="button" variant="outline" className="h-9 shrink-0" onClick={() => setCardReturnsOpen(true)}>
+              İade bekleyen kartlar · {scopedCardIssues.length}
+            </Button>
+          )}
 
-        <Button type="button" className="h-9 shrink-0" disabled aria-describedby="unplanned-visit-note">+ Plansız ziyaret</Button>
-        <span id="unplanned-visit-note" className="sr-only">Plansız ziyaret işlemi sonraki aşamada kullanıma açılacaktır.</span>
+          <Button type="button" className="h-9 shrink-0" disabled aria-describedby="unplanned-visit-note">+ Plansız ziyaret</Button>
+          <span id="unplanned-visit-note" className="sr-only">Plansız ziyaret işlemi sonraki aşamada kullanıma açılacaktır.</span>
+        </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-3 overflow-hidden grid-rows-2 lg:grid-cols-[3fr_2fr] lg:grid-rows-1">
-        <OperationPanel title="Beklenenler" count={expectedRows.length} ariaLabel="Beklenen ziyaretler">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-white shadow-panel lg:flex-row">
+        <OperationPanel
+          title="Beklenenler"
+          count={expectedRows.length}
+          ariaLabel="Beklenen ziyaretler"
+          className="flex-1 border-b border-slate-200 lg:flex-none lg:basis-3/5 lg:border-b-0 lg:border-r"
+        >
           {isLoading ? <PanelState message="Yükleniyor…" />
             : error ? <PanelState message={error} tone="error" />
-              : expectedRows.length === 0 ? <PanelState message={search.trim() ? "Aramayla eşleşen kayıt yok." : "Bugün beklenen ziyaret yok."} />
+              : expectedRows.length === 0 ? <PanelState message={searching ? "Aramayla eşleşen kayıt yok." : "Bugün beklenen ziyaret yok."} />
                 : <ul className="divide-y divide-slate-100">
                     {expectedRows.map((row) => <ExpectedRow key={row.visit.id} row={row} onOpenDetail={setDetailVisit} onCheckIn={setCheckInTarget} />)}
                   </ul>}
         </OperationPanel>
 
-        <OperationPanel title="İçeride" count={insideRows.length} ariaLabel="İçerideki ziyaretçiler">
+        <OperationPanel
+          title="İçeride"
+          count={insideRows.length}
+          ariaLabel="İçerideki ziyaretçiler"
+          className="flex-1 lg:flex-none lg:basis-2/5"
+        >
           {isLoading ? <PanelState message="Yükleniyor…" />
             : error ? <PanelState message={error} tone="error" />
-              : insideRows.length === 0 ? <PanelState message={search.trim() ? "Aramayla eşleşen kayıt yok." : "İçeride ziyaretçi yok."} />
+              : insideRows.length === 0 ? <PanelState message={searching ? "Aramayla eşleşen kayıt yok." : "İçeride ziyaretçi yok."} />
                 : <ul className="divide-y divide-slate-100">
                     {insideRows.map((row) => <InsideRow key={row.visit.id} row={row} onOpenDetail={setDetailVisit} onCheckOut={setCheckOutTarget} onEdit={setCorrectingVisit} />)}
                   </ul>}
@@ -161,11 +176,12 @@ export function SecurityOperationsPage() {
   )
 }
 
-function OperationPanel({ title, count, ariaLabel, children }: { title: string; count: number; ariaLabel: string; children: React.ReactNode }) {
+function OperationPanel({ title, count, ariaLabel, className, children }: { title: string; count: number; ariaLabel: string; className?: string; children: React.ReactNode }) {
   return (
-    <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border bg-white shadow-panel" aria-label={ariaLabel}>
-      <header className="flex shrink-0 items-center border-b bg-slate-50/80 px-3 py-2">
-        <h2 className="text-xs font-semibold text-slate-700">{title} <span className="tabular-nums text-slate-400">· {count}</span></h2>
+    <section className={cn("flex min-h-0 flex-col", className)} aria-label={ariaLabel}>
+      <header className="flex h-9 shrink-0 items-center gap-1.5 border-b bg-slate-50/80 px-3">
+        <h2 className="text-xs font-semibold text-slate-800">{title}</h2>
+        <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-slate-200/70 px-1 text-[10px] font-semibold tabular-nums text-slate-600">{count}</span>
       </header>
       <div className="min-h-0 flex-1 overflow-auto scrollbar-thin">{children}</div>
     </section>
@@ -185,7 +201,7 @@ function RowShell({ onOpenDetail, children }: { onOpenDetail(): void; children: 
       tabIndex={0}
       onClick={onOpenDetail}
       onKeyDown={openOnKey}
-      className="flex w-full items-center gap-3 px-3 text-left outline-none transition-colors hover:bg-slate-50 focus-visible:bg-slate-50"
+      className="flex w-full cursor-pointer items-center gap-3 px-3 text-left outline-none transition-colors hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500/40"
     >
       {children}
     </div>
@@ -196,8 +212,8 @@ function RowActions({ children }: { children: React.ReactNode }) {
   return <div className="flex shrink-0 items-center gap-1" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>{children}</div>
 }
 
-function ExpectedRow({ row, onOpenDetail, onCheckIn }: { row: SecurityVisitRow; onOpenDetail(visit: Visit): void; onCheckIn(visit: Visit): void }) {
-  const { visit, isDelayed } = row
+export function ExpectedRow({ row, onOpenDetail, onCheckIn }: { row: SecurityVisitRow; onOpenDetail(visit: Visit): void; onCheckIn(visit: Visit): void }) {
+  const { visit, isDelayed, delayMinutes } = row
   return (
     <li>
       <RowShell onOpenDetail={() => onOpenDetail(visit)}>
@@ -205,32 +221,36 @@ function ExpectedRow({ row, onOpenDetail, onCheckIn }: { row: SecurityVisitRow; 
           <div className="flex items-center gap-2">
             <span className="shrink-0 text-xs font-semibold tabular-nums text-slate-900">{formatVisitTime(visit.plannedStart)}</span>
             <span className="truncate text-xs font-semibold text-slate-900">{visit.visitor.firstName} {visit.visitor.lastName}</span>
-            {isDelayed && <StatusPill tone="warning">Gecikti</StatusPill>}
+            {isDelayed && <StatusPill tone="warning">{formatDelayLabel("Gecikti", delayMinutes)}</StatusPill>}
           </div>
-          <p className="mt-1 truncate text-[11px] text-slate-500">{visit.visitor.company} · {visit.hostEmployeeName}</p>
+          <p className="mt-1 flex items-center gap-1.5 text-[11px]">
+            <span className="min-w-0 truncate font-medium text-slate-600">{visit.visitor.company}</span>
+            <span aria-hidden="true" className="shrink-0 text-slate-300">•</span>
+            <span className="min-w-0 truncate text-slate-500">{visit.hostEmployeeName}</span>
+          </p>
         </div>
         <RowActions>
-          <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[11px]" onClick={() => onCheckIn(visit)}>Giriş yap</Button>
+          <Button type="button" size="sm" variant="outline" className="h-7 px-2.5 text-[11px]" onClick={() => onCheckIn(visit)}>Giriş yap</Button>
         </RowActions>
       </RowShell>
     </li>
   )
 }
 
-function InsideRow({ row, onOpenDetail, onCheckOut, onEdit }: { row: SecurityVisitRow; onOpenDetail(visit: Visit): void; onCheckOut(visit: Visit): void; onEdit(visit: Visit): void }) {
+export function InsideRow({ row, onOpenDetail, onCheckOut, onEdit }: { row: SecurityVisitRow; onOpenDetail(visit: Visit): void; onCheckOut(visit: Visit): void; onEdit(visit: Visit): void }) {
   const { visit, isDelayed, delayMinutes } = row
   return (
     <li>
       <RowShell onOpenDetail={() => onOpenDetail(visit)}>
         <div className="flex h-11 min-w-0 flex-1 items-center gap-2">
           <span className="truncate text-xs font-semibold text-slate-900">{visit.visitor.firstName} {visit.visitor.lastName}</span>
-          {isDelayed && <StatusPill tone="danger">Süre aştı · {delayMinutes} dk</StatusPill>}
+          {isDelayed && <StatusPill tone="danger">{formatDelayLabel("Süre aştı", delayMinutes)}</StatusPill>}
         </div>
         <RowActions>
-          <Button type="button" size="sm" className="h-7 px-2 text-[11px]" onClick={() => onCheckOut(visit)}>Çıkış yap</Button>
+          <Button type="button" size="sm" className="h-7 px-2.5 text-[11px]" onClick={() => onCheckOut(visit)}>Çıkış yap</Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button type="button" size="icon" variant="ghost" className="size-7" aria-label="Ziyaret işlemleri"><MoreHorizontal className="size-4" /></Button>
+              <Button type="button" size="icon-sm" variant="ghost" className="text-slate-500" aria-label="Ziyaret işlemleri" title="Ziyaret işlemleri"><MoreHorizontal className="size-4" /></Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => onEdit(visit)}>Bilgileri düzelt</DropdownMenuItem></DropdownMenuContent>
           </DropdownMenu>
@@ -249,7 +269,7 @@ function StatusPill({ children, tone }: { children: React.ReactNode; tone: "warn
 }
 
 function PanelState({ message, tone = "neutral" }: { message: string; tone?: "neutral" | "error" }) {
-  return <div className={cn("flex h-full min-h-32 items-center justify-center px-4 text-center text-sm", tone === "error" ? "text-rose-700" : "text-slate-500")} role={tone === "error" ? "alert" : "status"}>{message}</div>
+  return <p className={cn("px-3 py-3 text-xs", tone === "error" ? "text-rose-700" : "text-slate-500")} role={tone === "error" ? "alert" : "status"}>{message}</p>
 }
 
 function formatVisitTime(value: string) {

@@ -59,6 +59,17 @@ describe("security expected visits", () => {
     expect(rows[0]).toMatchObject({ isDelayed: true, delayMinutes: 90 })
     expect(rows[1].isDelayed).toBe(false)
   })
+
+  it("reports the elapsed minutes since planned start for a delayed expected visit and zero otherwise", () => {
+    const visits = [
+      makeVisit("Geciken", "PLANNED", "2026-08-28T11:42:00+03:00"),
+      makeVisit("Zamanında", "PLANNED", "2026-08-28T12:30:00+03:00"),
+    ]
+
+    const [delayed, onTime] = getExpectedSecurityVisits(visits, now)
+    expect(delayed).toMatchObject({ isDelayed: true, delayMinutes: 18 })
+    expect(onTime).toMatchObject({ isDelayed: false, delayMinutes: 0 })
+  })
 })
 
 describe("security inside visits", () => {

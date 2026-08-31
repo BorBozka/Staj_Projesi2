@@ -15,22 +15,44 @@ describe("SecurityOperationsPage contract", () => {
     expect(pageSource).not.toContain("Kart sorunları")
   })
 
-  it("renders the expected and inside lists together in two side-by-side panels", () => {
+  it("wraps both lists in one shared operation workspace container", () => {
     expect(pageSource).toContain('title="Beklenenler"')
     expect(pageSource).toContain('title="İçeride"')
-    expect(pageSource).toContain("lg:grid-cols-[3fr_2fr]")
+    expect(pageSource).toContain('className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-white shadow-panel lg:flex-row"')
     expect(pageSource).toContain("getExpectedSecurityVisits")
     expect(pageSource).toContain("getInsideSecurityVisits")
   })
 
-  it("keeps the page fixed while each panel manages its own overflow", () => {
-    expect(pageSource).toContain('className="flex h-full min-h-0 flex-col gap-3 overflow-hidden"')
+  it("splits the workspace roughly 60/40 on desktop and stacks (expected first) when narrow", () => {
+    const expectedPanel = pageSource.indexOf('title="Beklenenler"')
+    const insidePanel = pageSource.indexOf('title="İçeride"')
+    expect(expectedPanel).toBeGreaterThan(-1)
+    expect(insidePanel).toBeGreaterThan(expectedPanel)
+    expect(pageSource).toContain("lg:flex-none lg:basis-3/5 lg:border-b-0 lg:border-r")
+    expect(pageSource).toContain("lg:flex-none lg:basis-2/5")
+  })
+
+  it("gives each panel an independent header, scroll area, and empty state", () => {
     expect(pageSource).toContain('className="min-h-0 flex-1 overflow-auto scrollbar-thin"')
+    expect(pageSource).toContain('"Bugün beklenen ziyaret yok."')
+    expect(pageSource).toContain('"İçeride ziyaretçi yok."')
+    expect(pageSource).toContain('"Aramayla eşleşen kayıt yok."')
+    // Count sits in a neutral badge, not glued to the title text.
+    expect(pageSource).not.toContain("· {count}")
+    expect(pageSource).toContain("rounded-full bg-slate-200/70")
+  })
+
+  it("keeps the page itself fixed while the workspace manages overflow", () => {
+    expect(pageSource).toContain('className="flex h-full min-h-0 flex-col gap-3 overflow-hidden"')
   })
 
   it("filters both panels from the single search box", () => {
     expect(pageSource).toContain("filterSecurityVisitRows(getExpectedSecurityVisits(scopedVisits, now), search)")
     expect(pageSource).toContain("filterSecurityVisitRows(getInsideSecurityVisits(scopedVisits, now), search)")
+  })
+
+  it("caps the toolbar search width so it cannot swallow the toolbar", () => {
+    expect(pageSource).toContain("lg:max-w-xs lg:flex-1")
   })
 
   it("uses a facility icon, not a clock, for the company/facility context box", () => {
@@ -58,6 +80,14 @@ describe("SecurityOperationsPage contract", () => {
     expect(pageSource).toContain('from "@/features/security/SecurityVisitDetailDialog"')
     expect(pageSource).toContain("onClick={onOpenDetail}")
     expect(pageSource).toContain("event.stopPropagation()")
+    expect(pageSource).toContain('role="button"')
+    expect(pageSource).toContain('event.key === "Enter" || event.key === " "')
+  })
+
+  it("renders the inside overflow control as a real icon-button below the primary checkout action", () => {
+    expect(pageSource).toContain("MoreHorizontal")
+    expect(pageSource).toContain('size="icon-sm" variant="ghost"')
+    expect(pageSource).toContain('aria-label="Ziyaret işlemleri" title="Ziyaret işlemleri"')
   })
 
   it("wires check-in, checkout, and visitor correction through SecurityService dialogs", () => {
