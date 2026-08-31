@@ -5,6 +5,8 @@ import {
   isAdminUsernameTaken,
   isAuthorizationScopeValid,
   isVisitTypeNameTaken,
+  canMarkVisitorCardLost,
+  canRestoreVisitorCard,
   isVisitorCardNumberTaken,
   normalizeVisitorCardNumber,
   normalizeVisitTypeName,
@@ -84,6 +86,18 @@ describe("Visitor card number uniqueness", () => {
 
   it("does not treat the card being edited as its own duplicate", () => {
     expect(isVisitorCardNumberTaken(cards, "card-1", "001")).toBe(false)
+  })
+})
+
+describe("Visitor card write-off transitions", () => {
+  const statuses = ["AVAILABLE", "IN_USE", "NOT_RETURNED", "LOST", "DISABLED"] as const
+
+  it("allows marking only NOT_RETURNED cards as lost", () => {
+    expect(statuses.filter((status) => canMarkVisitorCardLost({ status }))).toEqual(["NOT_RETURNED"])
+  })
+
+  it("allows restoring only LOST cards to inventory", () => {
+    expect(statuses.filter((status) => canRestoreVisitorCard({ status }))).toEqual(["LOST"])
   })
 })
 

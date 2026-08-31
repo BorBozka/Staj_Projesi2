@@ -140,6 +140,26 @@ export function isAdminManagedVisitorCard(card: Pick<VisitorCardInventoryItem, "
   return card.status === "AVAILABLE" || card.status === "DISABLED"
 }
 
+/**
+ * Visitor card status ownership:
+ *   AVAILABLE      Admin
+ *   IN_USE         Security (check-in)
+ *   NOT_RETURNED   Security (visitor left without checking out)
+ *   LOST           Admin (written off)
+ *   DISABLED       Admin
+ *
+ * `isAdminManagedVisitorCard` answers "may Admin edit this card's number/active
+ * flag" (AVAILABLE | DISABLED). The two write-off transitions below are separate,
+ * intent-revealing actions and are not covered by it.
+ */
+export function canMarkVisitorCardLost(card: Pick<VisitorCardInventoryItem, "status">): boolean {
+  return card.status === "NOT_RETURNED"
+}
+
+export function canRestoreVisitorCard(card: Pick<VisitorCardInventoryItem, "status">): boolean {
+  return card.status === "LOST"
+}
+
 export interface VisitorRuleVersion {
   id: string
   version: number

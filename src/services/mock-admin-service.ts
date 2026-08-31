@@ -2,6 +2,8 @@ import {
   isAdminEmailTaken,
   isAdminUsernameTaken,
   isAdminManagedVisitorCard,
+  canMarkVisitorCardLost,
+  canRestoreVisitorCard,
   isOperationalSettingsValid,
   isAuthorizationScopeValid,
   isVisitorCardNumberTaken,
@@ -93,6 +95,24 @@ export class MockAdminService implements AdminService {
     if (!cardNumber) throw new Error("Kart numarası boş olamaz.")
     if (isVisitorCardNumberTaken(this.cards, existing.id, cardNumber)) throw new Error("Bu kart numarası zaten tanımlı.")
     const entity: VisitorCardInventoryItem = { ...existing, cardNumber, status: input.active ? "AVAILABLE" : "DISABLED" }
+    this.cards = this.cards.map((card) => card.id === existing.id ? entity : card)
+    return clone(entity)
+  }
+  async markVisitorCardLost(idValue: string) {
+    const existing = this.cards.find((card) => card.id === idValue)
+    if (!existing) throw new Error("Kart bulunamadı.")
+    if (!canMarkVisitorCardLost(existing)) throw new Error("Yalnız iade edilmemiş kartlar kayıp olarak işaretlenebilir.")
+    // Keep assignedVisitorName: who held the card is the write-off record's key detail.
+    const entity: VisitorCardInventoryItem = { ...existing, status: "LOST" }
+    this.cards = this.cards.map((card) => card.id === existing.id ? entity : card)
+    return clone(entity)
+  }
+  async restoreVisitorCard(idValue: string) {
+    const existing = this.cards.find((card) => card.id === idValue)
+    if (!existing) throw new Error("Kart bulunamadı.")
+    if (!canRestoreVisitorCard(existing)) throw new Error("Yalnız kayıp kartlar envantere geri alınabilir.")
+    // Drop assignedVisitorName: the card is physically back in inventory, held by no one.
+    const entity: VisitorCardInventoryItem = { id: existing.id, cardNumber: existing.cardNumber, status: "AVAILABLE" }
     this.cards = this.cards.map((card) => card.id === existing.id ? entity : card)
     return clone(entity)
   }

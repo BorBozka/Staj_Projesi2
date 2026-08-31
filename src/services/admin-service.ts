@@ -20,6 +20,8 @@ export interface AdminService {
   getVisitorCards(): Promise<VisitorCardInventoryItem[]>
   createVisitorCard(input: CreateVisitorCardInput): Promise<VisitorCardInventoryItem>
   updateVisitorCardInventory(id: string, input: UpdateVisitorCardInventoryInput): Promise<VisitorCardInventoryItem>
+  markVisitorCardLost(id: string): Promise<VisitorCardInventoryItem>
+  restoreVisitorCard(id: string): Promise<VisitorCardInventoryItem>
   getVisitorRuleVersions(): Promise<VisitorRuleVersion[]>
   publishVisitorRule(content: string): Promise<VisitorRuleVersion>
   getOperationalSettings(): Promise<OperationalSettings>

@@ -226,6 +226,47 @@ describe("MockAdminService other admin resources", () => {
     await expect(service.updateVisitorCardInventory(lost.id, { cardNumber: lost.cardNumber, active: false })).rejects.toThrow("Security operasyonu")
   })
 
+  it("marks a not-returned card lost while keeping the holder's name on record", async () => {
+    const service = new MockAdminService()
+    const notReturned = (await service.getVisitorCards()).find((card) => card.status === "NOT_RETURNED")!
+    expect(notReturned.assignedVisitorName).toBeTruthy()
+
+    const lost = await service.markVisitorCardLost(notReturned.id)
+    expect(lost).toMatchObject({ id: notReturned.id, status: "LOST", assignedVisitorName: notReturned.assignedVisitorName })
+  })
+
+  it("restores a lost card to inventory and clears its holder", async () => {
+    const service = new MockAdminService()
+    const notReturned = (await service.getVisitorCards()).find((card) => card.status === "NOT_RETURNED")!
+    await service.markVisitorCardLost(notReturned.id)
+
+    const restored = await service.restoreVisitorCard(notReturned.id)
+    expect(restored).toMatchObject({ id: notReturned.id, status: "AVAILABLE" })
+    expect(restored.assignedVisitorName).toBeUndefined()
+    expect((await service.getVisitorCards()).find((card) => card.id === notReturned.id)?.assignedVisitorName).toBeUndefined()
+  })
+
+  it("rejects write-off transitions that do not start from the required status", async () => {
+    const service = new MockAdminService()
+    const cards = await service.getVisitorCards()
+    const byStatus = (status: string) => cards.find((card) => card.status === status)!
+
+    for (const status of ["AVAILABLE", "IN_USE", "DISABLED"] as const) {
+      await expect(service.markVisitorCardLost(byStatus(status).id)).rejects.toThrow("Yalnız iade edilmemiş kartlar kayıp olarak işaretlenebilir.")
+    }
+    for (const status of ["NOT_RETURNED", "AVAILABLE"] as const) {
+      await expect(service.restoreVisitorCard(byStatus(status).id)).rejects.toThrow("Yalnız kayıp kartlar envantere geri alınabilir.")
+    }
+    await expect(service.markVisitorCardLost("no-such-card")).rejects.toThrow("Kart bulunamadı.")
+    await expect(service.restoreVisitorCard("no-such-card")).rejects.toThrow("Kart bulunamadı.")
+  })
+
+  it("keeps a lost card out of the Admin inventory-edit boundary", async () => {
+    const service = new MockAdminService()
+    const lost = (await service.getVisitorCards()).find((card) => card.status === "LOST")!
+    await expect(service.updateVisitorCardInventory(lost.id, { cardNumber: lost.cardNumber, active: true })).rejects.toThrow("Security operasyonu")
+  })
+
   it("preserves operational visitor assignments and isolates inventory edits", async () => {
     const service = new MockAdminService()
     const before = await service.getVisitorCards()
