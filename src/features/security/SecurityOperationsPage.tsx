@@ -168,8 +168,7 @@ function ExpectedRow({ row, onCheckIn }: { row: SecurityVisitRow; onCheckIn(visi
         <div className="h-14 min-w-0 flex-1 py-2">
           <div className="flex items-center gap-2">
             <span className="shrink-0 text-xs font-semibold tabular-nums text-slate-900">{formatVisitTime(visit.plannedStart)}</span>
-            <span className="truncate text-xs font-semibold text-slate-900">{visit.visitor.firstName} {visit.visitor.lastName}</span>
-            <span className="shrink-0 text-[10px] text-slate-500">{visit.visitTypeName}</span>
+            <span className="truncate text-xs font-semibold text-slate-900">{visit.visitor.firstName} {visit.visitor.lastName} - {visit.visitTypeName}</span>
             {isDelayed && <StatusPill tone="warning">Gecikti</StatusPill>}
           </div>
           <p className="mt-1 truncate text-[11px] text-slate-500">{visit.visitor.company} · {visit.hostEmployeeName}</p>
@@ -190,8 +189,7 @@ function InsideRow({ row, onCheckOut }: { row: SecurityVisitRow; onCheckOut(visi
       <div className="flex w-full items-center gap-3 px-3">
         <div className="h-14 min-w-0 flex-1 py-2">
           <div className="flex items-center gap-2">
-            <span className="truncate text-xs font-semibold text-slate-900">{visit.visitor.firstName} {visit.visitor.lastName}</span>
-            <span className="shrink-0 text-[10px] text-slate-500">{visit.visitTypeName}</span>
+            <span className="truncate text-xs font-semibold text-slate-900">{visit.visitor.firstName} {visit.visitor.lastName} - {visit.visitTypeName}</span>
             {isDelayed && <StatusPill tone="danger">Süre aştı · {delayMinutes} dk</StatusPill>}
           </div>
           <p className="mt-1 flex items-center justify-between gap-2 text-[11px]">

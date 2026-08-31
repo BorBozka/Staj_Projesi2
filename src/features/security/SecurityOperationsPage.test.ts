@@ -33,8 +33,8 @@ describe("SecurityOperationsPage contract", () => {
     expect(pageSource).toContain("filterSecurityVisitRows(getInsideSecurityVisits(scopedVisits, now), search)")
   })
 
-  it("shows each visit type on both operation row variants and suppresses the search focus outline", () => {
-    expect(pageSource.match(/\{visit\.visitTypeName\}/g)).toHaveLength(2)
+  it("shows each visit type after the visitor name on both operation row variants and suppresses the search focus outline", () => {
+    expect(pageSource.match(/\{visit\.visitor\.firstName\} \{visit\.visitor\.lastName\} - \{visit\.visitTypeName\}/g)).toHaveLength(2)
     expect(pageSource).toContain('className="h-9 pl-9 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"')
   })
 
