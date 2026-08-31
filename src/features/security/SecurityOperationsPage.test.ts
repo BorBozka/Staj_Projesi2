@@ -18,7 +18,7 @@ describe("SecurityOperationsPage contract", () => {
   it("renders the expected and inside lists together in two side-by-side panels", () => {
     expect(pageSource).toContain('title="Beklenenler"')
     expect(pageSource).toContain('title="İçeride"')
-    expect(pageSource).toContain("lg:grid-cols-[3fr_2fr]")
+    expect(pageSource).toContain("lg:grid-cols-2")
     expect(pageSource).toContain("getExpectedSecurityVisits")
     expect(pageSource).toContain("getInsideSecurityVisits")
   })
@@ -60,23 +60,31 @@ describe("SecurityOperationsPage contract", () => {
     expect(pageSource).toContain("event.stopPropagation()")
   })
 
-  it("wires check-in, checkout, and visitor correction through SecurityService dialogs", () => {
+  it("wires check-in and checkout through SecurityService dialogs", () => {
     expect(pageSource).toContain('from "@/features/security/SecurityCheckInDialog"')
     expect(pageSource).toContain('from "@/features/security/SecurityCheckOutDialog"')
-    expect(pageSource).toContain('from "@/features/security/SecurityVisitorCorrectionDialog"')
     expect(pageSource).toContain("Giriş yap")
     expect(pageSource).toContain("Çıkış yap")
-    expect(pageSource).toContain("Bilgileri düzelt")
   })
 
-  it("renders the İçeride row as a three-line block matching ExpectedRow's hierarchy", () => {
-    // Line 1: visitor name. Line 2: "{company} · {host}" (identical style to ExpectedRow).
-    // Line 3: "{check-in} giriş · Kart {n}" with the overrun pill moved off the name line.
-    expect(pageSource).toContain('<p className="mt-1 truncate text-[11px] text-slate-500">{visit.visitor.company} · {visit.hostEmployeeName}</p>')
-    expect(pageSource).toContain('{checkInLabel} giriş · Kart {cardLabel}')
+  it("keeps the İçeride panel free of the row overflow menu and the in-page correction dialog", () => {
+    expect(pageSource).not.toContain("DropdownMenu")
+    expect(pageSource).not.toContain("MoreHorizontal")
+    expect(pageSource).not.toContain("Bilgileri düzelt")
+    expect(pageSource).not.toContain("SecurityVisitorCorrectionDialog")
+    expect(pageSource).not.toContain("correctingVisit")
+    expect(pageSource).not.toContain("onEdit")
+  })
+
+  it("renders the İçeride row as a two-line block with the overrun pill on the name line", () => {
+    // Line 1: name + "Süre aştı" pill (same placement as ExpectedRow's "Gecikti").
+    // Line 2: "{company} · {host}" (truncates) on the left, "{check-in} · #{card}" (never
+    // truncates) on the right.
+    expect(pageSource).toContain('<span className="min-w-0 flex-1 truncate text-slate-500">{visit.visitor.company} · {visit.hostEmployeeName}</span>')
+    expect(pageSource).toContain('<span className="shrink-0 text-slate-400">{checkInLabel} · #{cardLabel}</span>')
     expect(pageSource).toContain('visit.actualCheckIn ? formatVisitTime(visit.actualCheckIn) : "—"')
     expect(pageSource).toContain('visit.visitorCardNumber ?? "—"')
-    // The overrun pill is no longer on the name line; the row is the same height as ExpectedRow.
-    expect(pageSource).not.toContain('<div className="flex h-11 min-w-0 flex-1 items-center gap-2">')
+    // No third line, and no "giriş" word next to the time any more.
+    expect(pageSource).not.toContain("giriş ·")
   })
 })

@@ -1,15 +1,13 @@
-import { Building2, MoreHorizontal, Search } from "lucide-react"
+import { Building2, Search } from "lucide-react"
 import { type KeyboardEvent, useEffect, useMemo, useState } from "react"
 
 import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import type { Visit } from "@/domain/visits"
 import { SecurityCheckInDialog } from "@/features/security/SecurityCheckInDialog"
 import { SecurityCheckOutDialog } from "@/features/security/SecurityCheckOutDialog"
 import { SecurityPendingCardReturnsDialog } from "@/features/security/SecurityPendingCardReturnsDialog"
 import { SecurityVisitDetailDialog } from "@/features/security/SecurityVisitDetailDialog"
-import { SecurityVisitorCorrectionDialog } from "@/features/security/SecurityVisitorCorrectionDialog"
 import { formatTr } from "@/lib/date"
 import { cn } from "@/lib/utils"
 import { useVisits } from "@/features/visits/visit-context"
@@ -29,7 +27,6 @@ export function SecurityOperationsPage() {
   const [now, setNow] = useState(() => new Date())
   const [checkInTarget, setCheckInTarget] = useState<Visit | null>(null)
   const [checkOutTarget, setCheckOutTarget] = useState<Visit | null>(null)
-  const [correctingVisit, setCorrectingVisit] = useState<Visit | null>(null)
   const [detailVisit, setDetailVisit] = useState<Visit | null>(null)
   const [cardIssues, setCardIssues] = useState<SecurityCardIssue[]>([])
   const [cardReturnsOpen, setCardReturnsOpen] = useState(false)
@@ -108,7 +105,7 @@ export function SecurityOperationsPage() {
         <span id="unplanned-visit-note" className="sr-only">Plansız ziyaret işlemi sonraki aşamada kullanıma açılacaktır.</span>
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-3 overflow-hidden grid-rows-2 lg:grid-cols-[3fr_2fr] lg:grid-rows-1">
+      <div className="grid min-h-0 flex-1 gap-3 overflow-hidden grid-rows-2 lg:grid-cols-2 lg:grid-rows-1">
         <OperationPanel title="Beklenenler" count={expectedRows.length} ariaLabel="Beklenen ziyaretler">
           {isLoading ? <PanelState message="Yükleniyor…" />
             : error ? <PanelState message={error} tone="error" />
@@ -123,7 +120,7 @@ export function SecurityOperationsPage() {
             : error ? <PanelState message={error} tone="error" />
               : insideRows.length === 0 ? <PanelState message={search.trim() ? "Aramayla eşleşen kayıt yok." : "İçeride ziyaretçi yok."} />
                 : <ul className="divide-y divide-slate-100">
-                    {insideRows.map((row) => <InsideRow key={row.visit.id} row={row} onOpenDetail={setDetailVisit} onCheckOut={setCheckOutTarget} onEdit={setCorrectingVisit} />)}
+                    {insideRows.map((row) => <InsideRow key={row.visit.id} row={row} onOpenDetail={setDetailVisit} onCheckOut={setCheckOutTarget} />)}
                   </ul>}
         </OperationPanel>
       </div>
@@ -150,12 +147,6 @@ export function SecurityOperationsPage() {
         open={Boolean(checkOutTarget)}
         onOpenChange={(next) => { if (!next) setCheckOutTarget(null) }}
         onCheckedOut={() => { setCheckOutTarget(null); void reload() }}
-      />
-      <SecurityVisitorCorrectionDialog
-        visit={correctingVisit}
-        open={Boolean(correctingVisit)}
-        onOpenChange={(next) => { if (!next) setCorrectingVisit(null) }}
-        onSaved={() => { setCorrectingVisit(null); void reload() }}
       />
     </div>
   )
@@ -217,7 +208,7 @@ function ExpectedRow({ row, onOpenDetail, onCheckIn }: { row: SecurityVisitRow; 
   )
 }
 
-function InsideRow({ row, onOpenDetail, onCheckOut, onEdit }: { row: SecurityVisitRow; onOpenDetail(visit: Visit): void; onCheckOut(visit: Visit): void; onEdit(visit: Visit): void }) {
+function InsideRow({ row, onOpenDetail, onCheckOut }: { row: SecurityVisitRow; onOpenDetail(visit: Visit): void; onCheckOut(visit: Visit): void }) {
   const { visit, isDelayed, delayMinutes } = row
   const checkInLabel = visit.actualCheckIn ? formatVisitTime(visit.actualCheckIn) : "—"
   const cardLabel = visit.visitorCardNumber ?? "—"
@@ -227,21 +218,15 @@ function InsideRow({ row, onOpenDetail, onCheckOut, onEdit }: { row: SecurityVis
         <div className="h-14 min-w-0 flex-1 py-2">
           <div className="flex items-center gap-2">
             <span className="truncate text-xs font-semibold text-slate-900">{visit.visitor.firstName} {visit.visitor.lastName}</span>
-          </div>
-          <p className="mt-1 truncate text-[11px] text-slate-500">{visit.visitor.company} · {visit.hostEmployeeName}</p>
-          <p className="mt-1 flex items-center gap-2 text-[11px] text-slate-500">
-            <span className="min-w-0 truncate">{checkInLabel} giriş · Kart {cardLabel}</span>
             {isDelayed && <StatusPill tone="danger">Süre aştı · {delayMinutes} dk</StatusPill>}
+          </div>
+          <p className="mt-1 flex items-center justify-between gap-2 text-[11px]">
+            <span className="min-w-0 flex-1 truncate text-slate-500">{visit.visitor.company} · {visit.hostEmployeeName}</span>
+            <span className="shrink-0 text-slate-400">{checkInLabel} · #{cardLabel}</span>
           </p>
         </div>
         <RowActions>
           <Button type="button" size="sm" className="h-7 px-2 text-[11px]" onClick={() => onCheckOut(visit)}>Çıkış yap</Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button type="button" size="icon" variant="ghost" className="size-7" aria-label="Ziyaret işlemleri"><MoreHorizontal className="size-4" /></Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => onEdit(visit)}>Bilgileri düzelt</DropdownMenuItem></DropdownMenuContent>
-          </DropdownMenu>
         </RowActions>
       </RowShell>
     </li>
