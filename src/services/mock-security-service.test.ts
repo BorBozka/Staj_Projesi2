@@ -199,6 +199,32 @@ describe("MockSecurityService correctVisitor", () => {
     expect(result.status).toBe("CHECKED_IN")
   })
 
+  it("updates the meeting-level visit type for the corrected visitor", async () => {
+    const { visitService, security } = setup()
+    const created = await visitService.createMeeting({
+      ...meetingInput,
+      visitors: [
+        ...meetingInput.visitors,
+        { firstName: "İkinci", lastName: "Ziyaretçi", email: "ikinci@example.com", company: "Test A.Ş." },
+      ],
+    })
+
+    const result = await security.correctVisitor(created.visits[0].id, {
+      firstName: "Test",
+      lastName: "Ziyaretci",
+      company: "Test A.Ş.",
+      visitTypeId: "customer",
+      ...hostUnchanged,
+    })
+
+    expect(result).toMatchObject({ visitTypeId: "customer", visitTypeName: "Müşteri Ziyareti" })
+    expect((await visitService.listVisits()).filter((visit) => visit.meetingId === created.meeting.id))
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({ visitTypeId: "customer", visitTypeName: "Müşteri Ziyareti" }),
+        expect.objectContaining({ visitTypeId: "customer", visitTypeName: "Müşteri Ziyareti" }),
+      ]))
+  })
+
   it("leaves the visitor email untouched when the correction omits it", async () => {
     const { visitService, security } = setup()
     const created = await visitService.createMeeting(meetingInput)
@@ -261,7 +287,7 @@ describe("MockSecurityService correctVisitor", () => {
     expect(result.hostCorrectedBy).toBeUndefined()
   })
 
-  it("never changes visit type, facility, schedule, note, status, or invitation metadata", async () => {
+  it("never changes unedited facility, schedule, note, status, or invitation metadata", async () => {
     const { visitService, security } = setup()
     const created = await visitService.createMeeting(meetingInput)
     await visitService.sendVisitInvitation(created.visits[0].id)
@@ -270,7 +296,6 @@ describe("MockSecurityService correctVisitor", () => {
     const result = await security.correctVisitor(created.visits[0].id, { firstName: "Yeni", lastName: "İsim", company: "Farklı A.Ş.", ...hostUnchanged })
 
     expect(result.hostEmployeeName).toBe(before.hostEmployeeName)
-    expect(result.visitTypeName).toBe(before.visitTypeName)
     expect(result.facilityId).toBe(before.facilityId)
     expect(result.plannedStart).toBe(before.plannedStart)
     expect(result.plannedEnd).toBe(before.plannedEnd)

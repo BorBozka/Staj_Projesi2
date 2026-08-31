@@ -21,8 +21,9 @@ describe("SecurityVisitorCorrectionDialog contract", () => {
     expect(source).not.toContain("draft.email")
     expect(source).toContain('label="Ev sahibi"')
     expect(source).toContain("hostEmployeeName: visit.hostEmployeeName")
-    // Free text, not a picker.
-    expect(source).not.toContain("<Select")
+    expect(source).toContain("visitTypeId: visit.visitTypeId")
+    // The host remains free text; the meeting-level visit type is a picker.
+    expect(source).toContain("<Select")
     expect(source).not.toContain("required")
   })
 
@@ -33,9 +34,16 @@ describe("SecurityVisitorCorrectionDialog contract", () => {
     expect(source).toContain("saveDisabled = invalid || !dirty || saving")
   })
 
-  it("sends the host name to correctVisitor and no longer sends an email field", () => {
+  it("sends the host name and selected visit type to correctVisitor and no longer sends an email field", () => {
     expect(source).toContain("hostEmployeeName,")
+    expect(source).toContain("visitTypeId: draft.visitTypeId")
     expect(source).not.toContain("email:")
+  })
+
+  it("lets Security choose an active visit type while retaining the current type", () => {
+    expect(source).toContain('from "@/components/ui/select"')
+    expect(source).toContain("type.active || type.id === visit.visitTypeId")
+    expect(source).toContain('label="Ziyaret türü"')
   })
 
   it("only lets Security correct an existing phone, using the shared local formatter", () => {

@@ -281,15 +281,19 @@ export class MockVisitService implements VisitService {
 
   applyVisitorCorrection(
     visitId: string,
-    correction: { firstName: string; lastName: string; company: string; email?: string; phone?: string; hostEmployeeName?: string },
+    correction: { firstName: string; lastName: string; company: string; email?: string; phone?: string; hostEmployeeName?: string; visitTypeId?: string },
   ): Visit {
     const current = this.findVisitRecord(visitId)
     const meeting = this.findMeeting(current.meetingId)
     const now = new Date().toISOString()
-    const { hostEmployeeName, ...visitorCorrection } = correction
+    const { hostEmployeeName, visitTypeId, ...visitorCorrection } = correction
 
     const nextHostName = hostEmployeeName?.trim()
     const hostChanged = Boolean(nextHostName) && nextHostName !== meeting.hostEmployeeName
+    const nextVisitType = visitTypeId ? this.getReferenceDataSnapshot().visitTypes.find((type) => type.id === visitTypeId) : undefined
+    if (visitTypeId && !nextVisitType) throw new Error("Ziyaret türü bulunamadı.")
+    if (nextVisitType && !nextVisitType.active && nextVisitType.id !== meeting.visitTypeId) throw new Error("Pasif ziyaret türü seçilemez.")
+    const visitTypeChanged = Boolean(nextVisitType) && nextVisitType!.id !== meeting.visitTypeId
 
     let hostAudit: Pick<VisitRecord, "hostCorrectedFrom" | "hostCorrectedAt" | "hostCorrectedBy"> = {}
     if (hostChanged) {
@@ -297,8 +301,15 @@ export class MockVisitService implements VisitService {
       const actorName = reference.employees.find((employee) => employee.id === reference.currentEmployee.employeeId)?.name
         ?? reference.currentEmployee.employeeId
       hostAudit = { hostCorrectedFrom: meeting.hostEmployeeName, hostCorrectedAt: now, hostCorrectedBy: actorName }
+    }
+    if (hostChanged || visitTypeChanged) {
       this.meetings = this.meetings.map((item) => item.id === meeting.id
-        ? { ...item, hostEmployeeName: nextHostName!, updatedAt: now }
+        ? {
+            ...item,
+            ...(hostChanged ? { hostEmployeeName: nextHostName! } : {}),
+            ...(visitTypeChanged ? { visitTypeId: nextVisitType!.id, visitTypeName: nextVisitType!.name } : {}),
+            updatedAt: now,
+          }
         : item)
     }
 

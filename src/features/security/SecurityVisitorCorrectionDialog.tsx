@@ -3,7 +3,9 @@ import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Select } from "@/components/ui/select"
 import type { Visit } from "@/domain/visits"
+import { useVisits } from "@/features/visits/visit-context"
 import { formatLocalVisitorPhone, normalizeVisitorPhone } from "@/lib/phone"
 import { securityService } from "@/services"
 
@@ -12,6 +14,7 @@ interface CorrectionDraft {
   lastName: string
   company: string
   hostEmployeeName: string
+  visitTypeId: string
   phone: string
 }
 
@@ -21,6 +24,7 @@ function draftFor(visit: Visit): CorrectionDraft {
     lastName: visit.visitor.lastName,
     company: visit.visitor.company,
     hostEmployeeName: visit.hostEmployeeName,
+    visitTypeId: visit.visitTypeId,
     phone: visit.visitor.phone ? formatLocalVisitorPhone(visit.visitor.phone) : "",
   }
 }
@@ -33,6 +37,7 @@ interface SecurityVisitorCorrectionDialogProps {
 }
 
 export function SecurityVisitorCorrectionDialog({ visit, open, onOpenChange, onSaved }: SecurityVisitorCorrectionDialogProps) {
+  const { referenceData } = useVisits()
   const [draft, setDraft] = useState<CorrectionDraft | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -51,10 +56,12 @@ export function SecurityVisitorCorrectionDialog({ visit, open, onOpenChange, onS
   const lastName = draft.lastName.trim()
   const company = draft.company.trim()
   const hostEmployeeName = draft.hostEmployeeName.trim()
+  const visitTypes = referenceData?.visitTypes.filter((type) => type.active || type.id === visit.visitTypeId) ?? [{ id: visit.visitTypeId, name: visit.visitTypeName, active: true }]
   const invalid = !firstName || !lastName || !company || !hostEmployeeName
   const initial = draftFor(visit)
   const dirty = draft.firstName !== initial.firstName || draft.lastName !== initial.lastName
     || draft.company !== initial.company || draft.hostEmployeeName !== initial.hostEmployeeName
+    || draft.visitTypeId !== initial.visitTypeId
     || draft.phone !== initial.phone
   const saveDisabled = invalid || !dirty || saving
 
@@ -67,6 +74,7 @@ export function SecurityVisitorCorrectionDialog({ visit, open, onOpenChange, onS
         firstName,
         lastName,
         company,
+        visitTypeId: draft.visitTypeId,
         ...(visit.visitor.phone ? { phone: draft.phone.trim() ? normalizeVisitorPhone(draft.phone) : undefined } : {}),
         hostEmployeeName,
       })
@@ -98,6 +106,11 @@ export function SecurityVisitorCorrectionDialog({ visit, open, onOpenChange, onS
           </Field>
           <Field label="Ev sahibi">
             <Input value={draft.hostEmployeeName} onChange={(event) => setDraft({ ...draft, hostEmployeeName: event.target.value })} />
+          </Field>
+          <Field label="Ziyaret türü">
+            <Select value={draft.visitTypeId} onChange={(event) => setDraft({ ...draft, visitTypeId: event.target.value })}>
+              {visitTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
+            </Select>
           </Field>
           {visit.visitor.phone && (
             <Field label="Telefon (opsiyonel)">

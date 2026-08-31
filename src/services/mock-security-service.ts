@@ -100,15 +100,16 @@ export class MockSecurityService implements SecurityService {
     if (!hostEmployeeName) throw new Error("Ev sahibi zorunludur.")
 
     const phone = input.phone?.trim() || undefined
+    const visitTypeId = input.visitTypeId?.trim() || undefined
 
     // email is only applied when the caller actually passed the field. The dialog no longer
     // sends it, so an omitted email leaves visitor.email untouched; an explicit value (even a
     // blank one, which clears it) still flows through.
     if (input.email === undefined) {
-      return this.visitService.applyVisitorCorrection(visitId, { firstName, lastName, company, phone, hostEmployeeName })
+      return this.visitService.applyVisitorCorrection(visitId, { firstName, lastName, company, phone, hostEmployeeName, visitTypeId })
     }
     const email = normalizeVisitorEmail(input.email)
     if (email && !isValidVisitorEmail(email)) throw new Error("Geçerli bir e-posta adresi girin.")
-    return this.visitService.applyVisitorCorrection(visitId, { firstName, lastName, company, email, phone, hostEmployeeName })
+    return this.visitService.applyVisitorCorrection(visitId, { firstName, lastName, company, email, phone, hostEmployeeName, visitTypeId })
   }
 }
