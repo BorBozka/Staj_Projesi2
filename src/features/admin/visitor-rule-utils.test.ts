@@ -4,9 +4,9 @@ import type { VisitorRuleVersion } from "@/domain/admin"
 import { getActiveVisitorRule, getHistoricalVisitorRules, getVisitorRuleContentError, isVisitorRuleDraftDirty } from "@/features/admin/visitor-rule-utils"
 
 const rules: VisitorRuleVersion[] = [
-  { id: "rule-1", version: 1, content: "v1", createdAt: "2026-01-01", publishedAt: "2026-01-01", active: false },
-  { id: "rule-3", version: 3, content: "v3", createdAt: "2026-03-01", publishedAt: "2026-03-01", active: true },
-  { id: "rule-2", version: 2, content: "v2", createdAt: "2026-02-01", publishedAt: "2026-02-01", active: false },
+  { id: "rule-1", version: 1, content: "v1", publishedAt: "2026-01-01", active: false },
+  { id: "rule-3", version: 3, content: "v3", publishedAt: "2026-03-01", active: true },
+  { id: "rule-2", version: 2, content: "v2", publishedAt: "2026-02-01", active: false },
 ]
 
 describe("Visitor rule read model and draft validation", () => {

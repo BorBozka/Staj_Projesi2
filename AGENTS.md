@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex when working with code in this repository.
 
 ## Project
 
@@ -132,3 +132,5 @@ No jsdom, no `@testing-library/react` — not installed, not needed for how test
 - Domain-specific comparator functions (`compareVisits`, `compareGoodsMovements`,
   `compareResources`, etc.) intentionally stay local to their feature file — only the generic
   toggle/paginate mechanics are shared.
+
+## Imported Claude Cowork project instructions

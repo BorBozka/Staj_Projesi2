@@ -401,6 +401,11 @@ Changing rules creates a new version.
 
 Historical versions and acceptance records are immutable.
 
+Admin publishes a complete rule text directly; there is no draft, edit, or delete lifecycle.
+Publishing atomically makes the new version active and deactivates the previous active version.
+Each published version has one `publishedAt` timestamp; a separate creation timestamp is not kept
+because a rule cannot exist before publication.
+
 Legal/KVKK review may later add requirements.
 
 ---
@@ -420,6 +425,13 @@ Suggested states:
 Only available cards can be assigned.
 
 An in-use card cannot be assigned to another active visit.
+
+Card state ownership is explicit:
+
+- Admin creates cards and may edit the card number or disable/enable cards only while they are `AVAILABLE` or `DISABLED`.
+- Security changes a card to `IN_USE` at check-in and to `NOT_RETURNED` when the visitor leaves without returning it.
+- Admin may write off a `NOT_RETURNED` card as `LOST`, and may return a `LOST` card to `AVAILABLE` inventory.
+- `IN_USE` and `NOT_RETURNED` cards cannot be renumbered, disabled, or reassigned by Admin.
 
 Check-in:
 

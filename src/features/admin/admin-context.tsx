@@ -13,6 +13,8 @@ interface AdminContextValue {
   settings: OperationalSettings | null
   reload(): Promise<void>
   saveOrganizationEntity(kind: OrganizationKind, entity: Omit<OrganizationEntity, "id"> & { id?: string }): Promise<OrganizationEntity>
+  markVisitorCardLost(id: string): Promise<VisitorCardInventoryItem>
+  restoreVisitorCard(id: string): Promise<VisitorCardInventoryItem>
 }
 
 const AdminContext = createContext<AdminContextValue | null>(null)
@@ -38,7 +40,17 @@ export function AdminProvider({ service, children }: { service: AdminService; ch
     setOrganization(await service.getOrganization())
     return saved
   }, [service])
-  const value = useMemo(() => ({ users, organization, visitTypes, visitorCards, visitorRules, settings, reload, saveOrganizationEntity }), [users, organization, visitTypes, visitorCards, visitorRules, settings, reload, saveOrganizationEntity])
+  const markVisitorCardLost = useCallback(async (id: string) => {
+    const updated = await service.markVisitorCardLost(id)
+    setVisitorCards(await service.getVisitorCards())
+    return updated
+  }, [service])
+  const restoreVisitorCard = useCallback(async (id: string) => {
+    const updated = await service.restoreVisitorCard(id)
+    setVisitorCards(await service.getVisitorCards())
+    return updated
+  }, [service])
+  const value = useMemo(() => ({ users, organization, visitTypes, visitorCards, visitorRules, settings, reload, saveOrganizationEntity, markVisitorCardLost, restoreVisitorCard }), [users, organization, visitTypes, visitorCards, visitorRules, settings, reload, saveOrganizationEntity, markVisitorCardLost, restoreVisitorCard])
   return <AdminContext.Provider value={value}>{children}</AdminContext.Provider>
 }
 
