@@ -80,10 +80,10 @@ describe("SecurityOperationsPage contract", () => {
 
   it("renders the İçeride row as a two-line block: name + pill, then company·host and the visit times", () => {
     // Line 1: name + "Süre aştı" pill (same placement as ExpectedRow's "Gecikti").
-    // Line 2: "{company} · {host}" (truncates) on the left, "Giriş {check-in} · Bek. çıkış
+    // Line 2: "{company} · {host}" (truncates) on the left, "Giriş {check-in} · Beklenen çıkış
     // {planned end}" (never truncates) on the right. No card number on the row.
     expect(pageSource).toContain('<span className="min-w-0 flex-1 truncate text-slate-500">{visit.visitor.company} · {visit.hostEmployeeName}</span>')
-    expect(pageSource).toContain('Giriş {checkInLabel} · Bek. çıkış {formatVisitTime(visit.plannedEnd)}')
+    expect(pageSource).toContain('Giriş {checkInLabel} · Beklenen çıkış {formatVisitTime(visit.plannedEnd)}')
     expect(pageSource).toContain('visit.actualCheckIn ? formatVisitTime(visit.actualCheckIn) : "—"')
     expect(pageSource).not.toContain("visitorCardNumber")
     expect(pageSource).not.toContain("cardLabel")

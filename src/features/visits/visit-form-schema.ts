@@ -1,6 +1,7 @@
 import { z } from "zod"
 
 import { isValidVisitorEmail } from "@/domain/visits"
+import { normalizeVisitorPhone } from "@/lib/phone"
 
 const visitorSchema = z.object({
   visitId: z.string().optional(),
@@ -10,8 +11,6 @@ const visitorSchema = z.object({
   // email format.
   visitorEmail: z.string().trim().refine((value) => value === "" || isValidVisitorEmail(value), "Geçerli bir e-posta adresi girin."),
   visitorCompany: z.string().trim().min(1, "Ziyaretçi şirketi zorunludur."),
-  phoneCountryCode: z.string().default("+90"),
-  customPhoneCountryCode: z.string().trim().optional(),
   visitorPhone: z.string().trim().optional(),
 })
 
@@ -40,14 +39,8 @@ export const visitFormSchema = z
 
     value.visitors.forEach((visitor, index) => {
       if (!visitor.visitorPhone) return
-      if (visitor.phoneCountryCode === "+90" && !/^5\d{2} \d{3} \d{2} \d{2}$/.test(visitor.visitorPhone)) {
-        context.addIssue({ code: z.ZodIssueCode.custom, path: ["visitors", index, "visitorPhone"], message: "Telefon numarasını 5XX XXX XX XX formatında girin." })
-      }
-      if (visitor.phoneCountryCode !== "+90" && !/^\d{6,15}$/.test(visitor.visitorPhone.replace(/\s/g, ""))) {
-        context.addIssue({ code: z.ZodIssueCode.custom, path: ["visitors", index, "visitorPhone"], message: "Geçerli bir telefon numarası girin." })
-      }
-      if (visitor.phoneCountryCode === "other" && !/^\+\d{1,3}$/.test(visitor.customPhoneCountryCode ?? "")) {
-        context.addIssue({ code: z.ZodIssueCode.custom, path: ["visitors", index, "customPhoneCountryCode"], message: "Ülke kodunu + ile girin." })
+      if (!/^0?5\d{2}\s?\d{3}\s?\d{2}\s?\d{2}$/.test(visitor.visitorPhone)) {
+        context.addIssue({ code: z.ZodIssueCode.custom, path: ["visitors", index, "visitorPhone"], message: "Telefon numarasını 05XX XXX XX XX formatında girin." })
       }
     })
   })
@@ -62,9 +55,7 @@ export function toMeetingInput(values: VisitFormValues) {
       lastName: visitor.visitorLastName,
       email: visitor.visitorEmail.trim() || undefined,
       company: visitor.visitorCompany,
-      phone: visitor.visitorPhone?.trim()
-        ? `${visitor.phoneCountryCode === "other" ? visitor.customPhoneCountryCode : visitor.phoneCountryCode} ${visitor.visitorPhone.trim()}`
-        : undefined,
+      phone: visitor.visitorPhone?.trim() ? normalizeVisitorPhone(visitor.visitorPhone) : undefined,
     })),
     visitTypeId: values.visitTypeId,
     hostEmployeeName: values.hostEmployeeName,

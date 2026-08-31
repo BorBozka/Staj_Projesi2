@@ -21,15 +21,7 @@ import { getInvitationActionLabel } from "@/features/visits/invitation-status"
 import { useVisits } from "@/features/visits/visit-context"
 import { toMeetingInput, visitFormSchema, type VisitFormValues } from "@/features/visits/visit-form-schema"
 import { formatTr } from "@/lib/date"
-
-const phoneCountryCodes = [
-  { value: "+90", label: "Türkiye (+90)" },
-  { value: "+1", label: "ABD / Kanada (+1)" },
-  { value: "+31", label: "Hollanda (+31)" },
-  { value: "+44", label: "Birleşik Krallık (+44)" },
-  { value: "+49", label: "Almanya (+49)" },
-  { value: "other", label: "Diğer ülke" },
-]
+import { formatLocalVisitorPhone } from "@/lib/phone"
 
 const invitationStatusLabels: Record<InvitationStatus, string> = {
   NOT_SENT: "Gönderilmedi",
@@ -39,18 +31,7 @@ const invitationStatusLabels: Record<InvitationStatus, string> = {
 }
 
 function getPhoneDefaults(phone?: string) {
-  if (!phone) return { phoneCountryCode: "+90", customPhoneCountryCode: "", visitorPhone: "" }
-  const selectedCountry = phoneCountryCodes.find((country) => country.value !== "other" && phone.startsWith(`${country.value} `))
-  if (selectedCountry) {
-    const localNumber = phone.slice(selectedCountry.value.length).trim()
-    return {
-      phoneCountryCode: selectedCountry.value,
-      customPhoneCountryCode: "",
-      visitorPhone: selectedCountry.value === "+90" ? formatMobilePhone(localNumber) : localNumber.replace(/\D/g, ""),
-    }
-  }
-  const [countryCode = "", ...numberParts] = phone.split(/\s+/)
-  return { phoneCountryCode: "other", customPhoneCountryCode: countryCode, visitorPhone: numberParts.join("").replace(/\D/g, "") }
+  return { visitorPhone: phone ? formatLocalVisitorPhone(phone) : "" }
 }
 
 function blankVisitor() {
@@ -60,8 +41,6 @@ function blankVisitor() {
     visitorLastName: "",
     visitorEmail: "",
     visitorCompany: "",
-    phoneCountryCode: "+90",
-    customPhoneCountryCode: "",
     visitorPhone: "",
   }
 }
@@ -92,11 +71,6 @@ function defaultsFor(visits: Visit[] = []): VisitFormValues {
     hasAdditionalRequirements: visit?.hasAdditionalRequirements ?? false,
     additionalRequirementNote: visit?.additionalRequirementNote ?? "",
   }
-}
-
-function formatMobilePhone(value: string) {
-  const digits = value.replace(/\D/g, "").replace(/^0/, "").slice(0, 10)
-  return [digits.slice(0, 3), digits.slice(3, 6), digits.slice(6, 8), digits.slice(8, 10)].filter(Boolean).join(" ")
 }
 
 function findFirstErrorPath(errors: FieldErrors<VisitFormValues>, prefix = ""): FieldPath<VisitFormValues> | undefined {
@@ -306,7 +280,6 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
               </div>
 
               {visitorFields.fields.map((field, index) => {
-                const phoneCountryCode = form.watch(`visitors.${index}.phoneCountryCode`)
                 const canRemove = visitorFields.fields.length > 1 && !field.visitId
                 const { ref: phoneFieldRef, onChange: onPhoneChange, ...phoneField } = form.register(`visitors.${index}.visitorPhone`)
                 return (
@@ -333,38 +306,18 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
                         <Input {...form.register(`visitors.${index}.visitorCompany`)} />
                       </FormField>
                       <FormField label="Telefon (opsiyonel)" error={fieldError(`visitors.${index}.visitorPhone`)}>
-                        <div className={phoneCountryCode === "other" ? "grid gap-2 sm:grid-cols-[150px_96px_minmax(0,1fr)]" : "grid gap-2 sm:grid-cols-[150px_minmax(0,1fr)]"}>
-                          <Select {...form.register(`visitors.${index}.phoneCountryCode`)} aria-label={`Ziyaretçi ${index + 1} telefon ülke kodu`}>
-                            {phoneCountryCodes.map((country) => <option key={country.value} value={country.value}>{country.label}</option>)}
-                          </Select>
-                          {phoneCountryCode === "other" && (
-                            <Input
-                              placeholder="+ kod"
-                              inputMode="numeric"
-                              maxLength={4}
-                              aria-label={`Ziyaretçi ${index + 1} özel ülke kodu`}
-                              {...form.register(`visitors.${index}.customPhoneCountryCode`, {
-                                onChange: (event) => {
-                                  event.target.value = `+${event.target.value.replace(/\D/g, "").slice(0, 3)}`
-                                },
-                              })}
-                            />
-                          )}
-                          <Input
-                            {...phoneField}
-                            ref={phoneFieldRef}
-                            type="tel"
-                            inputMode="numeric"
-                            maxLength={phoneCountryCode === "+90" ? 13 : 15}
-                            placeholder={phoneCountryCode === "+90" ? "5XX XXX XX XX" : "Ulusal numara"}
-                            onChange={(event) => {
-                              event.target.value = phoneCountryCode === "+90"
-                                ? formatMobilePhone(event.target.value)
-                                : event.target.value.replace(/\D/g, "").slice(0, 15)
-                              onPhoneChange(event)
-                            }}
-                          />
-                        </div>
+                        <Input
+                          {...phoneField}
+                          ref={phoneFieldRef}
+                          type="tel"
+                          inputMode="numeric"
+                          maxLength={14}
+                          placeholder="05XX XXX XX XX"
+                          onChange={(event) => {
+                            event.target.value = formatLocalVisitorPhone(event.target.value)
+                            onPhoneChange(event)
+                          }}
+                        />
                       </FormField>
                     </div>
                     {field.visitId && visitorFields.fields.length > 1 && (

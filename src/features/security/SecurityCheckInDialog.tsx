@@ -9,6 +9,7 @@ import type { Visit } from "@/domain/visits"
 import type { VisitorCardInventoryItem } from "@/domain/admin"
 import { SecurityVisitorCorrectionDialog } from "@/features/security/SecurityVisitorCorrectionDialog"
 import { formatTr } from "@/lib/date"
+import { normalizeVisitorPhone } from "@/lib/phone"
 import { cn } from "@/lib/utils"
 import { securityService } from "@/services"
 
@@ -63,7 +64,7 @@ export function SecurityCheckInDialog({ visit, open, onOpenChange, onCheckedIn }
         visitId: currentVisit.id,
         visitorCardId: selectedCardId,
         vehiclePlate: plate.trim() || undefined,
-        phone: phone.trim() || undefined,
+        phone: phone.trim() ? normalizeVisitorPhone(phone) : undefined,
       })
       onCheckedIn(updated)
       onOpenChange(false)
@@ -125,7 +126,7 @@ export function SecurityCheckInDialog({ visit, open, onOpenChange, onCheckedIn }
             </div>
             <div>
               <Label htmlFor="security-checkin-phone">Telefon (opsiyonel)</Label>
-              <Input id="security-checkin-phone" type="tel" className="mt-1" value={phone} onChange={(event) => setPhone(event.target.value)} />
+              <Input id="security-checkin-phone" type="tel" placeholder="05XX XXX XX XX" className="mt-1" value={phone} onChange={(event) => setPhone(event.target.value)} />
             </div>
           </div>
 

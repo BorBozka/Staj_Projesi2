@@ -63,11 +63,13 @@ describe("visitFormSchema", () => {
     expect(toMeetingInput(parsed).visitors[0].email).toBeUndefined()
   })
 
-  it("accepts optional and international visitor phone values independently", () => {
+  it("accepts optional local visitor phone values and normalizes them to +90", () => {
     expect(visitFormSchema.safeParse({ ...validValues, visitors: [{ ...validVisitor, visitorPhone: "" }] }).success).toBe(true)
     expect(visitFormSchema.safeParse({ ...validValues, visitors: [{ ...validVisitor, visitorPhone: "532 123 45 67" }] }).success).toBe(true)
-    expect(visitFormSchema.safeParse({ ...validValues, visitors: [{ ...validVisitor, visitorPhone: "0532 123 45 67" }] }).success).toBe(false)
-    expect(visitFormSchema.safeParse({ ...validValues, visitors: [{ ...validVisitor, phoneCountryCode: "+44", visitorPhone: "2079460123" }] }).success).toBe(true)
+    expect(visitFormSchema.safeParse({ ...validValues, visitors: [{ ...validVisitor, visitorPhone: "0532 123 45 67" }] }).success).toBe(true)
+    expect(visitFormSchema.safeParse({ ...validValues, visitors: [{ ...validVisitor, visitorPhone: "531 123 45 6" }] }).success).toBe(false)
+    const parsed = visitFormSchema.parse({ ...validValues, visitors: [{ ...validVisitor, visitorPhone: "0530 555 18 24" }] })
+    expect(toMeetingInput(parsed).visitors[0].phone).toBe("+90 530 555 18 24")
   })
 
   it("maps several visitors and keeps the additional requirement note separate", () => {

@@ -34,7 +34,8 @@ describe("SecurityCheckInDialog contract", () => {
   it("captures an optional phone at the gate and forwards it to check-in", () => {
     expect(source).toContain("Telefon (opsiyonel)")
     expect(source).toContain('type="tel"')
-    expect(source).toContain("phone: phone.trim() || undefined")
+    expect(source).toContain('placeholder="05XX XXX XX XX"')
+    expect(source).toContain("phone: phone.trim() ? normalizeVisitorPhone(phone) : undefined")
   })
 
   it("offers a subtle path to correct visitor details without leaving the check-in flow", () => {

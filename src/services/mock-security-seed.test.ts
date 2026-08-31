@@ -3,9 +3,13 @@ import { describe, expect, it } from "vitest"
 import { MockSecurityService } from "@/services/mock-security-service"
 import { MockVisitService } from "@/services/mock-visit-service"
 import { defaultVisitorCards, MockVisitorCardStore } from "@/services/mock-visitor-card-store"
-import { initialMockVisitRecords } from "@/services/mock-visit-data"
+import { initialMockMeetings, initialMockVisitRecords } from "@/services/mock-visit-data"
 
 const seededInsideRecords = initialMockVisitRecords.filter((visit) => visit.status === "CHECKED_IN")
+const bplasMerkezMeetingIds = new Set(initialMockMeetings
+  .filter((meeting) => meeting.hostCompanyId === "bplas" && meeting.facilityId === "bplas-merkez")
+  .map((meeting) => meeting.id))
+const bplasMerkezRecords = initialMockVisitRecords.filter((visit) => bplasMerkezMeetingIds.has(visit.meetingId))
 
 function setup() {
   const cardStore = new MockVisitorCardStore()
@@ -15,6 +19,14 @@ function setup() {
 }
 
 describe("security seed card invariants", () => {
+  it("provides a dense BPLAS Merkez operations workspace with planned and checked-in edge cases", () => {
+    expect(bplasMerkezRecords.filter((visit) => visit.status === "PLANNED").length).toBeGreaterThanOrEqual(10)
+    expect(bplasMerkezRecords.filter((visit) => visit.status === "CHECKED_IN").length).toBeGreaterThanOrEqual(10)
+    expect(bplasMerkezRecords.find((visit) => visit.id === "v-security-inside-long")?.visitor).toMatchObject({ firstName: "Zeynep Gülsevinç", lastName: "Karamehmetoğlu" })
+    expect(bplasMerkezRecords.find((visit) => visit.id === "v-security-inside-host-audit")).toMatchObject({ hostCorrectedFrom: "Maya Karaca", hostCorrectedBy: "Eda Karaca" })
+    expect(bplasMerkezRecords.find((visit) => visit.id === "v-security-inside-phone")?.visitor.phone).toBe("+90 533 742 16 90")
+  })
+
   it("has at least one visitor already inside", () => {
     expect(seededInsideRecords.length).toBeGreaterThan(0)
   })

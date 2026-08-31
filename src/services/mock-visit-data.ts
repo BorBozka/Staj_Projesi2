@@ -70,6 +70,9 @@ interface SeedVisit {
   visitorCardReturned?: boolean
   actualMeetingEnd?: string
   meetingEndSource?: "MANUAL" | "VISITOR_CHECK_OUT"
+  hostCorrectedFrom?: string
+  hostCorrectedAt?: string
+  hostCorrectedBy?: string
 }
 
 function endFor(dayOffset: number, hour: number, minute: number, durationMinutes: number) {
@@ -122,6 +125,9 @@ function toMeetingVisit(seed: SeedVisit): { meeting: Meeting; visit: VisitRecord
       visitorCardId: seed.visitorCardId,
       visitorCardNumber: seed.visitorCardNumber,
       visitorCardReturned: seed.visitorCardReturned,
+      hostCorrectedFrom: seed.hostCorrectedFrom,
+      hostCorrectedAt: seed.hostCorrectedAt,
+      hostCorrectedBy: seed.hostCorrectedBy,
       status: seed.status,
       invitationStatus,
       invitationSentAt: invitationStatus === "SENT" ? createdAt : undefined,
@@ -146,6 +152,21 @@ const operationalSeeds: SeedVisit[] = [
   { id: "v-unplanned-desk", firstName: "Kuzey", lastName: "Mert", company: "Bora Elektrik Taahhüt", plannedStart: scenarioMoment(-125), plannedEnd: scenarioMoment(-35), actualCheckIn: scenarioMoment(-118), actualCheckOut: scenarioMoment(-42), visitorCardReturned: true, status: "CHECKED_OUT", typeId: "technical-service", employeeId: "emre-yilmaz", companyId: "bplas", facilityId: "bplas-arge", invitationStatus: "NOT_SENT", note: "Güvenlik masasında kaydedilen plansız klima bakım ziyareti." },
   { id: "v-invitation-failed", firstName: "Mina", lastName: "Koşal", company: "Nokta Finans Danışmanlık", dayOffset: 1, startHour: 10, durationMinutes: 60, status: "PLANNED", typeId: "meeting", employeeId: "eda-karaca", companyId: "bplas", facilityId: "bplas-merkez", invitationStatus: "FAILED" },
   { id: "v-lifecycle-active", firstName: "Levent", lastName: "Yaman", company: "Yalın Süreç Akademi", plannedStart: scenarioMoment(-30), plannedEnd: scenarioMoment(75), actualCheckIn: scenarioMoment(-25), visitorCardId: "card-8", visitorCardNumber: "008", status: "CHECKED_IN", typeId: "meeting", employeeId: "eda-karaca", creatorEmployeeId: "maya-kara", companyId: "bplas", facilityId: "bplas-merkez", note: "Operasyon verimliliği çalışma oturumu" },
+  { id: "v-security-expected-1", firstName: "Buse", lastName: "Tekin", company: "Marmara Hassas Parça Sanayi", dayOffset: 0, startHour: 8, durationMinutes: 60, status: "PLANNED", typeId: "supplier", employeeId: "maya-kara", companyId: "bplas", facilityId: "bplas-merkez" },
+  { id: "v-security-expected-2", firstName: "Cihat", lastName: "Eroğlu", company: "Doruk Endüstri Sistemleri", dayOffset: 0, startHour: 9, startMinute: 15, durationMinutes: 60, status: "PLANNED", typeId: "meeting", employeeId: "emre-yilmaz", companyId: "bplas", facilityId: "bplas-merkez" },
+  { id: "v-security-expected-3", firstName: "Elif", lastName: "Köksal", company: "Yakamoz Teknik Tedarik", dayOffset: 0, startHour: 10, startMinute: 30, durationMinutes: 90, status: "PLANNED", typeId: "customer", employeeId: "eda-karaca", companyId: "bplas", facilityId: "bplas-merkez" },
+  { id: "v-security-expected-4", firstName: "Hakan", lastName: "Duman", company: "Vadi Kalıp Tasarım", dayOffset: 0, startHour: 11, startMinute: 45, durationMinutes: 80, status: "PLANNED", typeId: "technical-service", employeeId: "maya-kara", companyId: "bplas", facilityId: "bplas-merkez" },
+  { id: "v-security-expected-5", firstName: "Melis", lastName: "Özbek", company: "Kule Proje Mühendislik", dayOffset: 0, startHour: 13, durationMinutes: 60, status: "PLANNED", typeId: "audit", employeeId: "emre-yilmaz", companyId: "bplas", facilityId: "bplas-merkez" },
+  { id: "v-security-expected-6", firstName: "Onur", lastName: "Taşçı", company: "Rota Kompozit Teknolojileri", dayOffset: 0, startHour: 14, startMinute: 15, durationMinutes: 90, status: "PLANNED", typeId: "supplier", employeeId: "eda-karaca", companyId: "bplas", facilityId: "bplas-merkez" },
+  { id: "v-security-expected-7", firstName: "Pelin", lastName: "Ergün", company: "Eksenel Otomasyon Çözümleri", dayOffset: 0, startHour: 15, startMinute: 30, durationMinutes: 60, status: "PLANNED", typeId: "meeting", employeeId: "maya-kara", companyId: "bplas", facilityId: "bplas-merkez" },
+  { id: "v-security-expected-8", firstName: "Tolga", lastName: "Şener", company: "Ufuk Enerji Kontrol", dayOffset: 0, startHour: 18, startMinute: 30, durationMinutes: 90, status: "PLANNED", typeId: "customer", employeeId: "emre-yilmaz", companyId: "bplas", facilityId: "bplas-merkez" },
+  { id: "v-security-inside-long", firstName: "Zeynep Gülsevinç", lastName: "Karamehmetoğlu", company: "Anadolu Endüstriyel Otomasyon ve Danışmanlık Hizmetleri A.Ş.", plannedStart: scenarioMoment(-150), plannedEnd: scenarioMoment(30), actualCheckIn: scenarioMoment(-145), visitorCardId: "card-9", visitorCardNumber: "009", status: "CHECKED_IN", typeId: "meeting", employeeId: "maya-kara", companyId: "bplas", facilityId: "bplas-merkez" },
+  { id: "v-security-inside-now", firstName: "Barış", lastName: "Köseoğlu", company: "Kıyı Makine Sanayi", plannedStart: scenarioMoment(-5), plannedEnd: scenarioMoment(85), actualCheckIn: scenarioMoment(0), visitorCardId: "card-10", visitorCardNumber: "010", status: "CHECKED_IN", typeId: "supplier", employeeId: "emre-yilmaz", companyId: "bplas", facilityId: "bplas-merkez" },
+  { id: "v-security-inside-host-audit", firstName: "Derya", lastName: "Akalın", company: "Pusula Kimya Teknolojileri", plannedStart: scenarioMoment(-120), plannedEnd: scenarioMoment(20), actualCheckIn: scenarioMoment(-112), visitorCardId: "card-11", visitorCardNumber: "011", status: "CHECKED_IN", typeId: "audit", employeeId: "eda-karaca", companyId: "bplas", facilityId: "bplas-merkez", hostCorrectedFrom: "Maya Karaca", hostCorrectedAt: scenarioMoment(-110), hostCorrectedBy: "Eda Karaca" },
+  { id: "v-security-inside-phone", firstName: "Fırat", lastName: "Orhan", company: "Güney Bağlantı Elemanları", plannedStart: scenarioMoment(-80), plannedEnd: scenarioMoment(70), actualCheckIn: scenarioMoment(-75), visitorCardId: "card-12", visitorCardNumber: "012", status: "CHECKED_IN", typeId: "technical-service", employeeId: "maya-kara", companyId: "bplas", facilityId: "bplas-merkez", phone: "+90 533 742 16 90" },
+  { id: "v-security-inside-5", firstName: "İrem", lastName: "Yazgan", company: "Köprü Test Laboratuvarı", plannedStart: scenarioMoment(-210), plannedEnd: scenarioMoment(-10), actualCheckIn: scenarioMoment(-205), visitorCardId: "card-13", visitorCardNumber: "013", status: "CHECKED_IN", typeId: "customer", employeeId: "emre-yilmaz", companyId: "bplas", facilityId: "bplas-merkez" },
+  { id: "v-security-inside-6", firstName: "Kaan", lastName: "Balcı", company: "Metropol Endüstri Bakım", plannedStart: scenarioMoment(-180), plannedEnd: scenarioMoment(-40), actualCheckIn: scenarioMoment(-175), visitorCardId: "card-14", visitorCardNumber: "014", status: "CHECKED_IN", typeId: "supplier", employeeId: "eda-karaca", companyId: "bplas", facilityId: "bplas-merkez" },
+  { id: "v-security-inside-7", firstName: "Nalan", lastName: "Kurt", company: "Sarmal Plastik Teknolojileri", plannedStart: scenarioMoment(-60), plannedEnd: scenarioMoment(90), actualCheckIn: scenarioMoment(-55), visitorCardId: "card-15", visitorCardNumber: "015", status: "CHECKED_IN", typeId: "meeting", employeeId: "maya-kara", companyId: "bplas", facilityId: "bplas-merkez" },
   { id: "v-lifecycle-manual", firstName: "Dora", lastName: "Eren", company: "Kare Plan Mimarlık", dayOffset: -1, startHour: 9, durationMinutes: 120, actualCheckIn: scenarioAt(-1, 9, 5), actualCheckOut: scenarioAt(-1, 10, 42), visitorCardReturned: true, status: "CHECKED_OUT", typeId: "meeting", employeeId: "maya-kara", companyId: "bplas", facilityId: "bplas-merkez", actualMeetingEnd: scenarioAt(-1, 10, 42), meetingEndSource: "MANUAL" },
   { id: "v-lifecycle-auto", firstName: "Sarp", lastName: "Önen", company: "Eko Dönüşüm Teknolojileri", dayOffset: -2, startHour: 13, durationMinutes: 90, actualCheckIn: scenarioAt(-2, 13, 8), actualCheckOut: scenarioAt(-2, 14, 47), visitorCardReturned: true, status: "CHECKED_OUT", typeId: "customer", employeeId: "selin-aydin", companyId: "bplas-otomotiv", facilityId: "otomotiv-uretim", actualMeetingEnd: scenarioAt(-2, 14, 47), meetingEndSource: "VISITOR_CHECK_OUT" },
 ]

@@ -10,6 +10,13 @@ export const defaultVisitorCards: VisitorCardInventoryItem[] = [
   { id: "card-5", cardNumber: "005", status: "DISABLED" },
   { id: "card-7", cardNumber: "007", status: "IN_USE", assignedVisitId: "v-today-overdue", assignedVisitorName: "Rüzgar Arman" },
   { id: "card-8", cardNumber: "008", status: "IN_USE", assignedVisitId: "v-lifecycle-active", assignedVisitorName: "Levent Yaman" },
+  { id: "card-9", cardNumber: "009", status: "IN_USE", assignedVisitId: "v-security-inside-long", assignedVisitorName: "Zeynep Gülsevinç Karamehmetoğlu" },
+  { id: "card-10", cardNumber: "010", status: "IN_USE", assignedVisitId: "v-security-inside-now", assignedVisitorName: "Barış Köseoğlu" },
+  { id: "card-11", cardNumber: "011", status: "IN_USE", assignedVisitId: "v-security-inside-host-audit", assignedVisitorName: "Derya Akalın" },
+  { id: "card-12", cardNumber: "012", status: "IN_USE", assignedVisitId: "v-security-inside-phone", assignedVisitorName: "Fırat Orhan" },
+  { id: "card-13", cardNumber: "013", status: "IN_USE", assignedVisitId: "v-security-inside-5", assignedVisitorName: "İrem Yazgan" },
+  { id: "card-14", cardNumber: "014", status: "IN_USE", assignedVisitId: "v-security-inside-6", assignedVisitorName: "Kaan Balcı" },
+  { id: "card-15", cardNumber: "015", status: "IN_USE", assignedVisitId: "v-security-inside-7", assignedVisitorName: "Nalan Kurt" },
 ]
 
 /**

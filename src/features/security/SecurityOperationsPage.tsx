@@ -194,7 +194,7 @@ function InsideRow({ row, onCheckOut }: { row: SecurityVisitRow; onCheckOut(visi
           </div>
           <p className="mt-1 flex items-center justify-between gap-2 text-[11px]">
             <span className="min-w-0 flex-1 truncate text-slate-500">{visit.visitor.company} · {visit.hostEmployeeName}</span>
-            <span className="shrink-0 text-slate-400">Giriş {checkInLabel} · Bek. çıkış {formatVisitTime(visit.plannedEnd)}</span>
+            <span className="shrink-0 text-slate-400">Giriş {checkInLabel} · Beklenen çıkış {formatVisitTime(visit.plannedEnd)}</span>
           </p>
         </div>
         <RowActions>
