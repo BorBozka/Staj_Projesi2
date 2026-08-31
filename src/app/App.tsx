@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect } from "react"
 import { Navigate, Route, Routes, useLocation } from "react-router-dom"
 
-import { AppShell } from "@/components/app-shell/AppShell"
+import { EmployeeShell } from "@/components/app-shell/EmployeeShell"
 import { ManagerShell } from "@/components/app-shell/ManagerShell"
 import { SecurityShell } from "@/components/app-shell/SecurityShell"
 
@@ -68,7 +68,7 @@ export function App() {
 
   return (
     <Routes>
-      <Route element={<AppShell />}>
+      <Route element={<EmployeeShell />}>
         <Route
           path="/my-visits"
           element={
