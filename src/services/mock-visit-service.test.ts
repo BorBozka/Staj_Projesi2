@@ -4,6 +4,7 @@ import type { MeetingInput, VisitRecord } from "@/domain/visits"
 import { getInvitationActionLabel, getPendingInvitationVisits } from "@/features/visits/invitation-status"
 import { getOwnVisits, getVisibleAdditionalRequirementNote } from "@/features/visits/visit-visibility"
 import { MockVisitService } from "@/services/mock-visit-service"
+import { MockVisitTypeStore } from "@/services/mock-visit-type-store"
 
 const meetingInput: MeetingInput = {
   visitors: [{ firstName: "Test", lastName: "Ziyaretci", email: "test@example.com", company: "Test A.Ş." }],
@@ -243,5 +244,48 @@ describe("MockVisitService Meeting–Visit behavior", () => {
 
     // Missing employee context must never fall back to exposing all visits.
     expect(getOwnVisits(allVisits)).toEqual([])
+  })
+})
+
+describe("MockVisitService canonical visit types", () => {
+  const visitorPayload = (visit: { id: string; visitor: { firstName: string; lastName: string; email: string; company: string; phone?: string } }) => ({
+    visitId: visit.id,
+    firstName: visit.visitor.firstName,
+    lastName: visit.visitor.lastName,
+    email: visit.visitor.email,
+    company: visit.visitor.company,
+    phone: visit.visitor.phone,
+  })
+
+  it("exposes a type added to the shared store in fresh reference data", async () => {
+    const visitTypeStore = new MockVisitTypeStore()
+    const service = new MockVisitService(undefined, undefined, visitTypeStore)
+    const created = visitTypeStore.save({ name: "Denetim Takibi", active: true })
+
+    expect((await service.getReferenceData()).visitTypes).toContainEqual({ id: created.id, name: "Denetim Takibi", active: true })
+  })
+
+  it("blocks creating a new meeting with an inactive visit type", async () => {
+    const service = new MockVisitService()
+    await expect(service.createMeeting({ ...meetingInput, visitTypeId: "interview" })).rejects.toThrow("Pasif ziyaret türü seçilemez.")
+  })
+
+  it("still updates an existing meeting whose visit type is inactive as long as the type is unchanged", async () => {
+    const service = new MockVisitService()
+    const seeded = (await service.listVisits()).find((visit) => visit.id === "v-today-no-show")!
+    expect(seeded.visitTypeId).toBe("interview")
+
+    const updated = await service.updateMeeting(seeded.meetingId, {
+      visitors: [visitorPayload(seeded)],
+      visitTypeId: seeded.visitTypeId,
+      hostEmployeeName: seeded.hostEmployeeName,
+      hostCompanyId: seeded.hostCompanyId,
+      facilityId: seeded.facilityId,
+      plannedStart: seeded.plannedStart,
+      plannedEnd: seeded.plannedEnd,
+      note: "Pasif tür korunarak güncellendi",
+    })
+
+    expect(updated.meeting).toMatchObject({ visitTypeId: "interview", visitTypeName: "İş Görüşmesi", note: "Pasif tür korunarak güncellendi" })
   })
 })

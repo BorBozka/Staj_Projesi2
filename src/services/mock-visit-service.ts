@@ -13,6 +13,7 @@ import type {
 import { computeExtendedPlannedEnd, getManualMeetingLifecycleBlockReason, isMeetingExplicitlyClosed } from "@/lib/meeting-lifecycle"
 import { createMockVisitReferenceData, initialMockMeetings, initialMockVisitRecords } from "@/services/mock-visit-data"
 import { MockOrganizationStore } from "@/services/mock-organization-store"
+import { MockVisitTypeStore } from "@/services/mock-visit-type-store"
 import type { VisitService } from "@/services/visit-service"
 
 
@@ -25,6 +26,7 @@ export class MockVisitService implements VisitService {
   constructor(
     private readonly shouldFailInvitation: (visit: Visit) => boolean = () => false,
     private readonly organizationStore = new MockOrganizationStore(),
+    private readonly visitTypeStore = new MockVisitTypeStore(),
   ) {}
 
   async listMeetings(): Promise<Meeting[]> {
@@ -337,6 +339,7 @@ export class MockVisitService implements VisitService {
     const company = reference.companies.find((item) => item.id === input.hostCompanyId)
     const facility = reference.facilities.find((item) => item.id === input.facilityId && item.companyId === input.hostCompanyId)
     if (!visitType || !company || !facility) throw new Error("Geçersiz ziyaret referans bilgisi.")
+    if (!visitType.active && visitType.id !== existing?.visitTypeId) throw new Error("Pasif ziyaret türü seçilemez.")
 
     const hostName = input.hostEmployeeName.trim()
     const hostEmployee = reference.employees.find((employee) => employee.name === hostName)
@@ -395,6 +398,6 @@ export class MockVisitService implements VisitService {
   }
 
   private getReferenceDataSnapshot() {
-    return createMockVisitReferenceData(this.organizationStore.getSnapshot())
+    return createMockVisitReferenceData(this.organizationStore.getSnapshot(), this.visitTypeStore.getAll())
   }
 }

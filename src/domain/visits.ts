@@ -116,6 +116,7 @@ export interface EmployeeOption {
 export interface VisitTypeOption {
   id: string
   name: string
+  active: boolean
 }
 
 export interface VisitReferenceData {

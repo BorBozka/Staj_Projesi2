@@ -1,6 +1,8 @@
+import type { VisitTypeDefinition } from "@/domain/admin"
 import type { OrganizationSnapshot } from "@/domain/organization"
 import type { InvitationStatus, Meeting, VisitRecord, VisitReferenceData, VisitStatus } from "@/domain/visits"
 import { initialMockOrganizationSnapshot } from "@/services/mock-organization-store"
+import { initialMockVisitTypes } from "@/services/mock-visit-type-store"
 import { scenarioAt, scenarioCreatedAt, scenarioMoment } from "@/services/mock-scenario"
 
 const employeeDefinitions = [
@@ -11,19 +13,13 @@ const employeeDefinitions = [
   { id: "kerem-demir", companyId: "anadolu-lojistik", facilityIds: ["anadolu-lojistik-merkez"], name: "Kerem Demir", departmentId: "department-anadolu-lojistik-operasyon" },
 ] as const
 
-const visitTypes = [
-    { id: "meeting", name: "Toplantı" },
-    { id: "technical-service", name: "Teknik Servis / Bakım" },
-    { id: "supplier", name: "Tedarikçi" },
-    { id: "interview", name: "İş Görüşmesi" },
-    { id: "audit", name: "Denetim" },
-    { id: "customer", name: "Müşteri Ziyareti" },
-    { id: "training", name: "Eğitim" },
-]
-
-/** Compatibility projection for Visit UI. Company, facility, and department labels are
- * always resolved from the canonical organization snapshot; this function owns no state. */
-export function createMockVisitReferenceData(organization: OrganizationSnapshot): VisitReferenceData {
+/** Compatibility projection for Visit UI. Company, facility, department labels and visit
+ * types are always resolved from their canonical sources (the organization snapshot and the
+ * visit-type store); this function owns no state. */
+export function createMockVisitReferenceData(
+  organization: OrganizationSnapshot,
+  visitTypes: VisitTypeDefinition[] = initialMockVisitTypes,
+): VisitReferenceData {
   const companies = organization.companies.filter((company) => company.active).map(({ id, name }) => ({ id, name }))
   const facilities = organization.facilities
     .filter((facility) => facility.active && organization.companies.some((company) => company.id === facility.parentId && company.active))
@@ -43,7 +39,7 @@ export function createMockVisitReferenceData(organization: OrganizationSnapshot)
 
 // Legacy tests and pure UI utilities can use the initial projection. Runtime services never
 // read this constant; they request a fresh projection from MockOrganizationStore.
-export const mockVisitReferenceData = createMockVisitReferenceData(initialMockOrganizationSnapshot)
+export const mockVisitReferenceData = createMockVisitReferenceData(initialMockOrganizationSnapshot, initialMockVisitTypes)
 
 interface SeedVisit {
   id: string

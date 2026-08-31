@@ -5,6 +5,7 @@ import { MockTransportAssignmentService } from "@/services/mock-transport-assign
 import { MockGoodsMovementService } from "@/services/mock-goods-movement-service"
 import { MockAdminService } from "@/services/mock-admin-service"
 import { MockOrganizationStore } from "@/services/mock-organization-store"
+import { MockVisitTypeStore } from "@/services/mock-visit-type-store"
 import type { AdminService } from "@/services/admin-service"
 import type { GoodsMovementService } from "@/services/goods-movement-service"
 import type { ResourceCatalogService } from "@/services/resource-catalog-service"
@@ -13,12 +14,13 @@ import type { TransportAssignmentService } from "@/services/transport-assignment
 import type { VisitService } from "@/services/visit-service"
 
 const _organizationStore = new MockOrganizationStore()
-const _visitService = new MockVisitService(undefined, _organizationStore)
+const _visitTypeStore = new MockVisitTypeStore()
+const _visitService = new MockVisitService(undefined, _organizationStore, _visitTypeStore)
 const _resourceCatalogService = new MockResourceCatalogService(_organizationStore)
 const _resourceAssignmentService = new MockResourceAssignmentService(_visitService, _resourceCatalogService)
 const _transportAssignmentService = new MockTransportAssignmentService(_visitService, _resourceCatalogService)
 const _goodsMovementService = new MockGoodsMovementService(_visitService)
-const _adminService = new MockAdminService(_organizationStore)
+const _adminService = new MockAdminService(_organizationStore, undefined, _visitTypeStore)
 
 // Break the circular dependency: visit service needs assignment service for
 // extension validation; assignment service needs visit service for meeting data.

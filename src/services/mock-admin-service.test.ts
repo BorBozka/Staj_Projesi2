@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 
 import { MockAdminService } from "@/services/mock-admin-service"
+import { MockVisitService } from "@/services/mock-visit-service"
+import { MockVisitTypeStore } from "@/services/mock-visit-type-store"
 
 const scope = (companyIds: string[]) => ({ companyIds, facilityIds: [], securityGateIds: [] })
 
@@ -131,6 +133,19 @@ describe("MockAdminService other admin resources", () => {
 
     const created = await service.saveVisitType({ name: "  Resmi ziyaret  ", active: true })
     expect(created.name).toBe("Resmi ziyaret")
+  })
+
+  it("writes visit types to the store shared with MockVisitService", async () => {
+    const visitTypeStore = new MockVisitTypeStore()
+    const admin = new MockAdminService(undefined, undefined, visitTypeStore)
+    const visits = new MockVisitService(undefined, undefined, visitTypeStore)
+
+    const created = await admin.saveVisitType({ name: "Denetim Takibi", active: true })
+    expect((await visits.getReferenceData()).visitTypes).toContainEqual({ id: created.id, name: "Denetim Takibi", active: true })
+
+    await admin.saveVisitType({ id: "audit", name: "Denetim", active: false })
+    const auditForVisits = (await visits.getReferenceData()).visitTypes.find((type) => type.id === "audit")
+    expect(auditForVisits).toMatchObject({ active: false })
   })
 
   it("publishes new immutable visitor-rule versions instead of mutating history", async () => {
