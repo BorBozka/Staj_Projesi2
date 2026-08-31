@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest"
 
 import type { Visit } from "@/domain/visits"
 import { ExpectedRow, InsideRow } from "@/features/security/SecurityOperationsPage"
-import { formatDelayLabel, type SecurityVisitRow } from "@/features/security/security-operations"
+import type { SecurityVisitRow } from "@/features/security/security-operations"
 
 function makeVisit(overrides: Partial<Visit> = {}): Visit {
   return {
@@ -34,18 +34,6 @@ function row(overrides: Partial<SecurityVisitRow> = {}): SecurityVisitRow {
   return { visit: makeVisit(), isDelayed: false, delayMinutes: 0, ...overrides }
 }
 
-describe("formatDelayLabel", () => {
-  it("appends the minute count only for a positive whole number", () => {
-    expect(formatDelayLabel("Gecikti", 18)).toBe("Gecikti · 18 dk")
-    expect(formatDelayLabel("Süre aştı", 25)).toBe("Süre aştı · 25 dk")
-  })
-
-  it("falls back to the bare label for zero or negative input", () => {
-    expect(formatDelayLabel("Gecikti", 0)).toBe("Gecikti")
-    expect(formatDelayLabel("Süre aştı", -4)).toBe("Süre aştı")
-  })
-})
-
 describe("ExpectedRow", () => {
   it("is a keyboard-accessible control that shows time, name, company and host as distinct facts", () => {
     const markup = renderToStaticMarkup(<ExpectedRow row={row()} onOpenDetail={vi.fn()} onCheckIn={vi.fn()} />)
@@ -59,43 +47,47 @@ describe("ExpectedRow", () => {
     expect(markup).toContain("Giriş yap")
   })
 
-  it("keeps a fixed row height regardless of record count", () => {
-    expect(renderToStaticMarkup(<ExpectedRow row={row()} onOpenDetail={vi.fn()} onCheckIn={vi.fn()} />)).toContain("h-14")
+  it("keeps a consistent minimum row height regardless of record count", () => {
+    expect(renderToStaticMarkup(<ExpectedRow row={row()} onOpenDetail={vi.fn()} onCheckIn={vi.fn()} />)).toContain("min-h-[4.75rem]")
   })
 
-  it("shows the delay in minutes for a late expected visit", () => {
-    const markup = renderToStaticMarkup(<ExpectedRow row={row({ isDelayed: true, delayMinutes: 18 })} onOpenDetail={vi.fn()} onCheckIn={vi.fn()} />)
-    expect(markup).toContain("Gecikti · 18 dk")
+  it("renders the delay as a human-readable duration for a late expected visit", () => {
+    expect(renderToStaticMarkup(<ExpectedRow row={row({ isDelayed: true, delayMinutes: 18 })} onOpenDetail={vi.fn()} onCheckIn={vi.fn()} />)).toContain("18 dk gecikti")
+    expect(renderToStaticMarkup(<ExpectedRow row={row({ isDelayed: true, delayMinutes: 295 })} onOpenDetail={vi.fn()} onCheckIn={vi.fn()} />)).toContain("4 sa 55 dk gecikti")
   })
 
-  it("shows no delay pill and no minute text when the visit is on time", () => {
+  it("shows no delay text when the visit is on time", () => {
     const markup = renderToStaticMarkup(<ExpectedRow row={row()} onOpenDetail={vi.fn()} onCheckIn={vi.fn()} />)
-    expect(markup).not.toContain("Gecikti")
+    expect(markup).not.toContain("gecikti")
     expect(markup).not.toContain(" dk")
   })
 })
 
 describe("InsideRow", () => {
-  it("stays minimal: visitor name, checkout and an overflow icon-button only", () => {
-    const markup = renderToStaticMarkup(<InsideRow row={row({ visit: makeVisit({ status: "CHECKED_IN" }) })} onOpenDetail={vi.fn()} onCheckOut={vi.fn()} onEdit={vi.fn()} />)
+  const insideVisit = (overrides: Partial<Visit> = {}) => makeVisit({ status: "CHECKED_IN", actualCheckIn: "2026-08-28T11:11:00+03:00", visitorCardNumber: "002", ...overrides })
+
+  it("always shows the visitor, the check-in time, the card number, checkout and an overflow icon-button", () => {
+    const markup = renderToStaticMarkup(<InsideRow row={row({ visit: insideVisit() })} onOpenDetail={vi.fn()} onCheckOut={vi.fn()} onEdit={vi.fn()} />)
     expect(markup).toContain("Deniz Aksoy")
+    expect(markup).toContain("11:11 giriş")
+    expect(markup).toContain("Kart 002")
     expect(markup).toContain("Çıkış yap")
     expect(markup).toContain('aria-label="Ziyaret işlemleri"')
     expect(markup).toContain('title="Ziyaret işlemleri"')
-    expect(markup).toContain("h-11")
+    expect(markup).toContain("min-h-[4.75rem]")
   })
 
   it("does not repeat company, host or an 'İçeride' status pill on the row", () => {
-    const markup = renderToStaticMarkup(<InsideRow row={row({ visit: makeVisit({ status: "CHECKED_IN" }) })} onOpenDetail={vi.fn()} onCheckOut={vi.fn()} onEdit={vi.fn()} />)
+    const markup = renderToStaticMarkup(<InsideRow row={row({ visit: insideVisit() })} onOpenDetail={vi.fn()} onCheckOut={vi.fn()} onEdit={vi.fn()} />)
     expect(markup).not.toContain("İçeride")
     expect(markup).not.toContain("Kuzey Hat Tedarik A.Ş.")
     expect(markup).not.toContain("Emre Yılmaz")
   })
 
-  it("shows 'Süre aştı · N dk' for an overdue inside visit and nothing when within time", () => {
-    const overdue = renderToStaticMarkup(<InsideRow row={row({ isDelayed: true, delayMinutes: 25 })} onOpenDetail={vi.fn()} onCheckOut={vi.fn()} onEdit={vi.fn()} />)
-    expect(overdue).toContain("Süre aştı · 25 dk")
-    const onTime = renderToStaticMarkup(<InsideRow row={row()} onOpenDetail={vi.fn()} onCheckOut={vi.fn()} onEdit={vi.fn()} />)
-    expect(onTime).not.toContain("Süre aştı")
+  it("shows a human-readable overrun for an overdue inside visit and nothing when within time", () => {
+    const overdue = renderToStaticMarkup(<InsideRow row={row({ visit: insideVisit(), isDelayed: true, delayMinutes: 72 })} onOpenDetail={vi.fn()} onCheckOut={vi.fn()} onEdit={vi.fn()} />)
+    expect(overdue).toContain("1 sa 12 dk süre aştı")
+    const onTime = renderToStaticMarkup(<InsideRow row={row({ visit: insideVisit() })} onOpenDetail={vi.fn()} onCheckOut={vi.fn()} onEdit={vi.fn()} />)
+    expect(onTime).not.toContain("süre aştı")
   })
 })

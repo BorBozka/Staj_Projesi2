@@ -42,9 +42,29 @@ export function getInsideSecurityVisits(visits: Visit[], now: Date): SecurityVis
     })
 }
 
-/** Delay pill copy: append the minute count only when it is a positive whole number. */
-export function formatDelayLabel(prefix: string, minutes: number) {
-  return minutes > 0 ? `${prefix} · ${minutes} dk` : prefix
+/**
+ * Human-readable elapsed time in Turkish. Below an hour it stays in minutes
+ * ("18 dk"); from an hour up it switches to "S sa D dk" ("1 sa 25 dk") and
+ * drops the minute part on a whole hour ("2 sa"). Negative input clamps to 0.
+ */
+export function formatDuration(totalMinutes: number) {
+  const minutes = Math.max(0, Math.trunc(totalMinutes))
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  if (hours === 0) return `${rest} dk`
+  if (rest === 0) return `${hours} sa`
+  return `${hours} sa ${rest} dk`
+}
+
+/**
+ * Delay / overrun copy for a status pill, e.g. "1 sa 25 dk gecikti" or
+ * "20 dk süre aştı". Falls back to the bare state word when the elapsed time
+ * truncates to zero. Shared by the expected and inside panels so the two never
+ * grow separate duration-formatting logic.
+ */
+export function formatDelayLabel(state: "gecikti" | "süre aştı", minutes: number) {
+  if (Math.trunc(minutes) <= 0) return state === "gecikti" ? "Gecikti" : "Süre aştı"
+  return `${formatDuration(minutes)} ${state}`
 }
 
 export function filterSecurityVisitRows(rows: SecurityVisitRow[], search: string) {

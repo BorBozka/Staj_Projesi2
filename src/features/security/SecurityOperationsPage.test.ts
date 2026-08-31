@@ -33,7 +33,7 @@ describe("SecurityOperationsPage contract", () => {
   })
 
   it("gives each panel an independent header, scroll area, and empty state", () => {
-    expect(pageSource).toContain('className="min-h-0 flex-1 overflow-auto scrollbar-thin"')
+    expect(pageSource).toContain('className="min-h-0 flex-1 overflow-auto scrollbar-thin bg-slate-50/40"')
     expect(pageSource).toContain('"Bugün beklenen ziyaret yok."')
     expect(pageSource).toContain('"İçeride ziyaretçi yok."')
     expect(pageSource).toContain('"Aramayla eşleşen kayıt yok."')
@@ -51,8 +51,8 @@ describe("SecurityOperationsPage contract", () => {
     expect(pageSource).toContain("filterSecurityVisitRows(getInsideSecurityVisits(scopedVisits, now), search)")
   })
 
-  it("caps the toolbar search width so it cannot swallow the toolbar", () => {
-    expect(pageSource).toContain("lg:max-w-xs lg:flex-1")
+  it("gives the toolbar search a usable width band without letting it span the toolbar", () => {
+    expect(pageSource).toContain("lg:max-w-[34rem] lg:flex-1")
   })
 
   it("uses a facility icon, not a clock, for the company/facility context box", () => {

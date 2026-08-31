@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest"
 import type { Visit, VisitStatus } from "@/domain/visits"
 import {
   filterSecurityVisitRows,
+  formatDelayLabel,
+  formatDuration,
   getExpectedSecurityVisits,
   getInsideSecurityVisits,
 } from "./security-operations"
@@ -31,6 +33,38 @@ function makeVisit(id: string, status: VisitStatus, plannedStart: string, overri
     ...overrides,
   }
 }
+
+describe("formatDuration", () => {
+  it("stays in minutes below an hour", () => {
+    expect(formatDuration(18)).toBe("18 dk")
+    expect(formatDuration(59)).toBe("59 dk")
+  })
+
+  it("switches to hours and minutes at exactly one hour and above", () => {
+    expect(formatDuration(60)).toBe("1 sa")
+    expect(formatDuration(85)).toBe("1 sa 25 dk")
+    expect(formatDuration(295)).toBe("4 sa 55 dk")
+    expect(formatDuration(120)).toBe("2 sa")
+  })
+
+  it("clamps non-positive input to zero minutes", () => {
+    expect(formatDuration(0)).toBe("0 dk")
+    expect(formatDuration(-9)).toBe("0 dk")
+  })
+})
+
+describe("formatDelayLabel", () => {
+  it("suffixes the human-readable duration with the state word", () => {
+    expect(formatDelayLabel("gecikti", 18)).toBe("18 dk gecikti")
+    expect(formatDelayLabel("gecikti", 295)).toBe("4 sa 55 dk gecikti")
+    expect(formatDelayLabel("süre aştı", 72)).toBe("1 sa 12 dk süre aştı")
+  })
+
+  it("falls back to the bare state word when the elapsed time truncates to zero", () => {
+    expect(formatDelayLabel("gecikti", 0)).toBe("Gecikti")
+    expect(formatDelayLabel("süre aştı", -4)).toBe("Süre aştı")
+  })
+})
 
 describe("security expected visits", () => {
   const now = new Date("2026-08-28T12:00:00+03:00")
