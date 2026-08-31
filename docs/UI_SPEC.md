@@ -355,7 +355,12 @@ Do not show the additional-requirement description to the Security role.
 
 Before check-in:
 - visitor card selector,
+- optional plate,
+- optional phone,
 - Check In.
+
+The correction dialog reachable from here edits visitor name, company, phone and the host
+display name as free text (no e-mail field, no host picker).
 
 After check-in:
 - actual check-in,

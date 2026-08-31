@@ -120,10 +120,14 @@ Security may correct fields such as:
 - phone,
 - plate,
 - optional visitor information,
-- note.
+- note,
+- host employee display name.
 
 Visitor company is a required field; Security's correction here may update it but must not
-clear it.
+clear it. The gate correction form edits name, company, host name and phone (no e-mail field).
+Correcting the host name updates the displayed name only and is recorded as an audit note on
+the visit (previous name, timestamp, acting security employee); the linked host employee
+reference is not changed.
 
 ### Manager
 

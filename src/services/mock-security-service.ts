@@ -25,10 +25,12 @@ export class MockSecurityService implements SecurityService {
     // Validation is complete; the two mutations below run synchronously with no intervening
     // await so the visit and card update as a single atomic step.
     const vehiclePlate = normalizeVehiclePlate(input.vehiclePlate)
+    const phone = input.phone?.trim() || undefined
     const updatedVisit = this.visitService.applyCheckIn(input.visitId, {
       visitorCardId: card.id,
       visitorCardNumber: card.cardNumber,
       vehiclePlate,
+      phone,
     })
     this.cardStore.replace(card.id, {
       ...card,
@@ -91,15 +93,22 @@ export class MockSecurityService implements SecurityService {
     const firstName = input.firstName.trim()
     const lastName = input.lastName.trim()
     const company = input.company.trim()
+    const hostEmployeeName = input.hostEmployeeName.trim()
     if (!firstName) throw new Error("Ad zorunludur.")
     if (!lastName) throw new Error("Soyad zorunludur.")
     if (!company) throw new Error("Ziyaretçi şirketi zorunludur.")
-
-    const email = normalizeVisitorEmail(input.email)
-    if (email && !isValidVisitorEmail(email)) throw new Error("Geçerli bir e-posta adresi girin.")
+    if (!hostEmployeeName) throw new Error("Ev sahibi zorunludur.")
 
     const phone = input.phone?.trim() || undefined
 
-    return this.visitService.applyVisitorCorrection(visitId, { firstName, lastName, company, email, phone })
+    // email is only applied when the caller actually passed the field. The dialog no longer
+    // sends it, so an omitted email leaves visitor.email untouched; an explicit value (even a
+    // blank one, which clears it) still flows through.
+    if (input.email === undefined) {
+      return this.visitService.applyVisitorCorrection(visitId, { firstName, lastName, company, phone, hostEmployeeName })
+    }
+    const email = normalizeVisitorEmail(input.email)
+    if (email && !isValidVisitorEmail(email)) throw new Error("Geçerli bir e-posta adresi girin.")
+    return this.visitService.applyVisitorCorrection(visitId, { firstName, lastName, company, email, phone, hostEmployeeName })
   }
 }

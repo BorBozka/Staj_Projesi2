@@ -31,6 +31,12 @@ describe("SecurityCheckInDialog contract", () => {
     expect(source).toContain('"Giriş yapılıyor…"')
   })
 
+  it("captures an optional phone at the gate and forwards it to check-in", () => {
+    expect(source).toContain("Telefon (opsiyonel)")
+    expect(source).toContain('type="tel"')
+    expect(source).toContain("phone: phone.trim() || undefined")
+  })
+
   it("offers a subtle path to correct visitor details without leaving the check-in flow", () => {
     expect(source).toContain("Bilgileri düzelt")
     expect(source).toContain('from "@/features/security/SecurityVisitorCorrectionDialog"')

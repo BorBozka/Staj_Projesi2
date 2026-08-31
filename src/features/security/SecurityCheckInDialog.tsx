@@ -25,6 +25,7 @@ export function SecurityCheckInDialog({ visit, open, onOpenChange, onCheckedIn }
   const [cardsLoading, setCardsLoading] = useState(true)
   const [selectedCardId, setSelectedCardId] = useState("")
   const [plate, setPlate] = useState("")
+  const [phone, setPhone] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showCorrection, setShowCorrection] = useState(false)
@@ -34,6 +35,7 @@ export function SecurityCheckInDialog({ visit, open, onOpenChange, onCheckedIn }
     setCurrentVisit(visit)
     setSelectedCardId("")
     setPlate("")
+    setPhone("")
     setSubmitting(false)
     setError(null)
     setShowCorrection(false)
@@ -61,6 +63,7 @@ export function SecurityCheckInDialog({ visit, open, onOpenChange, onCheckedIn }
         visitId: currentVisit.id,
         visitorCardId: selectedCardId,
         vehiclePlate: plate.trim() || undefined,
+        phone: phone.trim() || undefined,
       })
       onCheckedIn(updated)
       onOpenChange(false)
@@ -119,6 +122,10 @@ export function SecurityCheckInDialog({ visit, open, onOpenChange, onCheckedIn }
             <div>
               <Label htmlFor="security-checkin-plate">Plaka (opsiyonel)</Label>
               <Input id="security-checkin-plate" className="mt-1" value={plate} onChange={(event) => setPlate(event.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="security-checkin-phone">Telefon (opsiyonel)</Label>
+              <Input id="security-checkin-phone" type="tel" className="mt-1" value={phone} onChange={(event) => setPhone(event.target.value)} />
             </div>
           </div>
 

@@ -82,6 +82,20 @@ describe("MockSecurityService checkInVisit", () => {
     expect(result.vehiclePlate).toBeUndefined()
   })
 
+  it("writes an optional gate-captured phone onto the visitor, and leaves it alone when blank", async () => {
+    const { visitService, security } = setup([
+      { id: "card-1", cardNumber: "001", status: "AVAILABLE" },
+      { id: "card-2", cardNumber: "002", status: "AVAILABLE" },
+    ])
+    const withPhone = await visitService.createMeeting(meetingInput)
+    const captured = await security.checkInVisit({ visitId: withPhone.visits[0].id, visitorCardId: "card-1", phone: "  +90 555 111 22 33 " })
+    expect(captured.visitor.phone).toBe("+90 555 111 22 33")
+
+    const withoutPhone = await visitService.createMeeting(meetingInput)
+    const untouched = await security.checkInVisit({ visitId: withoutPhone.visits[0].id, visitorCardId: "card-2" })
+    expect(untouched.visitor.phone).toBeUndefined()
+  })
+
   it("moves the assigned card to IN_USE, linked to the visit and visitor name", async () => {
     const { cardStore, visitService, security } = setup()
     const created = await visitService.createMeeting(meetingInput)
@@ -167,10 +181,12 @@ describe("MockSecurityService checkInVisit", () => {
 })
 
 describe("MockSecurityService correctVisitor", () => {
+  const hostUnchanged = { hostEmployeeName: meetingInput.hostEmployeeName }
+
   it("corrects a PLANNED visitor's identity fields", async () => {
     const { visitService, security } = setup()
     const created = await visitService.createMeeting(meetingInput)
-    const result = await security.correctVisitor(created.visits[0].id, { firstName: "Yeni", lastName: "Ad", company: "Yeni A.Ş.", email: "yeni@example.com", phone: "+90 532 000 00 00" })
+    const result = await security.correctVisitor(created.visits[0].id, { firstName: "Yeni", lastName: "Ad", company: "Yeni A.Ş.", email: "yeni@example.com", phone: "+90 532 000 00 00", ...hostUnchanged })
     expect(result.visitor).toMatchObject({ firstName: "Yeni", lastName: "Ad", company: "Yeni A.Ş.", email: "yeni@example.com" })
   })
 
@@ -178,9 +194,16 @@ describe("MockSecurityService correctVisitor", () => {
     const { visitService, security } = setup()
     const created = await visitService.createMeeting(meetingInput)
     await security.checkInVisit({ visitId: created.visits[0].id, visitorCardId: "card-1" })
-    const result = await security.correctVisitor(created.visits[0].id, { firstName: "Düzeltilmiş", lastName: "İsim", company: "Firma" })
+    const result = await security.correctVisitor(created.visits[0].id, { firstName: "Düzeltilmiş", lastName: "İsim", company: "Firma", ...hostUnchanged })
     expect(result.visitor.firstName).toBe("Düzeltilmiş")
     expect(result.status).toBe("CHECKED_IN")
+  })
+
+  it("leaves the visitor email untouched when the correction omits it", async () => {
+    const { visitService, security } = setup()
+    const created = await visitService.createMeeting(meetingInput)
+    const result = await security.correctVisitor(created.visits[0].id, { firstName: "Yeni", lastName: "Ad", company: "Firma", ...hostUnchanged })
+    expect(result.visitor.email).toBe("test@example.com")
   })
 
   it("rejects correction for CHECKED_OUT, CANCELLED, and NO_SHOW visits", async () => {
@@ -188,39 +211,63 @@ describe("MockSecurityService correctVisitor", () => {
     const created = await visitService.createMeeting(meetingInput)
     await security.checkInVisit({ visitId: created.visits[0].id, visitorCardId: "card-1" })
     await visitService.checkoutVisit(created.visits[0].id)
-    await expect(security.correctVisitor(created.visits[0].id, { firstName: "A", lastName: "B", company: "C" })).rejects.toThrow("düzenlenebilir")
+    await expect(security.correctVisitor(created.visits[0].id, { firstName: "A", lastName: "B", company: "C", ...hostUnchanged })).rejects.toThrow("düzenlenebilir")
 
     const cancelled = await visitService.createMeeting(meetingInput)
     await visitService.cancelVisit(cancelled.visits[0].id)
-    await expect(security.correctVisitor(cancelled.visits[0].id, { firstName: "A", lastName: "B", company: "C" })).rejects.toThrow("düzenlenebilir")
+    await expect(security.correctVisitor(cancelled.visits[0].id, { firstName: "A", lastName: "B", company: "C", ...hostUnchanged })).rejects.toThrow("düzenlenebilir")
 
     const noShow = (await visitService.listVisits()).find((visit) => visit.status === "NO_SHOW")!
-    await expect(security.correctVisitor(noShow.id, { firstName: "A", lastName: "B", company: "C" })).rejects.toThrow("düzenlenebilir")
+    await expect(security.correctVisitor(noShow.id, { firstName: "A", lastName: "B", company: "C", ...hostUnchanged })).rejects.toThrow("düzenlenebilir")
   })
 
-  it("enforces required firstName, lastName, and company", async () => {
+  it("enforces required firstName, lastName, company, and host name", async () => {
     const { visitService, security } = setup()
     const created = await visitService.createMeeting(meetingInput)
-    await expect(security.correctVisitor(created.visits[0].id, { firstName: "  ", lastName: "B", company: "C" })).rejects.toThrow("Ad zorunludur")
-    await expect(security.correctVisitor(created.visits[0].id, { firstName: "A", lastName: "  ", company: "C" })).rejects.toThrow("Soyad zorunludur")
-    await expect(security.correctVisitor(created.visits[0].id, { firstName: "A", lastName: "B", company: " " })).rejects.toThrow("şirketi zorunludur")
+    await expect(security.correctVisitor(created.visits[0].id, { firstName: "  ", lastName: "B", company: "C", ...hostUnchanged })).rejects.toThrow("Ad zorunludur")
+    await expect(security.correctVisitor(created.visits[0].id, { firstName: "A", lastName: "  ", company: "C", ...hostUnchanged })).rejects.toThrow("Soyad zorunludur")
+    await expect(security.correctVisitor(created.visits[0].id, { firstName: "A", lastName: "B", company: " ", ...hostUnchanged })).rejects.toThrow("şirketi zorunludur")
+    await expect(security.correctVisitor(created.visits[0].id, { firstName: "A", lastName: "B", company: "C", hostEmployeeName: "  " })).rejects.toThrow("Ev sahibi zorunludur")
   })
 
   it("normalizes a blank email to undefined and rejects an invalid non-empty email", async () => {
     const { visitService, security } = setup()
     const created = await visitService.createMeeting(meetingInput)
-    const cleared = await security.correctVisitor(created.visits[0].id, { firstName: "A", lastName: "B", company: "C", email: "   " })
+    const cleared = await security.correctVisitor(created.visits[0].id, { firstName: "A", lastName: "B", company: "C", email: "   ", ...hostUnchanged })
     expect(cleared.visitor.email).toBeUndefined()
-    await expect(security.correctVisitor(created.visits[0].id, { firstName: "A", lastName: "B", company: "C", email: "invalid" })).rejects.toThrow("Geçerli bir e-posta")
+    await expect(security.correctVisitor(created.visits[0].id, { firstName: "A", lastName: "B", company: "C", email: "invalid", ...hostUnchanged })).rejects.toThrow("Geçerli bir e-posta")
   })
 
-  it("never changes Meeting-shared fields, operational status fields, or invitation metadata", async () => {
+  it("applies a host-name correction and stamps the audit fields without touching hostEmployeeId", async () => {
+    const { visitService, security } = setup()
+    const created = await visitService.createMeeting(meetingInput)
+    const before = created.visits[0]
+
+    const result = await security.correctVisitor(before.id, { firstName: "Test", lastName: "Ziyaretci", company: "Test A.Ş.", hostEmployeeName: "Deniz Şahin" })
+
+    expect(result.hostEmployeeName).toBe("Deniz Şahin")
+    expect(result.hostCorrectedFrom).toBe(before.hostEmployeeName)
+    expect(result.hostCorrectedAt).toBeTruthy()
+    expect(result.hostCorrectedBy).toBeTruthy()
+    expect(result.hostEmployeeId).toBe(before.hostEmployeeId)
+  })
+
+  it("does not stamp host audit fields when the host name is unchanged", async () => {
+    const { visitService, security } = setup()
+    const created = await visitService.createMeeting(meetingInput)
+    const result = await security.correctVisitor(created.visits[0].id, { firstName: "Yeni", lastName: "Ad", company: "Firma", ...hostUnchanged })
+    expect(result.hostCorrectedFrom).toBeUndefined()
+    expect(result.hostCorrectedAt).toBeUndefined()
+    expect(result.hostCorrectedBy).toBeUndefined()
+  })
+
+  it("never changes visit type, facility, schedule, note, status, or invitation metadata", async () => {
     const { visitService, security } = setup()
     const created = await visitService.createMeeting(meetingInput)
     await visitService.sendVisitInvitation(created.visits[0].id)
     const before = (await visitService.listVisits()).find((visit) => visit.id === created.visits[0].id)!
 
-    const result = await security.correctVisitor(created.visits[0].id, { firstName: "Yeni", lastName: "İsim", company: "Farklı A.Ş." })
+    const result = await security.correctVisitor(created.visits[0].id, { firstName: "Yeni", lastName: "İsim", company: "Farklı A.Ş.", ...hostUnchanged })
 
     expect(result.hostEmployeeName).toBe(before.hostEmployeeName)
     expect(result.visitTypeName).toBe(before.visitTypeName)

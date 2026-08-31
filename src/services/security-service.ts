@@ -5,6 +5,8 @@ export interface SecurityCheckInInput {
   visitId: string
   visitorCardId: string
   vehiclePlate?: string
+  /** Optional phone captured at the gate; written to visitor.phone when present. */
+  phone?: string
 }
 
 export interface SecurityCheckOutInput {
@@ -20,9 +22,20 @@ export interface SecurityCardIssue {
 export interface SecurityVisitorCorrectionInput {
   firstName: string
   lastName: string
+  /**
+   * Kept optional for backward compatibility. SecurityVisitorCorrectionDialog no longer sends
+   * it; when omitted the visitor's existing email is left as-is, when present it is applied
+   * (a blank string still clears the email).
+   */
   email?: string
   company: string
   phone?: string
+  /**
+   * Free-text host display name. When it differs from the current value the parent Meeting's
+   * hostEmployeeName is updated and hostCorrectedFrom/At/By audit fields are written on the
+   * visit record; hostEmployeeId is not touched.
+   */
+  hostEmployeeName: string
 }
 
 export interface SecurityService {
@@ -47,9 +60,11 @@ export interface SecurityService {
   receiveReturnedVisitorCard(visitId: string): Promise<Visit>
 
   /**
-   * Corrects visitor identity/contact fields (name, company, email, phone) at the gate. Allowed
-   * for PLANNED and CHECKED_IN visits only; rejected for terminal visits. Never touches
-   * host/type/facility/schedule fields or invitation metadata.
+   * Corrects visitor identity/contact fields (name, company, email, phone) at the gate, plus
+   * the host *display name* when it is wrong. Allowed for PLANNED and CHECKED_IN visits only;
+   * rejected for terminal visits. A host-name change updates the parent Meeting's
+   * hostEmployeeName and records hostCorrectedFrom/At/By on the visit; hostEmployeeId, visit
+   * type, facility, schedule and invitation metadata are never touched.
    */
   correctVisitor(visitId: string, input: SecurityVisitorCorrectionInput): Promise<Visit>
 }

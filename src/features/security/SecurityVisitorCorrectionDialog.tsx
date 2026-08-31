@@ -3,14 +3,14 @@ import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { isValidVisitorEmail, type Visit } from "@/domain/visits"
+import type { Visit } from "@/domain/visits"
 import { securityService } from "@/services"
 
 interface CorrectionDraft {
   firstName: string
   lastName: string
   company: string
-  email: string
+  hostEmployeeName: string
   phone: string
 }
 
@@ -19,7 +19,7 @@ function draftFor(visit: Visit): CorrectionDraft {
     firstName: visit.visitor.firstName,
     lastName: visit.visitor.lastName,
     company: visit.visitor.company,
-    email: visit.visitor.email ?? "",
+    hostEmployeeName: visit.hostEmployeeName,
     phone: visit.visitor.phone ?? "",
   }
 }
@@ -49,12 +49,12 @@ export function SecurityVisitorCorrectionDialog({ visit, open, onOpenChange, onS
   const firstName = draft.firstName.trim()
   const lastName = draft.lastName.trim()
   const company = draft.company.trim()
-  const email = draft.email.trim()
-  const emailInvalid = email !== "" && !isValidVisitorEmail(email)
-  const invalid = !firstName || !lastName || !company || emailInvalid
+  const hostEmployeeName = draft.hostEmployeeName.trim()
+  const invalid = !firstName || !lastName || !company || !hostEmployeeName
   const initial = draftFor(visit)
   const dirty = draft.firstName !== initial.firstName || draft.lastName !== initial.lastName
-    || draft.company !== initial.company || draft.email !== initial.email || draft.phone !== initial.phone
+    || draft.company !== initial.company || draft.hostEmployeeName !== initial.hostEmployeeName
+    || draft.phone !== initial.phone
   const saveDisabled = invalid || !dirty || saving
 
   const save = async () => {
@@ -66,8 +66,8 @@ export function SecurityVisitorCorrectionDialog({ visit, open, onOpenChange, onS
         firstName,
         lastName,
         company,
-        email: email || undefined,
         phone: draft.phone.trim() || undefined,
+        hostEmployeeName,
       })
       onSaved(updated)
       onOpenChange(false)
@@ -95,8 +95,8 @@ export function SecurityVisitorCorrectionDialog({ visit, open, onOpenChange, onS
           <Field label="Firma">
             <Input value={draft.company} onChange={(event) => setDraft({ ...draft, company: event.target.value })} />
           </Field>
-          <Field label="E-posta (opsiyonel)" error={emailInvalid ? "Geçerli bir e-posta adresi girin." : undefined}>
-            <Input type="email" value={draft.email} onChange={(event) => setDraft({ ...draft, email: event.target.value })} />
+          <Field label="Ev sahibi">
+            <Input value={draft.hostEmployeeName} onChange={(event) => setDraft({ ...draft, hostEmployeeName: event.target.value })} />
           </Field>
           <Field label="Telefon (opsiyonel)">
             <Input type="tel" value={draft.phone} onChange={(event) => setDraft({ ...draft, phone: event.target.value })} />
@@ -112,12 +112,11 @@ export function SecurityVisitorCorrectionDialog({ visit, open, onOpenChange, onS
   )
 }
 
-function Field({ label, children, error }: { label: string; children: React.ReactNode; error?: string }) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
       <span className="mb-1 block text-xs font-medium text-slate-700">{label}</span>
       {children}
-      {error && <p className="mt-1 text-[11px] font-medium text-red-700" role="alert">{error}</p>}
     </label>
   )
 }

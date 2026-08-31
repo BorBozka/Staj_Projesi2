@@ -110,6 +110,12 @@ export interface VisitRecord {
   visitorCardId?: string
   visitorCardNumber?: string
   vehiclePlate?: string
+  // Security gate host-name correction audit. Set only when a gate correction changes the
+  // displayed host name (hostEmployeeName); the linked hostEmployeeId is intentionally left
+  // untouched. hostCorrectedBy is the acting security employee's name.
+  hostCorrectedFrom?: string
+  hostCorrectedAt?: string
+  hostCorrectedBy?: string
   status: VisitStatus
   invitationStatus: InvitationStatus
   invitationSentAt?: string

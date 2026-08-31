@@ -15,15 +15,27 @@ describe("SecurityVisitorCorrectionDialog contract", () => {
     expect(source).not.toContain("DialogDescription")
   })
 
-  it("labels email as optional and never warns on a blank value", () => {
-    expect(source).toContain("E-posta (opsiyonel)")
+  it("drops the e-mail field and edits the host name as free text instead", () => {
+    expect(source).not.toContain("E-posta")
+    expect(source).not.toContain("isValidVisitorEmail")
+    expect(source).not.toContain("draft.email")
+    expect(source).toContain('label="Ev sahibi"')
+    expect(source).toContain("hostEmployeeName: visit.hostEmployeeName")
+    // Free text, not a picker.
+    expect(source).not.toContain("<Select")
     expect(source).not.toContain("required")
   })
 
-  it("disables Save when nothing changed or the email is invalid", () => {
+  it("disables Save when nothing changed and requires name, company and host", () => {
     expect(source).toContain("!dirty")
-    expect(source).toContain("emailInvalid")
+    expect(source).toContain("!firstName || !lastName || !company || !hostEmployeeName")
+    expect(source).toContain("draft.hostEmployeeName !== initial.hostEmployeeName")
     expect(source).toContain("saveDisabled = invalid || !dirty || saving")
+  })
+
+  it("sends the host name to correctVisitor and no longer sends an email field", () => {
+    expect(source).toContain("hostEmployeeName,")
+    expect(source).not.toContain("email:")
   })
 
   it("routes the mutation through SecurityService.correctVisitor, not Admin/Manager APIs", () => {

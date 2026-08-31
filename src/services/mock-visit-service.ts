@@ -261,7 +261,7 @@ export class MockVisitService implements VisitService {
     return clone(this.findVisitRecord(id))
   }
 
-  applyCheckIn(visitId: string, checkIn: { visitorCardId: string; visitorCardNumber: string; vehiclePlate?: string }): Visit {
+  applyCheckIn(visitId: string, checkIn: { visitorCardId: string; visitorCardNumber: string; vehiclePlate?: string; phone?: string }): Visit {
     const current = this.findVisitRecord(visitId)
     const now = new Date().toISOString()
     const updated: VisitRecord = {
@@ -271,18 +271,41 @@ export class MockVisitService implements VisitService {
       visitorCardId: checkIn.visitorCardId,
       visitorCardNumber: checkIn.visitorCardNumber,
       vehiclePlate: checkIn.vehiclePlate,
+      // Only overwrite the visitor's phone when the gate actually captured one.
+      visitor: checkIn.phone ? { ...current.visitor, phone: checkIn.phone } : current.visitor,
       updatedAt: now,
     }
     this.visits = this.visits.map((visit) => visit.id === visitId ? updated : visit)
     return clone(this.projectVisit(updated))
   }
 
-  applyVisitorCorrection(visitId: string, correction: { firstName: string; lastName: string; company: string; email?: string; phone?: string }): Visit {
+  applyVisitorCorrection(
+    visitId: string,
+    correction: { firstName: string; lastName: string; company: string; email?: string; phone?: string; hostEmployeeName?: string },
+  ): Visit {
     const current = this.findVisitRecord(visitId)
+    const meeting = this.findMeeting(current.meetingId)
     const now = new Date().toISOString()
+    const { hostEmployeeName, ...visitorCorrection } = correction
+
+    const nextHostName = hostEmployeeName?.trim()
+    const hostChanged = Boolean(nextHostName) && nextHostName !== meeting.hostEmployeeName
+
+    let hostAudit: Pick<VisitRecord, "hostCorrectedFrom" | "hostCorrectedAt" | "hostCorrectedBy"> = {}
+    if (hostChanged) {
+      const reference = this.getReferenceDataSnapshot()
+      const actorName = reference.employees.find((employee) => employee.id === reference.currentEmployee.employeeId)?.name
+        ?? reference.currentEmployee.employeeId
+      hostAudit = { hostCorrectedFrom: meeting.hostEmployeeName, hostCorrectedAt: now, hostCorrectedBy: actorName }
+      this.meetings = this.meetings.map((item) => item.id === meeting.id
+        ? { ...item, hostEmployeeName: nextHostName!, updatedAt: now }
+        : item)
+    }
+
     const updated: VisitRecord = {
       ...current,
-      visitor: { ...current.visitor, ...correction },
+      visitor: { ...current.visitor, ...visitorCorrection },
+      ...hostAudit,
       updatedAt: now,
     }
     this.visits = this.visits.map((visit) => visit.id === visitId ? updated : visit)
