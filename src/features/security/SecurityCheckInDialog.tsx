@@ -97,6 +97,10 @@ export function SecurityCheckInDialog({ visit, open, onOpenChange, onCheckedIn }
                 <dd className="font-medium text-slate-900">{currentVisit.hostEmployeeName}</dd>
                 <dt className="text-slate-500">Tür</dt>
                 <dd className="font-medium text-slate-900">{currentVisit.visitTypeName}</dd>
+                {currentVisit.visitor.phone && <>
+                  <dt className="text-slate-500">Telefon</dt>
+                  <dd className="font-medium text-slate-900">{currentVisit.visitor.phone}</dd>
+                </>}
                 <dt className="text-slate-500">Saat</dt>
                 <dd className="font-medium text-slate-900">{formatTr(new Date(currentVisit.plannedStart), "HH:mm")}</dd>
               </dl>
@@ -124,10 +128,12 @@ export function SecurityCheckInDialog({ visit, open, onOpenChange, onCheckedIn }
               <Label htmlFor="security-checkin-plate">Plaka (opsiyonel)</Label>
               <Input id="security-checkin-plate" className="mt-1" value={plate} onChange={(event) => setPlate(event.target.value)} />
             </div>
-            <div>
-              <Label htmlFor="security-checkin-phone">Telefon (opsiyonel)</Label>
-              <Input id="security-checkin-phone" type="tel" placeholder="05XX XXX XX XX" className="mt-1" value={phone} onChange={(event) => setPhone(event.target.value)} />
-            </div>
+            {!currentVisit.visitor.phone && (
+              <div>
+                <Label htmlFor="security-checkin-phone">Telefon (opsiyonel)</Label>
+                <Input id="security-checkin-phone" type="tel" placeholder="05XX XXX XX XX" className="mt-1" value={phone} onChange={(event) => setPhone(event.target.value)} />
+              </div>
+            )}
           </div>
 
           {error && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700" role="alert">{error}</p>}

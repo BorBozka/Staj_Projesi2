@@ -10,6 +10,8 @@ describe("SecurityCheckInDialog contract", () => {
     expect(source).toContain("Ev sahibi</dt>")
     expect(source).toContain("Tür</dt>")
     expect(source).toContain("Saat</dt>")
+    expect(source).toContain('currentVisit.visitor.phone &&')
+    expect(source).toContain("Telefon</dt>")
     expect(source).not.toContain('from "@/features/visits/VisitFormDialog"')
   })
 
@@ -36,6 +38,7 @@ describe("SecurityCheckInDialog contract", () => {
     expect(source).toContain('type="tel"')
     expect(source).toContain('placeholder="05XX XXX XX XX"')
     expect(source).toContain("phone: phone.trim() ? normalizeVisitorPhone(phone) : undefined")
+    expect(source).toContain("!currentVisit.visitor.phone &&")
   })
 
   it("offers a subtle path to correct visitor details without leaving the check-in flow", () => {
