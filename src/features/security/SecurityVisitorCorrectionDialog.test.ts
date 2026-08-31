@@ -38,10 +38,11 @@ describe("SecurityVisitorCorrectionDialog contract", () => {
     expect(source).not.toContain("email:")
   })
 
-  it("uses the shared local phone formatter and input placeholder", () => {
+  it("only lets Security correct an existing phone, using the shared local formatter", () => {
     expect(source).toContain('from "@/lib/phone"')
+    expect(source).toContain("visit.visitor.phone && (")
     expect(source).toContain('placeholder="05XX XXX XX XX"')
-    expect(source).toContain("phone: draft.phone.trim() ? normalizeVisitorPhone(draft.phone) : undefined")
+    expect(source).toContain("...(visit.visitor.phone ? { phone: draft.phone.trim() ? normalizeVisitorPhone(draft.phone) : undefined } : {})")
   })
 
   it("routes the mutation through SecurityService.correctVisitor, not Admin/Manager APIs", () => {

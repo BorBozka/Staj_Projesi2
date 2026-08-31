@@ -67,7 +67,7 @@ export function SecurityVisitorCorrectionDialog({ visit, open, onOpenChange, onS
         firstName,
         lastName,
         company,
-        phone: draft.phone.trim() ? normalizeVisitorPhone(draft.phone) : undefined,
+        ...(visit.visitor.phone ? { phone: draft.phone.trim() ? normalizeVisitorPhone(draft.phone) : undefined } : {}),
         hostEmployeeName,
       })
       onSaved(updated)
@@ -99,9 +99,11 @@ export function SecurityVisitorCorrectionDialog({ visit, open, onOpenChange, onS
           <Field label="Ev sahibi">
             <Input value={draft.hostEmployeeName} onChange={(event) => setDraft({ ...draft, hostEmployeeName: event.target.value })} />
           </Field>
-          <Field label="Telefon (opsiyonel)">
-            <Input type="tel" placeholder="05XX XXX XX XX" value={draft.phone} onChange={(event) => setDraft({ ...draft, phone: event.target.value })} />
-          </Field>
+          {visit.visitor.phone && (
+            <Field label="Telefon (opsiyonel)">
+              <Input type="tel" placeholder="05XX XXX XX XX" value={draft.phone} onChange={(event) => setDraft({ ...draft, phone: event.target.value })} />
+            </Field>
+          )}
         </div>
         {error && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700" role="alert">{error}</p>}
         <DialogFooter>
