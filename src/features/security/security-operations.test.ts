@@ -3,11 +3,8 @@ import { describe, expect, it } from "vitest"
 import type { Visit, VisitStatus } from "@/domain/visits"
 import {
   filterSecurityVisitRows,
-  filterSecurityCardIssues,
   getExpectedSecurityVisits,
   getInsideSecurityVisits,
-  getSecurityOperationView,
-  getSecurityOperationViewParams,
 } from "./security-operations"
 
 function makeVisit(id: string, status: VisitStatus, plannedStart: string, overrides: Partial<Visit> = {}): Visit {
@@ -98,39 +95,5 @@ describe("security operations search", () => {
 
   it("returns no records for an unrelated search", () => {
     expect(filterSecurityVisitRows(rows, "eşleşmeyen")).toEqual([])
-  })
-})
-
-describe("security card issue search", () => {
-  const issue = {
-    card: { id: "card-1", cardNumber: "007", status: "NOT_RETURNED" as const, assignedVisitId: "Ayça" },
-    visit: makeVisit("Ayça", "CHECKED_OUT", "2026-08-28T09:00:00+03:00", {
-      actualCheckOut: "2026-08-28T10:00:00+03:00",
-      visitorCardReturned: false,
-      visitorCardId: "card-1",
-      visitorCardNumber: "007",
-      visitor: { id: "visitor-1", firstName: "Ayça", lastName: "Yılmaz", email: "ayca@example.com", company: "İzmir Lojistik" },
-    }),
-  }
-
-  it.each(["007", "AYÇA YILMAZ", "izmir lojistik"])("matches an operational issue by %s", (query) => {
-    expect(filterSecurityCardIssues([issue], query)).toEqual([issue])
-  })
-})
-
-describe("security operations URL view state", () => {
-  it.each([
-    ["", "expected"],
-    ["view=expected", "expected"],
-    ["view=inside", "inside"],
-    ["view=cards", "cards"],
-    ["view=unknown", "expected"],
-  ] as const)("maps %s to %s", (query, expected) => {
-    expect(getSecurityOperationView(new URLSearchParams(query))).toBe(expected)
-  })
-
-  it("updates view while preserving unrelated search parameters", () => {
-    const params = getSecurityOperationViewParams(new URLSearchParams("q=ipek&view=expected"), "inside")
-    expect(params.toString()).toBe("q=ipek&view=inside")
   })
 })

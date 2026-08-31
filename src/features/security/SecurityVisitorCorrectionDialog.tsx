@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { isValidVisitorEmail, type Visit } from "@/domain/visits"
 import { securityService } from "@/services"
@@ -79,15 +79,14 @@ export function SecurityVisitorCorrectionDialog({ visit, open, onOpenChange, onS
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!saving) onOpenChange(next) }}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-sm" onOpenAutoFocus={(event) => event.preventDefault()}>
         <DialogHeader>
           <DialogTitle>Ziyaretçi Bilgilerini Düzelt</DialogTitle>
-          <DialogDescription>Kapıda tespit edilen yazım hatalarını düzeltin.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-2.5">
           <div className="grid grid-cols-2 gap-2.5">
             <Field label="Ad">
-              <Input autoFocus value={draft.firstName} onChange={(event) => setDraft({ ...draft, firstName: event.target.value })} />
+              <Input value={draft.firstName} onChange={(event) => setDraft({ ...draft, firstName: event.target.value })} />
             </Field>
             <Field label="Soyad">
               <Input value={draft.lastName} onChange={(event) => setDraft({ ...draft, lastName: event.target.value })} />

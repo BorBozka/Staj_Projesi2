@@ -2,12 +2,14 @@ import type { VisitorCardInventoryItem } from "@/domain/admin"
 
 const clone = <T,>(value: T): T => structuredClone(value)
 
-const defaultVisitorCards: VisitorCardInventoryItem[] = [
+export const defaultVisitorCards: VisitorCardInventoryItem[] = [
   { id: "card-1", cardNumber: "001", status: "AVAILABLE" },
-  { id: "card-2", cardNumber: "002", status: "IN_USE", assignedVisitorName: "Ece Korkmaz" },
+  { id: "card-2", cardNumber: "002", status: "IN_USE", assignedVisitId: "v-today-late", assignedVisitorName: "Nergis Koral" },
   { id: "card-3", cardNumber: "003", status: "NOT_RETURNED", assignedVisitorName: "Can Uslu" },
   { id: "card-4", cardNumber: "004", status: "LOST" },
   { id: "card-5", cardNumber: "005", status: "DISABLED" },
+  { id: "card-7", cardNumber: "007", status: "IN_USE", assignedVisitId: "v-today-overdue", assignedVisitorName: "Rüzgar Arman" },
+  { id: "card-8", cardNumber: "008", status: "IN_USE", assignedVisitId: "v-lifecycle-active", assignedVisitorName: "Levent Yaman" },
 ]
 
 /**

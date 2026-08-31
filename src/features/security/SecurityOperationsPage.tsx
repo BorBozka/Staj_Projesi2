@@ -1,6 +1,5 @@
 import { Building2, MoreHorizontal, Search } from "lucide-react"
-import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react"
-import { useSearchParams } from "react-router-dom"
+import { type KeyboardEvent, useEffect, useMemo, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -8,6 +7,8 @@ import { Input } from "@/components/ui/input"
 import type { Visit } from "@/domain/visits"
 import { SecurityCheckInDialog } from "@/features/security/SecurityCheckInDialog"
 import { SecurityCheckOutDialog } from "@/features/security/SecurityCheckOutDialog"
+import { SecurityPendingCardReturnsDialog } from "@/features/security/SecurityPendingCardReturnsDialog"
+import { SecurityVisitDetailDialog } from "@/features/security/SecurityVisitDetailDialog"
 import { SecurityVisitorCorrectionDialog } from "@/features/security/SecurityVisitorCorrectionDialog"
 import { formatTr } from "@/lib/date"
 import { cn } from "@/lib/utils"
@@ -16,34 +17,22 @@ import { securityService } from "@/services"
 import type { SecurityCardIssue } from "@/services/security-service"
 import {
   filterSecurityVisitRows,
-  filterSecurityCardIssues,
   getExpectedSecurityVisits,
   getInsideSecurityVisits,
-  getSecurityOperationView,
-  getSecurityOperationViewParams,
   getSecurityScopedVisits,
-  securityOperationViews,
-  type SecurityOperationView,
   type SecurityVisitRow,
 } from "./security-operations"
 
-const viewLabels: Record<SecurityOperationView, string> = {
-  expected: "Beklenen",
-  inside: "İçeride",
-  cards: "Kart sorunları",
-}
-
 export function SecurityOperationsPage() {
   const { visits, referenceData, isLoading, error, reload } = useVisits()
-  const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState("")
   const [now, setNow] = useState(() => new Date())
   const [checkInTarget, setCheckInTarget] = useState<Visit | null>(null)
   const [checkOutTarget, setCheckOutTarget] = useState<Visit | null>(null)
   const [correctingVisit, setCorrectingVisit] = useState<Visit | null>(null)
+  const [detailVisit, setDetailVisit] = useState<Visit | null>(null)
   const [cardIssues, setCardIssues] = useState<SecurityCardIssue[]>([])
-  const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
-  const activeView = getSecurityOperationView(searchParams)
+  const [cardReturnsOpen, setCardReturnsOpen] = useState(false)
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setNow(new Date()), 30_000)
@@ -70,28 +59,17 @@ export function SecurityOperationsPage() {
   }, [referenceData])
 
   const scopedVisits = useMemo(() => scope ? getSecurityScopedVisits(visits, scope.companyId, scope.facilityId) : [], [scope, visits])
-  const expectedRows = useMemo(() => getExpectedSecurityVisits(scopedVisits, now), [now, scopedVisits])
-  const insideRows = useMemo(() => getInsideSecurityVisits(scopedVisits, now), [now, scopedVisits])
+  const expectedRows = useMemo(() => filterSecurityVisitRows(getExpectedSecurityVisits(scopedVisits, now), search), [now, scopedVisits, search])
+  const insideRows = useMemo(() => filterSecurityVisitRows(getInsideSecurityVisits(scopedVisits, now), search), [now, scopedVisits, search])
   const scopedCardIssues = useMemo(() => scope ? cardIssues.filter(({ visit }) => visit.hostCompanyId === scope.companyId && visit.facilityId === scope.facilityId) : [], [cardIssues, scope])
-  const filteredVisitRows = useMemo(() => filterSecurityVisitRows(activeView === "expected" ? expectedRows : insideRows, search), [activeView, expectedRows, insideRows, search])
-  const filteredCardIssues = useMemo(() => filterSecurityCardIssues(scopedCardIssues, search), [scopedCardIssues, search])
 
-  function selectView(view: SecurityOperationView) {
-    setSearchParams(getSecurityOperationViewParams(searchParams, view))
-  }
+  useEffect(() => {
+    if (scopedCardIssues.length === 0) setCardReturnsOpen(false)
+  }, [scopedCardIssues.length])
 
-  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, view: SecurityOperationView) {
-    const index = securityOperationViews.indexOf(view)
-    const nextIndex = event.key === "ArrowRight" ? (index + 1) % securityOperationViews.length
-      : event.key === "ArrowLeft" ? (index - 1 + securityOperationViews.length) % securityOperationViews.length
-        : event.key === "Home" ? 0
-          : event.key === "End" ? securityOperationViews.length - 1
-            : -1
-    if (nextIndex < 0) return
-    event.preventDefault()
-    const nextView = securityOperationViews[nextIndex]
-    selectView(nextView)
-    tabRefs.current[nextIndex]?.focus()
+  const receiveReturnedCard = async (visitId: string) => {
+    await securityService.receiveReturnedVisitorCard(visitId)
+    await reload()
   }
 
   return (
@@ -108,7 +86,7 @@ export function SecurityOperationsPage() {
         </div>
 
         <label className="relative min-w-0 flex-1">
-          <span className="sr-only">Aktif operasyon görünümünde ara</span>
+          <span className="sr-only">Beklenen ve içerideki ziyaretlerde ara</span>
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
           <Input
             type="search"
@@ -120,51 +98,47 @@ export function SecurityOperationsPage() {
           />
         </label>
 
+        {scopedCardIssues.length > 0 && (
+          <Button type="button" variant="outline" className="h-9 shrink-0" onClick={() => setCardReturnsOpen(true)}>
+            İade bekleyen kartlar · {scopedCardIssues.length}
+          </Button>
+        )}
+
         <Button type="button" className="h-9 shrink-0" disabled aria-describedby="unplanned-visit-note">+ Plansız ziyaret</Button>
         <span id="unplanned-visit-note" className="sr-only">Plansız ziyaret işlemi sonraki aşamada kullanıma açılacaktır.</span>
       </div>
 
-      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-white shadow-panel" aria-label="Günlük ziyaret operasyonu">
-        <div className="flex shrink-0 items-center gap-1 border-b bg-slate-50/80 px-2.5 pt-2" role="tablist" aria-label="Operasyon görünümleri">
-          {securityOperationViews.map((view, index) => {
-            const count = view === "expected" ? expectedRows.length : view === "inside" ? insideRows.length : scopedCardIssues.length
-            const selected = activeView === view
-            return (
-              <button
-                key={view}
-                ref={(element) => { tabRefs.current[index] = element }}
-                id={`security-tab-${view}`}
-                type="button"
-                role="tab"
-                tabIndex={selected ? 0 : -1}
-                aria-selected={selected}
-                aria-controls={`security-panel-${view}`}
-                onClick={() => selectView(view)}
-                onKeyDown={(event) => handleTabKeyDown(event, view)}
-                className={cn("relative flex h-9 items-center gap-1.5 rounded-t-md px-3 text-xs font-semibold transition-colors", selected ? "bg-white text-blue-700 shadow-[0_-1px_0_0_rgb(226_232_240),1px_0_0_0_rgb(226_232_240),-1px_0_0_0_rgb(226_232_240)]" : "text-slate-500 hover:bg-slate-100 hover:text-slate-800")}
-              >
-                {viewLabels[view]}
-                <span className={cn("inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] tabular-nums", selected ? "bg-blue-50 text-blue-700" : "bg-slate-200/70 text-slate-600")}>{count}</span>
-                {selected && <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-blue-600" aria-hidden="true" />}
-              </button>
-            )
-          })}
-        </div>
+      <div className="grid min-h-0 flex-1 gap-3 overflow-hidden grid-rows-2 lg:grid-cols-[3fr_2fr] lg:grid-rows-1">
+        <OperationPanel title="Beklenenler" count={expectedRows.length} ariaLabel="Beklenen ziyaretler">
+          {isLoading ? <PanelState message="Yükleniyor…" />
+            : error ? <PanelState message={error} tone="error" />
+              : expectedRows.length === 0 ? <PanelState message={search.trim() ? "Aramayla eşleşen kayıt yok." : "Bugün beklenen ziyaret yok."} />
+                : <ul className="divide-y divide-slate-100">
+                    {expectedRows.map((row) => <ExpectedRow key={row.visit.id} row={row} onOpenDetail={setDetailVisit} onCheckIn={setCheckInTarget} />)}
+                  </ul>}
+        </OperationPanel>
 
-        <div
-          id={`security-panel-${activeView}`}
-          role="tabpanel"
-          aria-labelledby={`security-tab-${activeView}`}
-          className="min-h-0 flex-1 overflow-hidden"
-        >
-          {isLoading ? <WorkspaceState message="Ziyaretler yükleniyor…" />
-            : error ? <WorkspaceState message={error} tone="error" />
-              : activeView === "cards" ? filteredCardIssues.length === 0 ? <WorkspaceState message={search.trim() ? "Aramayla eşleşen kayıt yok." : "Kart sorunu bulunan kayıt yok."} /> : <CardIssuesTable rows={filteredCardIssues} onReceived={async (visitId) => { await securityService.receiveReturnedVisitorCard(visitId); await reload() }} />
-                : filteredVisitRows.length === 0 ? <WorkspaceState message={search.trim() ? "Aramayla eşleşen kayıt yok." : activeView === "expected" ? "Bugün beklenen ziyaret yok." : "İçeride ziyaretçi yok."} />
-                  : activeView === "expected" ? <ExpectedVisitsTable rows={filteredVisitRows} onCheckIn={setCheckInTarget} /> : <InsideVisitsTable rows={filteredVisitRows} onCheckOut={setCheckOutTarget} onEdit={setCorrectingVisit} />}
-        </div>
-      </section>
+        <OperationPanel title="İçeride" count={insideRows.length} ariaLabel="İçerideki ziyaretçiler">
+          {isLoading ? <PanelState message="Yükleniyor…" />
+            : error ? <PanelState message={error} tone="error" />
+              : insideRows.length === 0 ? <PanelState message={search.trim() ? "Aramayla eşleşen kayıt yok." : "İçeride ziyaretçi yok."} />
+                : <ul className="divide-y divide-slate-100">
+                    {insideRows.map((row) => <InsideRow key={row.visit.id} row={row} onOpenDetail={setDetailVisit} onCheckOut={setCheckOutTarget} onEdit={setCorrectingVisit} />)}
+                  </ul>}
+        </OperationPanel>
+      </div>
 
+      <SecurityVisitDetailDialog
+        visit={detailVisit}
+        open={Boolean(detailVisit)}
+        onOpenChange={(next) => { if (!next) setDetailVisit(null) }}
+      />
+      <SecurityPendingCardReturnsDialog
+        issues={scopedCardIssues}
+        open={cardReturnsOpen}
+        onOpenChange={setCardReturnsOpen}
+        onReceive={receiveReturnedCard}
+      />
       <SecurityCheckInDialog
         visit={checkInTarget}
         open={Boolean(checkInTarget)}
@@ -187,91 +161,95 @@ export function SecurityOperationsPage() {
   )
 }
 
-function ExpectedVisitsTable({ rows, onCheckIn }: { rows: SecurityVisitRow[]; onCheckIn(visit: Visit): void }) {
+function OperationPanel({ title, count, ariaLabel, children }: { title: string; count: number; ariaLabel: string; children: React.ReactNode }) {
   return (
-    <div className="h-full min-h-0 overflow-auto scrollbar-thin">
-      <table className="w-full min-w-[940px] border-separate border-spacing-0 text-left">
-        <thead className="sticky top-0 z-10 bg-white text-[10px] uppercase tracking-[0.06em] text-slate-500 shadow-[0_1px_0_0_rgb(226_232_240)]">
-          <tr><TableHeading>Saat</TableHeading><TableHeading>Ziyaretçi</TableHeading><TableHeading>Firma</TableHeading><TableHeading>Ev sahibi</TableHeading><TableHeading>Ziyaret türü</TableHeading><TableHeading>Durum</TableHeading><TableHeading className="w-28 text-right">Aksiyon</TableHeading></tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {rows.map(({ visit, isDelayed }) => (
-            <tr key={visit.id} className="h-12 text-xs text-slate-700">
-              <TableCell className="w-20 font-semibold tabular-nums text-slate-900">{formatVisitTime(visit.plannedStart)}</TableCell>
-              <TableCell className="font-semibold text-slate-900">{visit.visitor.firstName} {visit.visitor.lastName}</TableCell>
-              <TableCell>{visit.visitor.company}</TableCell>
-              <TableCell>{visit.hostEmployeeName}</TableCell>
-              <TableCell>{visit.visitTypeName}</TableCell>
-              <TableCell><StatusPill tone={isDelayed ? "warning" : "neutral"}>{isDelayed ? "Gecikti" : "Planlandı"}</StatusPill></TableCell>
-              <TableCell className="w-28 max-w-none text-right">
-                <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[11px]" onClick={() => onCheckIn(visit)}>Giriş yap</Button>
-              </TableCell>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border bg-white shadow-panel" aria-label={ariaLabel}>
+      <header className="flex shrink-0 items-center border-b bg-slate-50/80 px-3 py-2">
+        <h2 className="text-xs font-semibold text-slate-700">{title} <span className="tabular-nums text-slate-400">· {count}</span></h2>
+      </header>
+      <div className="min-h-0 flex-1 overflow-auto scrollbar-thin">{children}</div>
+    </section>
   )
 }
 
-function InsideVisitsTable({ rows, onCheckOut, onEdit }: { rows: SecurityVisitRow[]; onCheckOut(visit: Visit): void; onEdit(visit: Visit): void }) {
-  return (
-    <div className="h-full min-h-0 overflow-auto scrollbar-thin">
-      <table className="w-full min-w-[940px] border-separate border-spacing-0 text-left">
-        <thead className="sticky top-0 z-10 bg-white text-[10px] uppercase tracking-[0.06em] text-slate-500 shadow-[0_1px_0_0_rgb(226_232_240)]">
-          <tr><TableHeading>Ziyaretçi</TableHeading><TableHeading>Firma</TableHeading><TableHeading>Ev sahibi</TableHeading><TableHeading>Giriş / kart</TableHeading><TableHeading>Planlanan çıkış</TableHeading><TableHeading>Durum</TableHeading><TableHeading className="w-36 text-right">Aksiyon</TableHeading></tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {rows.map(({ visit, isDelayed, delayMinutes }) => (
-            <tr key={visit.id} className="h-12 text-xs text-slate-700">
-              <TableCell className="font-semibold text-slate-900">{visit.visitor.firstName} {visit.visitor.lastName}</TableCell>
-              <TableCell>{visit.visitor.company}</TableCell>
-              <TableCell>{visit.hostEmployeeName}</TableCell>
-              <TableCell className="tabular-nums"><span>{visit.actualCheckIn ? formatVisitTime(visit.actualCheckIn) : "—"}</span>{visit.visitorCardNumber && <span className="ml-1.5 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700">{visit.visitorCardNumber}</span>}</TableCell>
-              <TableCell className="tabular-nums">{formatVisitTime(visit.plannedEnd)}</TableCell>
-              <TableCell><StatusPill tone={isDelayed ? "danger" : "success"}>{isDelayed ? `Süre aştı · ${delayMinutes} dk` : "İçeride"}</StatusPill></TableCell>
-              <TableCell className="w-36 max-w-none text-right">
-                <div className="flex items-center justify-end gap-1"><Button type="button" size="sm" className="h-7 px-2 text-[11px]" onClick={() => onCheckOut(visit)}>Çıkış yap</Button><DropdownMenu><DropdownMenuTrigger asChild><Button type="button" size="icon" variant="ghost" className="size-7" aria-label="Ziyaret işlemleri"><MoreHorizontal className="size-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => onEdit(visit)}>Bilgileri düzelt</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
-              </TableCell>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-function CardIssuesTable({ rows, onReceived }: { rows: SecurityCardIssue[]; onReceived(visitId: string): Promise<void> }) {
-  const [pendingId, setPendingId] = useState<string | null>(null)
-  const [error, setError] = useState("")
-  const receive = async (visitId: string) => {
-    setPendingId(visitId)
-    setError("")
-    try { await onReceived(visitId) } catch (reason) { setError(reason instanceof Error ? reason.message : "Kart teslim alınamadı.") } finally { setPendingId(null) }
+function RowShell({ onOpenDetail, children }: { onOpenDetail(): void; children: React.ReactNode }) {
+  const openOnKey = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault()
+      onOpenDetail()
+    }
   }
-  return <div className="h-full min-h-0 overflow-auto scrollbar-thin">{error && <p className="border-b px-3 py-2 text-xs font-medium text-red-700" role="alert">{error}</p>}<table className="w-full min-w-[820px] border-separate border-spacing-0 text-left"><thead className="sticky top-0 z-10 bg-white text-[10px] uppercase tracking-[0.06em] text-slate-500 shadow-[0_1px_0_0_rgb(226_232_240)]"><tr><TableHeading>Kart</TableHeading><TableHeading>Ziyaretçi</TableHeading><TableHeading>Firma</TableHeading><TableHeading>Çıkış</TableHeading><TableHeading>Durum</TableHeading><TableHeading className="w-36 text-right">Aksiyon</TableHeading></tr></thead><tbody className="divide-y divide-slate-100">{rows.map(({ card, visit }) => <tr key={card.id} className="h-12 text-xs text-slate-700"><TableCell className="font-semibold text-slate-900">{card.cardNumber}</TableCell><TableCell className="font-semibold text-slate-900">{visit.visitor.firstName} {visit.visitor.lastName}</TableCell><TableCell>{visit.visitor.company}</TableCell><TableCell className="tabular-nums">{visit.actualCheckOut ? formatVisitTime(visit.actualCheckOut) : "—"}</TableCell><TableCell><StatusPill tone="warning">İade edilmedi</StatusPill></TableCell><TableCell className="w-36 max-w-none text-right"><Button type="button" size="sm" disabled={pendingId === visit.id} className="h-7 px-2 text-[11px]" onClick={() => void receive(visit.id)}>{pendingId === visit.id ? "Alınıyor…" : "Kartı teslim al"}</Button></TableCell></tr>)}</tbody></table></div>
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpenDetail}
+      onKeyDown={openOnKey}
+      className="flex w-full items-center gap-3 px-3 text-left outline-none transition-colors hover:bg-slate-50 focus-visible:bg-slate-50"
+    >
+      {children}
+    </div>
+  )
 }
 
-function TableHeading({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <th scope="col" className={cn("h-9 whitespace-nowrap px-3 font-semibold", className)}>{children}</th>
+function RowActions({ children }: { children: React.ReactNode }) {
+  return <div className="flex shrink-0 items-center gap-1" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>{children}</div>
 }
 
-function TableCell({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <td className={cn("max-w-[240px] truncate px-3", className)}>{children}</td>
+function ExpectedRow({ row, onOpenDetail, onCheckIn }: { row: SecurityVisitRow; onOpenDetail(visit: Visit): void; onCheckIn(visit: Visit): void }) {
+  const { visit, isDelayed } = row
+  return (
+    <li>
+      <RowShell onOpenDetail={() => onOpenDetail(visit)}>
+        <div className="h-14 min-w-0 flex-1 py-2">
+          <div className="flex items-center gap-2">
+            <span className="shrink-0 text-xs font-semibold tabular-nums text-slate-900">{formatVisitTime(visit.plannedStart)}</span>
+            <span className="truncate text-xs font-semibold text-slate-900">{visit.visitor.firstName} {visit.visitor.lastName}</span>
+            {isDelayed && <StatusPill tone="warning">Gecikti</StatusPill>}
+          </div>
+          <p className="mt-1 truncate text-[11px] text-slate-500">{visit.visitor.company} · {visit.hostEmployeeName}</p>
+        </div>
+        <RowActions>
+          <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[11px]" onClick={() => onCheckIn(visit)}>Giriş yap</Button>
+        </RowActions>
+      </RowShell>
+    </li>
+  )
 }
 
-function StatusPill({ children, tone }: { children: React.ReactNode; tone: "neutral" | "warning" | "success" | "danger" }) {
+function InsideRow({ row, onOpenDetail, onCheckOut, onEdit }: { row: SecurityVisitRow; onOpenDetail(visit: Visit): void; onCheckOut(visit: Visit): void; onEdit(visit: Visit): void }) {
+  const { visit, isDelayed, delayMinutes } = row
+  return (
+    <li>
+      <RowShell onOpenDetail={() => onOpenDetail(visit)}>
+        <div className="flex h-11 min-w-0 flex-1 items-center gap-2">
+          <span className="truncate text-xs font-semibold text-slate-900">{visit.visitor.firstName} {visit.visitor.lastName}</span>
+          {isDelayed && <StatusPill tone="danger">Süre aştı · {delayMinutes} dk</StatusPill>}
+        </div>
+        <RowActions>
+          <Button type="button" size="sm" className="h-7 px-2 text-[11px]" onClick={() => onCheckOut(visit)}>Çıkış yap</Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" size="icon" variant="ghost" className="size-7" aria-label="Ziyaret işlemleri"><MoreHorizontal className="size-4" /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => onEdit(visit)}>Bilgileri düzelt</DropdownMenuItem></DropdownMenuContent>
+          </DropdownMenu>
+        </RowActions>
+      </RowShell>
+    </li>
+  )
+}
+
+function StatusPill({ children, tone }: { children: React.ReactNode; tone: "warning" | "danger" }) {
   const tones = {
-    neutral: "border-slate-200 bg-slate-50 text-slate-700",
     warning: "border-amber-200 bg-amber-50 text-amber-700",
-    success: "border-emerald-200 bg-emerald-50 text-emerald-700",
     danger: "border-rose-200 bg-rose-50 text-rose-700",
   }
-  return <span className={cn("inline-flex whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold", tones[tone])}>{children}</span>
+  return <span className={cn("inline-flex shrink-0 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold", tones[tone])}>{children}</span>
 }
 
-function WorkspaceState({ message, tone = "neutral" }: { message: string; tone?: "neutral" | "error" }) {
-  return <div className={cn("flex h-full min-h-44 items-center justify-center px-4 text-center text-sm", tone === "error" ? "text-rose-700" : "text-slate-500")} role={tone === "error" ? "alert" : "status"}>{message}</div>
+function PanelState({ message, tone = "neutral" }: { message: string; tone?: "neutral" | "error" }) {
+  return <div className={cn("flex h-full min-h-32 items-center justify-center px-4 text-center text-sm", tone === "error" ? "text-rose-700" : "text-slate-500")} role={tone === "error" ? "alert" : "status"}>{message}</div>
 }
 
 function formatVisitTime(value: string) {

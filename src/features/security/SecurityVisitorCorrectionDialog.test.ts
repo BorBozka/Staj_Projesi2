@@ -5,6 +5,16 @@ import { describe, expect, it } from "vitest"
 const source = readFileSync(resolve(process.cwd(), "src/features/security/SecurityVisitorCorrectionDialog.tsx"), "utf8")
 
 describe("SecurityVisitorCorrectionDialog contract", () => {
+  it("does not move focus to or select the visitor name when the correction dialog opens", () => {
+    expect(source).toContain("onOpenAutoFocus={(event) => event.preventDefault()}")
+    expect(source).not.toContain("<Input autoFocus")
+  })
+
+  it("keeps the correction dialog header compact", () => {
+    expect(source).not.toContain("Kapıda tespit edilen yazım hatalarını düzeltin.")
+    expect(source).not.toContain("DialogDescription")
+  })
+
   it("labels email as optional and never warns on a blank value", () => {
     expect(source).toContain("E-posta (opsiyonel)")
     expect(source).not.toContain("required")

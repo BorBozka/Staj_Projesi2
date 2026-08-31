@@ -1,27 +1,11 @@
 import { differenceInMinutes, isBefore, isSameDay } from "date-fns"
 
 import type { Visit } from "@/domain/visits"
-import type { SecurityCardIssue } from "@/services/security-service"
-
-export const securityOperationViews = ["expected", "inside", "cards"] as const
-
-export type SecurityOperationView = (typeof securityOperationViews)[number]
 
 export interface SecurityVisitRow {
   visit: Visit
   isDelayed: boolean
   delayMinutes: number
-}
-
-export function getSecurityOperationView(searchParams: Pick<URLSearchParams, "get">): SecurityOperationView {
-  const view = searchParams.get("view")
-  return securityOperationViews.includes(view as SecurityOperationView) ? view as SecurityOperationView : "expected"
-}
-
-export function getSecurityOperationViewParams(searchParams: URLSearchParams, view: SecurityOperationView) {
-  const nextParams = new URLSearchParams(searchParams)
-  nextParams.set("view", view)
-  return nextParams
 }
 
 export function getSecurityScopedVisits(visits: Visit[], companyId: string, facilityId: string) {
@@ -67,18 +51,6 @@ export function filterSecurityVisitRows(rows: SecurityVisitRow[], search: string
     visit.visitor.lastName,
     visit.visitor.company,
     visit.hostEmployeeName,
-  ].join(" ")).includes(query))
-}
-
-export function filterSecurityCardIssues(issues: SecurityCardIssue[], search: string) {
-  const query = normalizeTurkishSearch(search)
-  if (!query) return issues
-
-  return issues.filter(({ card, visit }) => normalizeTurkishSearch([
-    card.cardNumber,
-    visit.visitor.firstName,
-    visit.visitor.lastName,
-    visit.visitor.company,
   ].join(" ")).includes(query))
 }
 
