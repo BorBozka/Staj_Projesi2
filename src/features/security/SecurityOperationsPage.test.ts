@@ -54,10 +54,12 @@ describe("SecurityOperationsPage contract", () => {
     expect(pageSource).not.toContain("adminService")
   })
 
-  it("opens a read-only detail dialog from the row body without letting row actions trigger it", () => {
-    expect(pageSource).toContain('from "@/features/security/SecurityVisitDetailDialog"')
-    expect(pageSource).toContain("onClick={onOpenDetail}")
-    expect(pageSource).toContain("event.stopPropagation()")
+  it("no longer opens a row detail dialog: rows are plain, non-interactive containers", () => {
+    expect(pageSource).not.toContain("SecurityVisitDetailDialog")
+    expect(pageSource).not.toContain("onOpenDetail")
+    expect(pageSource).not.toContain("detailVisit")
+    expect(pageSource).not.toContain('role="button"')
+    expect(pageSource).not.toContain("RowShell")
   })
 
   it("wires check-in and checkout through SecurityService dialogs", () => {
@@ -76,15 +78,15 @@ describe("SecurityOperationsPage contract", () => {
     expect(pageSource).not.toContain("onEdit")
   })
 
-  it("renders the İçeride row as a two-line block with the overrun pill on the name line", () => {
+  it("renders the İçeride row as a two-line block: name + pill, then company·host and the visit times", () => {
     // Line 1: name + "Süre aştı" pill (same placement as ExpectedRow's "Gecikti").
-    // Line 2: "{company} · {host}" (truncates) on the left, "{check-in} · #{card}" (never
-    // truncates) on the right.
+    // Line 2: "{company} · {host}" (truncates) on the left, "Giriş {check-in} · Bek. çıkış
+    // {planned end}" (never truncates) on the right. No card number on the row.
     expect(pageSource).toContain('<span className="min-w-0 flex-1 truncate text-slate-500">{visit.visitor.company} · {visit.hostEmployeeName}</span>')
-    expect(pageSource).toContain('<span className="shrink-0 text-slate-400">{checkInLabel} · #{cardLabel}</span>')
+    expect(pageSource).toContain('Giriş {checkInLabel} · Bek. çıkış {formatVisitTime(visit.plannedEnd)}')
     expect(pageSource).toContain('visit.actualCheckIn ? formatVisitTime(visit.actualCheckIn) : "—"')
-    expect(pageSource).toContain('visit.visitorCardNumber ?? "—"')
-    // No third line, and no "giriş" word next to the time any more.
-    expect(pageSource).not.toContain("giriş ·")
+    expect(pageSource).not.toContain("visitorCardNumber")
+    expect(pageSource).not.toContain("cardLabel")
+    expect(pageSource).not.toContain("#{")
   })
 })

@@ -1,5 +1,5 @@
 import { Building2, Search } from "lucide-react"
-import { type KeyboardEvent, useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -7,7 +7,6 @@ import type { Visit } from "@/domain/visits"
 import { SecurityCheckInDialog } from "@/features/security/SecurityCheckInDialog"
 import { SecurityCheckOutDialog } from "@/features/security/SecurityCheckOutDialog"
 import { SecurityPendingCardReturnsDialog } from "@/features/security/SecurityPendingCardReturnsDialog"
-import { SecurityVisitDetailDialog } from "@/features/security/SecurityVisitDetailDialog"
 import { formatTr } from "@/lib/date"
 import { cn } from "@/lib/utils"
 import { useVisits } from "@/features/visits/visit-context"
@@ -27,7 +26,6 @@ export function SecurityOperationsPage() {
   const [now, setNow] = useState(() => new Date())
   const [checkInTarget, setCheckInTarget] = useState<Visit | null>(null)
   const [checkOutTarget, setCheckOutTarget] = useState<Visit | null>(null)
-  const [detailVisit, setDetailVisit] = useState<Visit | null>(null)
   const [cardIssues, setCardIssues] = useState<SecurityCardIssue[]>([])
   const [cardReturnsOpen, setCardReturnsOpen] = useState(false)
 
@@ -111,7 +109,7 @@ export function SecurityOperationsPage() {
             : error ? <PanelState message={error} tone="error" />
               : expectedRows.length === 0 ? <PanelState message={search.trim() ? "Aramayla eşleşen kayıt yok." : "Bugün beklenen ziyaret yok."} />
                 : <ul className="divide-y divide-slate-100">
-                    {expectedRows.map((row) => <ExpectedRow key={row.visit.id} row={row} onOpenDetail={setDetailVisit} onCheckIn={setCheckInTarget} />)}
+                    {expectedRows.map((row) => <ExpectedRow key={row.visit.id} row={row} onCheckIn={setCheckInTarget} />)}
                   </ul>}
         </OperationPanel>
 
@@ -120,16 +118,11 @@ export function SecurityOperationsPage() {
             : error ? <PanelState message={error} tone="error" />
               : insideRows.length === 0 ? <PanelState message={search.trim() ? "Aramayla eşleşen kayıt yok." : "İçeride ziyaretçi yok."} />
                 : <ul className="divide-y divide-slate-100">
-                    {insideRows.map((row) => <InsideRow key={row.visit.id} row={row} onOpenDetail={setDetailVisit} onCheckOut={setCheckOutTarget} />)}
+                    {insideRows.map((row) => <InsideRow key={row.visit.id} row={row} onCheckOut={setCheckOutTarget} />)}
                   </ul>}
         </OperationPanel>
       </div>
 
-      <SecurityVisitDetailDialog
-        visit={detailVisit}
-        open={Boolean(detailVisit)}
-        onOpenChange={(next) => { if (!next) setDetailVisit(null) }}
-      />
       <SecurityPendingCardReturnsDialog
         issues={scopedCardIssues}
         open={cardReturnsOpen}
@@ -163,35 +156,15 @@ function OperationPanel({ title, count, ariaLabel, children }: { title: string; 
   )
 }
 
-function RowShell({ onOpenDetail, children }: { onOpenDetail(): void; children: React.ReactNode }) {
-  const openOnKey = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault()
-      onOpenDetail()
-    }
-  }
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onOpenDetail}
-      onKeyDown={openOnKey}
-      className="flex w-full items-center gap-3 px-3 text-left outline-none transition-colors hover:bg-slate-50 focus-visible:bg-slate-50"
-    >
-      {children}
-    </div>
-  )
-}
-
 function RowActions({ children }: { children: React.ReactNode }) {
-  return <div className="flex shrink-0 items-center gap-1" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>{children}</div>
+  return <div className="flex shrink-0 items-center gap-1">{children}</div>
 }
 
-function ExpectedRow({ row, onOpenDetail, onCheckIn }: { row: SecurityVisitRow; onOpenDetail(visit: Visit): void; onCheckIn(visit: Visit): void }) {
+function ExpectedRow({ row, onCheckIn }: { row: SecurityVisitRow; onCheckIn(visit: Visit): void }) {
   const { visit, isDelayed } = row
   return (
     <li>
-      <RowShell onOpenDetail={() => onOpenDetail(visit)}>
+      <div className="flex w-full items-center gap-3 px-3">
         <div className="h-14 min-w-0 flex-1 py-2">
           <div className="flex items-center gap-2">
             <span className="shrink-0 text-xs font-semibold tabular-nums text-slate-900">{formatVisitTime(visit.plannedStart)}</span>
@@ -203,18 +176,17 @@ function ExpectedRow({ row, onOpenDetail, onCheckIn }: { row: SecurityVisitRow; 
         <RowActions>
           <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[11px]" onClick={() => onCheckIn(visit)}>Giriş yap</Button>
         </RowActions>
-      </RowShell>
+      </div>
     </li>
   )
 }
 
-function InsideRow({ row, onOpenDetail, onCheckOut }: { row: SecurityVisitRow; onOpenDetail(visit: Visit): void; onCheckOut(visit: Visit): void }) {
+function InsideRow({ row, onCheckOut }: { row: SecurityVisitRow; onCheckOut(visit: Visit): void }) {
   const { visit, isDelayed, delayMinutes } = row
   const checkInLabel = visit.actualCheckIn ? formatVisitTime(visit.actualCheckIn) : "—"
-  const cardLabel = visit.visitorCardNumber ?? "—"
   return (
     <li>
-      <RowShell onOpenDetail={() => onOpenDetail(visit)}>
+      <div className="flex w-full items-center gap-3 px-3">
         <div className="h-14 min-w-0 flex-1 py-2">
           <div className="flex items-center gap-2">
             <span className="truncate text-xs font-semibold text-slate-900">{visit.visitor.firstName} {visit.visitor.lastName}</span>
@@ -222,13 +194,13 @@ function InsideRow({ row, onOpenDetail, onCheckOut }: { row: SecurityVisitRow; o
           </div>
           <p className="mt-1 flex items-center justify-between gap-2 text-[11px]">
             <span className="min-w-0 flex-1 truncate text-slate-500">{visit.visitor.company} · {visit.hostEmployeeName}</span>
-            <span className="shrink-0 text-slate-400">{checkInLabel} · #{cardLabel}</span>
+            <span className="shrink-0 text-slate-400">Giriş {checkInLabel} · Bek. çıkış {formatVisitTime(visit.plannedEnd)}</span>
           </p>
         </div>
         <RowActions>
           <Button type="button" size="sm" className="h-7 px-2 text-[11px]" onClick={() => onCheckOut(visit)}>Çıkış yap</Button>
         </RowActions>
-      </RowShell>
+      </div>
     </li>
   )
 }
