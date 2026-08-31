@@ -384,7 +384,9 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
                 <FormField label="Ziyaret Türü" required error={fieldError("visitTypeId")}>
                   <Select {...form.register("visitTypeId", { onChange: scrollToNextFields })}>
                     <option value="" disabled hidden>Ziyaret türü seçin</option>
-                    {referenceData?.visitTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
+                    {referenceData?.visitTypes
+                      .filter((type) => type.active || type.id === visit?.visitTypeId)
+                      .map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
                   </Select>
                 </FormField>
                 <FormField label="Ziyaret Edilecek Şirket" required error={fieldError("hostCompanyId")}>

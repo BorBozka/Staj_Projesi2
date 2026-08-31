@@ -5,7 +5,6 @@ import {
   isOperationalSettingsValid,
   isAuthorizationScopeValid,
   isVisitorCardNumberTaken,
-  isVisitTypeNameTaken,
   isSelfAdminDemotionAttempt,
   isSelfDeactivationAttempt,
   wouldRemoveLastActiveAdmin,
@@ -21,6 +20,7 @@ import {
 } from "@/domain/admin"
 import type { AdminService, SaveAdminUserOptions } from "@/services/admin-service"
 import { MockOrganizationStore } from "@/services/mock-organization-store"
+import { MockVisitTypeStore } from "@/services/mock-visit-type-store"
 
 const clone = <T,>(value: T): T => structuredClone(value)
 const id = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 9)}`
@@ -33,12 +33,11 @@ export class MockAdminService implements AdminService {
     { id: "user-4", fullName: "Orhan Yalçın", username: "orhan.yalcin", email: "orhan.yalcin@bplas.com", authenticationSource: "LOCAL", role: "EMPLOYEE", authorizationScope: { companyIds: ["bplas-otomotiv"], facilityIds: [], securityGateIds: [] }, active: false },
     { id: "user-5", fullName: "Deniz Acar", username: "deniz.acar", email: "deniz.acar@bplas.com", authenticationSource: "ACTIVE_DIRECTORY", role: "EMPLOYEE", authorizationScope: { companyIds: ["bplas"], facilityIds: [], securityGateIds: [] }, active: true },
   ]
-  private visitTypes: VisitTypeDefinition[] = [{ id: "type-1", name: "Toplantı", active: true }, { id: "type-2", name: "Teknik Servis / Bakım", active: true }, { id: "type-3", name: "Tedarikçi", active: true }, { id: "type-4", name: "İş Görüşmesi", active: false }]
   private cards: VisitorCardInventoryItem[] = [{ id: "card-1", cardNumber: "001", status: "AVAILABLE" }, { id: "card-2", cardNumber: "002", status: "IN_USE", assignedVisitorName: "Ece Korkmaz" }, { id: "card-3", cardNumber: "003", status: "NOT_RETURNED", assignedVisitorName: "Can Uslu" }, { id: "card-4", cardNumber: "004", status: "LOST" }, { id: "card-5", cardNumber: "005", status: "DISABLED" }]
   private rules: VisitorRuleVersion[]
   private settings: OperationalSettings = { overdueToleranceMinutes: 15, overdueAlertRepeatMinutes: 10 }
 
-  constructor(private readonly organizationStore = new MockOrganizationStore(), initialRules: VisitorRuleVersion[] = [{ id: "rule-2", version: 2, content: "Ziyaretçiler tesis güvenlik kurallarına ve yönlendirmelerine uymayı kabul eder.", createdAt: "2026-08-01T09:00:00.000Z", publishedAt: "2026-08-01T09:30:00.000Z", active: true }, { id: "rule-1", version: 1, content: "Ziyaretçiler tesis kurallarına uyacağını kabul eder.", createdAt: "2026-02-01T09:00:00.000Z", publishedAt: "2026-02-01T09:20:00.000Z", active: false }]) { this.rules = clone(initialRules) }
+  constructor(private readonly organizationStore = new MockOrganizationStore(), initialRules: VisitorRuleVersion[] = [{ id: "rule-2", version: 2, content: "Ziyaretçiler tesis güvenlik kurallarına ve yönlendirmelerine uymayı kabul eder.", createdAt: "2026-08-01T09:00:00.000Z", publishedAt: "2026-08-01T09:30:00.000Z", active: true }, { id: "rule-1", version: 1, content: "Ziyaretçiler tesis kurallarına uyacağını kabul eder.", createdAt: "2026-02-01T09:00:00.000Z", publishedAt: "2026-02-01T09:20:00.000Z", active: false }], private readonly visitTypeStore = new MockVisitTypeStore()) { this.rules = clone(initialRules) }
 
   async getUsers() { return clone(this.users) }
   async saveUser(input: Omit<AdminUser, "id"> & { id?: string }, options: SaveAdminUserOptions = {}) {
@@ -72,16 +71,9 @@ export class MockAdminService implements AdminService {
   async saveOrganizationEntity(kind: OrganizationKind, input: Omit<OrganizationEntity, "id"> & { id?: string }) {
     return this.organizationStore.save(kind, input)
   }
-  async getVisitTypes() { return clone(this.visitTypes) }
+  async getVisitTypes() { return this.visitTypeStore.getAll() }
   async saveVisitType(input: Omit<VisitTypeDefinition, "id"> & { id?: string }) {
-    const name = input.name.trim()
-    if (!name) throw new Error("Ziyaret türü adı boş olamaz.")
-    const existing = input.id ? this.visitTypes.find((item) => item.id === input.id) : undefined
-    if (input.id && !existing) throw new Error("Ziyaret türü bulunamadı.")
-    if (isVisitTypeNameTaken(this.visitTypes, existing?.id ?? null, name)) throw new Error("Bu ziyaret türü zaten tanımlı.")
-    const entity: VisitTypeDefinition = { ...input, name, id: input.id || id("type") }
-    this.visitTypes = existing ? this.visitTypes.map((item) => item.id === entity.id ? entity : item) : [...this.visitTypes, entity]
-    return clone(entity)
+    return this.visitTypeStore.save(input)
   }
   async getVisitorCards() { return clone(this.cards) }
   async createVisitorCard(input: CreateVisitorCardInput) {
