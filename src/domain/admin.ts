@@ -154,6 +154,8 @@ export interface OperationalSettings {
   overdueAlertRepeatMinutes: number
 }
 
+export const DEFAULT_OVERDUE_TOLERANCE_MINUTES = 15
+
 export function isOperationalSettingsValid(settings: OperationalSettings): boolean {
   return Number.isInteger(settings.overdueToleranceMinutes) && settings.overdueToleranceMinutes >= 0
     && Number.isInteger(settings.overdueAlertRepeatMinutes) && settings.overdueAlertRepeatMinutes >= 1
