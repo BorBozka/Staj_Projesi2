@@ -164,7 +164,6 @@ export interface VisitorRuleVersion {
   id: string
   version: number
   content: string
-  createdAt: string
   publishedAt: string
   active: boolean
 }

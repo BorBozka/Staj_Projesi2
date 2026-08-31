@@ -40,7 +40,7 @@ export class MockAdminService implements AdminService {
   private rules: VisitorRuleVersion[]
   private settings: OperationalSettings = { overdueToleranceMinutes: DEFAULT_OVERDUE_TOLERANCE_MINUTES, overdueAlertRepeatMinutes: 10 }
 
-  constructor(private readonly organizationStore = new MockOrganizationStore(), initialRules: VisitorRuleVersion[] = [{ id: "rule-2", version: 2, content: "Ziyaretçiler tesis güvenlik kurallarına ve yönlendirmelerine uymayı kabul eder.", createdAt: "2026-08-01T09:00:00.000Z", publishedAt: "2026-08-01T09:30:00.000Z", active: true }, { id: "rule-1", version: 1, content: "Ziyaretçiler tesis kurallarına uyacağını kabul eder.", createdAt: "2026-02-01T09:00:00.000Z", publishedAt: "2026-02-01T09:20:00.000Z", active: false }], private readonly visitTypeStore = new MockVisitTypeStore()) { this.rules = clone(initialRules) }
+  constructor(private readonly organizationStore = new MockOrganizationStore(), initialRules: VisitorRuleVersion[] = [{ id: "rule-2", version: 2, content: "Ziyaretçiler tesis güvenlik kurallarına ve yönlendirmelerine uymayı kabul eder.", publishedAt: "2026-08-01T09:30:00.000Z", active: true }, { id: "rule-1", version: 1, content: "Ziyaretçiler tesis kurallarına uyacağını kabul eder.", publishedAt: "2026-02-01T09:20:00.000Z", active: false }], private readonly visitTypeStore = new MockVisitTypeStore()) { this.rules = clone(initialRules) }
 
   async getUsers() { return clone(this.users) }
   async saveUser(input: Omit<AdminUser, "id"> & { id?: string }, options: SaveAdminUserOptions = {}) {
@@ -122,7 +122,7 @@ export class MockAdminService implements AdminService {
     if (!normalizedContent) throw new Error("Ziyaretçi kuralı boş bırakılamaz.")
     const nextVersion = this.rules.reduce((maximum, item) => Math.max(maximum, item.version), 0) + 1
     const now = new Date().toISOString()
-    const next: VisitorRuleVersion = { id: id("rule"), version: nextVersion, content: normalizedContent, createdAt: now, publishedAt: now, active: true }
+    const next: VisitorRuleVersion = { id: id("rule"), version: nextVersion, content: normalizedContent, publishedAt: now, active: true }
     this.rules = [next, ...this.rules.map((item) => ({ ...item, active: false }))]
     return clone(next)
   }

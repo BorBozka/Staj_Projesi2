@@ -173,8 +173,8 @@ describe("MockAdminService other admin resources", () => {
     await expect(emptyService.publishVisitorRule("İlk kural")).resolves.toMatchObject({ version: 1, active: true })
 
     const unordered: import("@/domain/admin").VisitorRuleVersion[] = [
-      { id: "rule-4", version: 4, content: "v4", createdAt: "2026-04-01", publishedAt: "2026-04-01", active: false },
-      { id: "rule-2", version: 2, content: "v2", createdAt: "2026-02-01", publishedAt: "2026-02-01", active: true },
+      { id: "rule-4", version: 4, content: "v4", publishedAt: "2026-04-01", active: false },
+      { id: "rule-2", version: 2, content: "v2", publishedAt: "2026-02-01", active: true },
     ]
     const service = new MockAdminService(undefined, unordered)
     await expect(service.publishVisitorRule("Yeni kural")).resolves.toMatchObject({ version: 5, active: true })
