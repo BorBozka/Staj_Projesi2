@@ -35,7 +35,7 @@ describe("SecurityOperationsPage contract", () => {
 
   it("shows each visit type on both operation row variants and suppresses the search focus outline", () => {
     expect(pageSource.match(/\{visit\.visitTypeName\}/g)).toHaveLength(2)
-    expect(pageSource).toContain('className="h-9 pl-9 focus:outline-none"')
+    expect(pageSource).toContain('className="h-9 pl-9 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"')
   })
 
   it("uses a facility icon, not a clock, for the company/facility context box", () => {

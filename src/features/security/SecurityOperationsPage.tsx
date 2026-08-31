@@ -89,7 +89,7 @@ export function SecurityOperationsPage() {
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Ziyaretçi, firma veya ev sahibi ara"
             aria-label="Ziyaretçi, firma veya ev sahibi ara"
-            className="h-9 pl-9 focus:outline-none"
+            className="h-9 pl-9 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
           />
         </label>
 
