@@ -1,6 +1,6 @@
 import { FilterX, Plus, Save, Search } from "lucide-react"
-import { useEffect, useMemo, useRef, useState } from "react"
-import { useSearchParams } from "react-router-dom"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useBeforeUnload, useBlocker, useSearchParams, type BlockerFunction } from "react-router-dom"
 
 import { ActiveStatusPill } from "@/components/common/ActiveStatusPill"
 import { Button } from "@/components/ui/button"
@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { canMarkVisitorCardLost, canRestoreVisitorCard, isAdminManagedVisitorCard, isVisitorCardNumberTaken, visitorCardStatusLabels, type OperationalSettings, type VisitTypeDefinition, type VisitorCardInventoryItem, type VisitorCardStatus } from "@/domain/admin"
 import { useAdmin } from "@/features/admin/admin-context"
 import { createOperationalSettingsDraft, getOperationalSettingsDraftValue, getOverdueAlertRepeatError, getOverdueToleranceError, isOperationalSettingsDraftDirty, type OperationalSettingsDraft } from "@/features/admin/operational-settings-form"
+import { shouldBlockSystemSettingsNavigation } from "@/features/admin/system-settings-navigation"
 import { parseSystemSettingsTab, setSystemSettingsTab, type SystemSettingsTab } from "@/features/admin/system-settings-tabs"
 import { clearVisitorCardFilterSearchParams, filterVisitorCards, hasActiveVisitorCardFilters, parseVisitorCardFilters, updateVisitorCardFilterSearchParams } from "@/features/admin/visitor-card-filters"
 import { getVisitTypeNameError, isVisitTypeDraftDirty } from "@/features/admin/visit-type-form"
@@ -36,6 +37,13 @@ export function SystemSettingsPage() {
   const [settingsError, setSettingsError] = useState("")
   const persistedSettingsRef = useRef<OperationalSettings | null>(null)
   const settingsDirty = Boolean(settings && settingsDraft && isOperationalSettingsDraftDirty(settings, settingsDraft))
+  const shouldBlockNavigation = useCallback<BlockerFunction>(({ currentLocation, nextLocation }) => shouldBlockSystemSettingsNavigation(settingsDirty, currentLocation.pathname, nextLocation.pathname), [settingsDirty])
+  const blocker = useBlocker(shouldBlockNavigation)
+  useBeforeUnload(useCallback((event) => {
+    if (!settingsDirty) return
+    event.preventDefault()
+    event.returnValue = ""
+  }, [settingsDirty]))
   useEffect(() => {
     if (!settings) return
     setSettingsDraft((current) => {
@@ -45,21 +53,10 @@ export function SystemSettingsPage() {
     })
   }, [settings])
   useEffect(() => {
-    if (!settingsDirty) return
-    const confirmPageExit = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = "" }
-    const confirmRouteExit = (event: MouseEvent) => {
-      const link = (event.target as Element | null)?.closest<HTMLAnchorElement>("a[href]")
-      if (!link || link.target || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
-      const target = new URL(link.href, window.location.href)
-      if (target.origin === window.location.origin && target.pathname !== window.location.pathname && !window.confirm("Kaydedilmemiş değişiklikler silinecek. Devam etmek istiyor musunuz?")) {
-        event.preventDefault()
-        event.stopPropagation()
-      }
-    }
-    window.addEventListener("beforeunload", confirmPageExit)
-    document.addEventListener("click", confirmRouteExit, true)
-    return () => { window.removeEventListener("beforeunload", confirmPageExit); document.removeEventListener("click", confirmRouteExit, true) }
-  }, [settingsDirty])
+    if (blocker.state !== "blocked") return
+    if (window.confirm("Kaydedilmemiş değişiklikler silinecek. Devam etmek istiyor musunuz?")) blocker.proceed()
+    else blocker.reset()
+  }, [blocker])
   const selectTab = (nextTab: SystemSettingsTab) => setSearchParams(setSystemSettingsTab(searchParams, nextTab))
   const saveSettings = async () => {
     const parsed = settingsDraft && getOperationalSettingsDraftValue(settingsDraft)
