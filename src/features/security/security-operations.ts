@@ -1,6 +1,7 @@
 import { differenceInMinutes, isBefore, isSameDay } from "date-fns"
 
 import type { Visit } from "@/domain/visits"
+import type { SecurityCardIssue } from "@/services/security-service"
 
 export const securityOperationViews = ["expected", "inside", "cards"] as const
 
@@ -66,6 +67,18 @@ export function filterSecurityVisitRows(rows: SecurityVisitRow[], search: string
     visit.visitor.lastName,
     visit.visitor.company,
     visit.hostEmployeeName,
+  ].join(" ")).includes(query))
+}
+
+export function filterSecurityCardIssues(issues: SecurityCardIssue[], search: string) {
+  const query = normalizeTurkishSearch(search)
+  if (!query) return issues
+
+  return issues.filter(({ card, visit }) => normalizeTurkishSearch([
+    card.cardNumber,
+    visit.visitor.firstName,
+    visit.visitor.lastName,
+    visit.visitor.company,
   ].join(" ")).includes(query))
 }
 

@@ -7,6 +7,16 @@ export interface SecurityCheckInInput {
   vehiclePlate?: string
 }
 
+export interface SecurityCheckOutInput {
+  visitId: string
+  cardReturned: boolean
+}
+
+export interface SecurityCardIssue {
+  card: VisitorCardInventoryItem
+  visit: Visit
+}
+
 export interface SecurityVisitorCorrectionInput {
   firstName: string
   lastName: string
@@ -26,6 +36,15 @@ export interface SecurityService {
    * this visit. Does not touch Meeting fields or invitation state.
    */
   checkInVisit(input: SecurityCheckInInput): Promise<Visit>
+
+  /** Completes a checked-in visit and records whether its assigned physical card was returned. */
+  checkOutVisit(input: SecurityCheckOutInput): Promise<Visit>
+
+  /** Current NOT_RETURNED cards that still have a linked checked-out visit. */
+  getUnreturnedVisitorCardIssues(): Promise<SecurityCardIssue[]>
+
+  /** Records a later physical card return without reopening or changing the visit checkout time. */
+  receiveReturnedVisitorCard(visitId: string): Promise<Visit>
 
   /**
    * Corrects visitor identity/contact fields (name, company, email, phone) at the gate. Allowed

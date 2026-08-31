@@ -12,8 +12,8 @@ const defaultVisitorCards: VisitorCardInventoryItem[] = [
 
 /**
  * Single source of truth for the physical visitor-card inventory's operational state.
- * MockAdminService (create/rename/enable/disable) and MockSecurityService (assign/return/lost,
- * added in a later phase) share one instance of this store instead of maintaining separate
+ * MockAdminService (inventory and write-off) and MockSecurityService (assign, checkout, and
+ * late return) share one instance of this store instead of maintaining separate
  * copies that could drift — Admin owns inventory identity, Security owns operational transitions,
  * but both read and write the same records.
  */

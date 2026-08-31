@@ -285,7 +285,7 @@ describe("MockVisitService Meeting–Visit behavior", () => {
 })
 
 describe("MockVisitService canonical visit types", () => {
-  const visitorPayload = (visit: { id: string; visitor: { firstName: string; lastName: string; email: string; company: string; phone?: string } }) => ({
+  const visitorPayload = (visit: { id: string; visitor: { firstName: string; lastName: string; email?: string; company: string; phone?: string } }) => ({
     visitId: visit.id,
     firstName: visit.visitor.firstName,
     lastName: visit.visitor.lastName,

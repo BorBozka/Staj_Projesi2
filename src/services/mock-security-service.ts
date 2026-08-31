@@ -2,7 +2,7 @@ import type { VisitorCardInventoryItem } from "@/domain/admin"
 import { isValidVisitorEmail, normalizeVehiclePlate, normalizeVisitorEmail, type Visit } from "@/domain/visits"
 import type { MockVisitService } from "@/services/mock-visit-service"
 import type { MockVisitorCardStore } from "@/services/mock-visitor-card-store"
-import type { SecurityCheckInInput, SecurityService, SecurityVisitorCorrectionInput } from "@/services/security-service"
+import type { SecurityCardIssue, SecurityCheckInInput, SecurityCheckOutInput, SecurityService, SecurityVisitorCorrectionInput } from "@/services/security-service"
 
 export class MockSecurityService implements SecurityService {
   constructor(
@@ -36,6 +36,49 @@ export class MockSecurityService implements SecurityService {
       assignedVisitId: updatedVisit.id,
       assignedVisitorName: `${updatedVisit.visitor.firstName} ${updatedVisit.visitor.lastName}`,
     })
+    return updatedVisit
+  }
+
+  async checkOutVisit(input: SecurityCheckOutInput): Promise<Visit> {
+    const current = this.visitService.getVisitRecordForSecurity(input.visitId)
+    if (current.status !== "CHECKED_IN") throw new Error("Yalnızca içerideki ziyaretçiler çıkış yapabilir.")
+    if (!current.visitorCardId) throw new Error("Ziyaret için atanmış fiziksel kart bulunamadı.")
+
+    const card = this.cardStore.get(current.visitorCardId)
+    if (!card || card.status !== "IN_USE" || card.assignedVisitId !== current.id) {
+      throw new Error("Ziyaretin atanmış kartı kullanımda değil.")
+    }
+
+    const { visit } = await this.visitService.checkoutVisit(current.id, { visitorCardReturned: input.cardReturned })
+    this.cardStore.replace(card.id, input.cardReturned
+      ? { id: card.id, cardNumber: card.cardNumber, status: "AVAILABLE" }
+      : { ...card, status: "NOT_RETURNED" })
+    return visit
+  }
+
+  async getUnreturnedVisitorCardIssues(): Promise<SecurityCardIssue[]> {
+    const visits = await this.visitService.listVisits()
+    return this.cardStore.list()
+      .filter((card) => card.status === "NOT_RETURNED" && Boolean(card.assignedVisitId))
+      .flatMap((card) => {
+        const visit = visits.find((item) => item.id === card.assignedVisitId
+          && item.status === "CHECKED_OUT" && item.visitorCardReturned === false)
+        return visit ? [{ card, visit }] : []
+      })
+  }
+
+  async receiveReturnedVisitorCard(visitId: string): Promise<Visit> {
+    const current = this.visitService.getVisitRecordForSecurity(visitId)
+    if (current.status !== "CHECKED_OUT" || !current.visitorCardId) {
+      throw new Error("Kart iadesi için uygun ziyaret kaydı bulunamadı.")
+    }
+    const card = this.cardStore.get(current.visitorCardId)
+    if (!card || card.status !== "NOT_RETURNED" || card.assignedVisitId !== current.id) {
+      throw new Error("Yalnız iade edilmemiş atanmış kart teslim alınabilir.")
+    }
+
+    const updatedVisit = this.visitService.applyLateVisitorCardReturn(current.id)
+    this.cardStore.replace(card.id, { id: card.id, cardNumber: card.cardNumber, status: "AVAILABLE" })
     return updatedVisit
   }
 

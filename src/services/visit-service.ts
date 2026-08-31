@@ -1,5 +1,10 @@
 import type { CloseMeetingInput, ExtendMeetingInput, Meeting, MeetingInput, MeetingWithVisits, RescheduleVisitInput, Visit, VisitReferenceData } from "@/domain/visits"
 
+export interface CheckoutVisitInput {
+  /** Recorded with the checkout as the operational card-return decision. */
+  visitorCardReturned?: boolean
+}
+
 export interface VisitService {
   listMeetings(): Promise<Meeting[]>
   listVisits(): Promise<Visit[]>
@@ -49,5 +54,5 @@ export interface VisitService {
    * If the meeting was already manually closed, or if other visitors are still
    * checked in, closedMeeting is null.
    */
-  checkoutVisit(visitId: string): Promise<{ visit: Visit; closedMeeting: Meeting | null }>
+  checkoutVisit(visitId: string, input?: CheckoutVisitInput): Promise<{ visit: Visit; closedMeeting: Meeting | null }>
 }

@@ -15,7 +15,7 @@ import { computeExtendedPlannedEnd, getManualMeetingLifecycleBlockReason, isMeet
 import { createMockVisitReferenceData, initialMockMeetings, initialMockVisitRecords } from "@/services/mock-visit-data"
 import { MockOrganizationStore } from "@/services/mock-organization-store"
 import { MockVisitTypeStore } from "@/services/mock-visit-type-store"
-import type { VisitService } from "@/services/visit-service"
+import type { CheckoutVisitInput, VisitService } from "@/services/visit-service"
 
 
 const clone = <T,>(value: T): T => structuredClone(value)
@@ -217,13 +217,19 @@ export class MockVisitService implements VisitService {
     return clone(updated)
   }
 
-  async checkoutVisit(visitId: string): Promise<{ visit: Visit; closedMeeting: Meeting | null }> {
+  async checkoutVisit(visitId: string, input?: CheckoutVisitInput): Promise<{ visit: Visit; closedMeeting: Meeting | null }> {
     const current = this.findVisitRecord(visitId)
     if (current.status !== "CHECKED_IN") {
       throw new Error("Yalnızca içerideki ziyaretçiler çıkış yapabilir.")
     }
     const now = new Date().toISOString()
-    const checkedOut: VisitRecord = { ...current, status: "CHECKED_OUT", actualCheckOut: now, updatedAt: now }
+    const checkedOut: VisitRecord = {
+      ...current,
+      status: "CHECKED_OUT",
+      actualCheckOut: now,
+      visitorCardReturned: input?.visitorCardReturned ?? current.visitorCardReturned,
+      updatedAt: now,
+    }
     this.visits = this.visits.map((v) => (v.id === visitId ? checkedOut : v))
 
     const meetingId = current.meetingId
@@ -278,6 +284,20 @@ export class MockVisitService implements VisitService {
       ...current,
       visitor: { ...current.visitor, ...correction },
       updatedAt: now,
+    }
+    this.visits = this.visits.map((visit) => visit.id === visitId ? updated : visit)
+    return clone(this.projectVisit(updated))
+  }
+
+  applyLateVisitorCardReturn(visitId: string): Visit {
+    const current = this.findVisitRecord(visitId)
+    if (current.status !== "CHECKED_OUT") {
+      throw new Error("Kart iadesi yalnızca çıkışı tamamlanmış ziyaret için kaydedilebilir.")
+    }
+    const updated: VisitRecord = {
+      ...current,
+      visitorCardReturned: true,
+      updatedAt: new Date().toISOString(),
     }
     this.visits = this.visits.map((visit) => visit.id === visitId ? updated : visit)
     return clone(this.projectVisit(updated))

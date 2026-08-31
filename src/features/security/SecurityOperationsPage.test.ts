@@ -24,21 +24,24 @@ describe("SecurityOperationsPage contract", () => {
     expect(pageSource).not.toContain("Clock3")
   })
 
-  it("still gates unplanned-visit creation and card-issue data out of this phase", () => {
+  it("keeps unplanned visits gated while binding card issues to the operational service", () => {
     expect(pageSource).toContain("+ Plansız ziyaret")
     expect(pageSource).toContain("disabled aria-describedby")
     expect(pageSource).toContain("Kart sorunu bulunan kayıt yok.")
-    expect(pageSource).not.toContain("checkOut")
-    expect(pageSource).not.toContain("NOT_RETURNED")
+    expect(pageSource).toContain("securityService.getUnreturnedVisitorCardIssues()")
+    expect(pageSource).toContain("Kartı teslim al")
+    expect(pageSource).not.toContain("Kayıp olarak işaretle")
     expect(pageSource).not.toContain("LOST")
     expect(pageSource).not.toContain('from "@/features/manager/')
   })
 
-  it("wires planned check-in and visitor correction through SecurityService, not Manager/Admin UI", () => {
+  it("wires check-in, checkout, and visitor correction through SecurityService, not Manager/Admin UI", () => {
     expect(pageSource).toContain('from "@/features/security/SecurityCheckInDialog"')
+    expect(pageSource).toContain('from "@/features/security/SecurityCheckOutDialog"')
     expect(pageSource).toContain('from "@/features/security/SecurityVisitorCorrectionDialog"')
     expect(pageSource).toContain("Giriş yap")
-    expect(pageSource).toContain("Düzenle")
+    expect(pageSource).toContain("Çıkış yap")
+    expect(pageSource).toContain("Bilgileri düzelt")
     expect(pageSource).not.toContain('from "@/features/manager/')
     expect(pageSource).not.toContain("adminService")
   })
