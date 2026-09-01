@@ -33,14 +33,33 @@ describe("SecurityOperationsPage contract", () => {
     expect(pageSource).toContain("filterSecurityVisitRows(getInsideSecurityVisits(scopedVisits, now), search)")
   })
 
-  it("shows each visit type after the visitor name on both operation row variants and suppresses the search focus outline", () => {
-    expect(pageSource.match(/\{visit\.visitor\.firstName\} \{visit\.visitor\.lastName\} - \{visit\.visitTypeName\}/g)).toHaveLength(2)
-    expect(pageSource).toContain('className="h-9 pl-9 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"')
+  it("groups the expected timeline and uses a fixed active-operations time block", () => {
+    expect(pageSource).toContain('groupExpectedSecurityVisits(expectedRows)')
+    expect(pageSource).toContain('title="Gecikenler"')
+    expect(pageSource).toContain('title="Sıradakiler"')
+    expect(pageSource).toContain('expectedGroups.delayed.length > 0')
+    expect(pageSource).toContain('expectedGroups.upcoming.length > 0')
+    expect(pageSource).toContain('grid-cols-[3rem_1rem_minmax(0,1fr)_auto]')
+    expect(pageSource).toContain('grid-cols-[minmax(0,1fr)_8.25rem_auto]')
+    expect(pageSource).toContain('aria-hidden="true"')
+    expect(pageSource).toContain('w-px -translate-x-1/2 bg-slate-200/70')
+    expect(pageSource).toContain('size-1.5 rounded-full border border-slate-300 bg-white')
+    expect(pageSource).toContain('grid-rows-[1fr_1fr] items-stretch')
+    expect(pageSource).toContain('text-[10px] font-semibold text-amber-700">Gecikti</span>')
+    expect(pageSource).not.toContain('StatusPill')
+    expect(pageSource).toContain('{visit.visitTypeName} · {visit.visitor.company} · {visit.hostEmployeeName}</p>')
+    expect(pageSource).not.toContain('rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">{visit.visitTypeName}</span>')
+    expect(pageSource).toContain('className="h-9 border-slate-200/70 bg-slate-50/80 pl-9 shadow-none transition-colors placeholder:text-slate-400 focus-visible:border-blue-400 focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-blue-100 focus-visible:ring-offset-0"')
   })
 
-  it("uses a facility icon, not a clock, for the company/facility context box", () => {
-    expect(pageSource).toContain("Building2")
-    expect(pageSource).not.toContain("Clock3")
+  it("keeps the second row limited to the operation search and actions", () => {
+    expect(pageSource).not.toContain("<SecurityNavigation />")
+    expect(pageSource).not.toContain("Building2")
+    expect(pageSource).not.toContain("companyName:")
+    expect(pageSource).not.toContain("facilityName:")
+    expect(pageSource).toContain('className="flex shrink-0 items-center gap-2 py-1"')
+    expect(pageSource).toContain('className="relative min-w-0 flex-1"')
+    expect(pageSource).toContain('placeholder="Ziyaretçi, firma veya ev sahibi ara"')
   })
 
   it("gates the pending-card-returns action on an unresolved count and never exposes LOST", () => {
@@ -84,12 +103,11 @@ describe("SecurityOperationsPage contract", () => {
     expect(pageSource).not.toContain("onEdit")
   })
 
-  it("renders the İçeride row as a two-line block: name + pill, then company·host and the visit times", () => {
-    // Line 1: name + "Süre aştı" pill (same placement as ExpectedRow's "Gecikti").
-    // Line 2: "{company} · {host}" (truncates) on the left, "Giriş {check-in} · Beklenen çıkış
-    // {planned end}" (never truncates) on the right. No card number on the row.
-    expect(pageSource).toContain('<span className="min-w-0 flex-1 truncate text-slate-500">{visit.visitor.company} · {visit.hostEmployeeName}</span>')
-    expect(pageSource).toContain('Giriş {checkInLabel} · Beklenen çıkış {formatVisitTime(visit.plannedEnd)}')
+  it("renders the İçeride row as a stable two-line active operation block", () => {
+    expect(pageSource).toContain('className="col-start-1 row-start-1 flex min-w-0 items-center"')
+    expect(pageSource).toContain('<span className="min-w-0 truncate text-slate-500">{visit.visitTypeName} · {visit.visitor.company} · {visit.hostEmployeeName}</span>')
+    expect(pageSource).toContain('Giriş {checkInLabel}')
+    expect(pageSource).toContain('Beklenen {formatVisitTime(visit.plannedEnd)}{isDelayed && <> · <strong className="font-semibold text-rose-700">+{delayMinutes} dk</strong></>}')
     expect(pageSource).toContain('visit.actualCheckIn ? formatVisitTime(visit.actualCheckIn) : "—"')
     expect(pageSource).not.toContain("visitorCardNumber")
     expect(pageSource).not.toContain("cardLabel")

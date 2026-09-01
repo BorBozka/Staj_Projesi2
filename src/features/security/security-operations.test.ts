@@ -5,6 +5,7 @@ import {
   filterSecurityVisitRows,
   getExpectedSecurityVisits,
   getInsideSecurityVisits,
+  groupExpectedSecurityVisits,
 } from "./security-operations"
 
 function makeVisit(id: string, status: VisitStatus, plannedStart: string, overrides: Partial<Visit> = {}): Visit {
@@ -47,17 +48,29 @@ describe("security expected visits", () => {
     expect(getExpectedSecurityVisits(visits, now).map(({ visit }) => visit.id)).toEqual(["Planlı"])
   })
 
-  it("marks delayed visits, places them first, then sorts upcoming visits by start time", () => {
+  it("marks delayed visits and sorts both delayed and upcoming visits by start time", () => {
     const visits = [
       makeVisit("Sonra", "PLANNED", "2026-08-28T15:00:00+03:00"),
-      makeVisit("Geciken", "PLANNED", "2026-08-28T10:30:00+03:00"),
+      makeVisit("Geciken geç", "PLANNED", "2026-08-28T10:30:00+03:00"),
+      makeVisit("Geciken erken", "PLANNED", "2026-08-28T09:30:00+03:00"),
       makeVisit("Yaklaşan", "PLANNED", "2026-08-28T12:30:00+03:00"),
     ]
 
     const rows = getExpectedSecurityVisits(visits, now)
-    expect(rows.map(({ visit }) => visit.id)).toEqual(["Geciken", "Yaklaşan", "Sonra"])
-    expect(rows[0]).toMatchObject({ isDelayed: true, delayMinutes: 90 })
-    expect(rows[1].isDelayed).toBe(false)
+    expect(rows.map(({ visit }) => visit.id)).toEqual(["Geciken erken", "Geciken geç", "Yaklaşan", "Sonra"])
+    expect(rows[0]).toMatchObject({ isDelayed: true, delayMinutes: 150 })
+    expect(rows[2].isDelayed).toBe(false)
+  })
+
+  it("splits sorted expected rows into delayed and upcoming groups without empty records", () => {
+    const rows = getExpectedSecurityVisits([
+      makeVisit("Geciken", "PLANNED", "2026-08-28T10:30:00+03:00"),
+      makeVisit("Sıradaki", "PLANNED", "2026-08-28T12:30:00+03:00"),
+    ], now)
+
+    const groups = groupExpectedSecurityVisits(rows)
+    expect(groups.delayed.map(({ visit }) => visit.id)).toEqual(["Geciken"])
+    expect(groups.upcoming.map(({ visit }) => visit.id)).toEqual(["Sıradaki"])
   })
 })
 

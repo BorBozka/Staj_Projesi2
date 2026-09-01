@@ -8,6 +8,11 @@ export interface SecurityVisitRow {
   delayMinutes: number
 }
 
+export interface ExpectedSecurityVisitGroups {
+  delayed: SecurityVisitRow[]
+  upcoming: SecurityVisitRow[]
+}
+
 export function getSecurityScopedVisits(visits: Visit[], companyId: string, facilityId: string) {
   return visits.filter((visit) => visit.hostCompanyId === companyId && visit.facilityId === facilityId)
 }
@@ -24,6 +29,13 @@ export function getExpectedSecurityVisits(visits: Visit[], now: Date): SecurityV
       return new Date(left.visit.plannedStart).getTime() - new Date(right.visit.plannedStart).getTime()
         || left.visit.id.localeCompare(right.visit.id)
     })
+}
+
+export function groupExpectedSecurityVisits(rows: SecurityVisitRow[]): ExpectedSecurityVisitGroups {
+  return {
+    delayed: rows.filter((row) => row.isDelayed),
+    upcoming: rows.filter((row) => !row.isDelayed),
+  }
 }
 
 export function getInsideSecurityVisits(visits: Visit[], now: Date): SecurityVisitRow[] {

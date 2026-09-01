@@ -4,19 +4,7 @@ import { describe, expect, it } from "vitest"
 
 const shellSource = readFileSync(resolve(process.cwd(), "src/components/app-shell/SecurityShell.tsx"), "utf8")
 
-describe("SecurityShell navigation", () => {
-  it("exposes only the two Security operation modules as top navigation", () => {
-    expect(shellSource).toContain('{ label: "Operasyon", to: "/security/operations" }')
-    expect(shellSource).toContain('{ label: "Mal Hareketleri", to: "/security/goods-movements" }')
-    expect(shellSource).toContain('aria-label="Güvenlik menüsü"')
-    expect(shellSource).not.toContain('label: "Dashboard"')
-    expect(shellSource).not.toContain('label: "Tüm Ziyaretler"')
-    expect(shellSource).not.toContain('label: "Kaynaklar"')
-    expect(shellSource).not.toContain('label: "Raporlar"')
-    expect(shellSource).not.toContain('label: "Kullanıcılar"')
-    expect(shellSource).not.toContain('label: "Sistem Ayarları"')
-    expect(shellSource).not.toContain('label: "Ziyaretlerim"')
-  })
+describe("SecurityShell header", () => {
 
   it("renders through the shared sidebar-less shell with no collapse or drawer state", () => {
     expect(shellSource).toContain("FocusedShell")
@@ -28,9 +16,24 @@ describe("SecurityShell navigation", () => {
     expect(shellSource).not.toContain("Menu")
   })
 
-  it("marks the active route with native semantics", () => {
+  it("keeps a second-updating clock centered in the compact Security header", () => {
+    expect(shellSource).toContain("headerHeight={64}")
+    expect(shellSource).toContain("headerNavigation={<SecurityNavigation />}")
+    expect(shellSource).toContain("headerCenter={<SecurityClock />}")
+    expect(shellSource).not.toContain("topBand")
+    expect(shellSource).toContain("window.setInterval(() => setNow(new Date()), 1_000)")
+    expect(shellSource).toContain("window.clearInterval(intervalId)")
+    expect(shellSource).toContain('hour: "2-digit", minute: "2-digit", second: "2-digit"')
+    expect(shellSource).toContain('weekday: "long"')
+    expect(shellSource).toContain("tabular-nums")
+    expect(shellSource).toContain("text-[38px]")
+    expect(shellSource).toContain("text-[11px]")
+  })
+
+  it("keeps the compact Security navigation beside the title", () => {
+    expect(shellSource).toContain('aria-label="Güvenlik menüsü"')
+    expect(shellSource).toContain('{ label: "Operasyon", to: "/security/operations" }')
+    expect(shellSource).toContain('{ label: "Mal Hareketleri", to: "/security/goods-movements" }')
     expect(shellSource).toContain('aria-current={pathname === to ? "page" : undefined}')
-    expect(shellSource).toContain("NavLink")
-    expect(shellSource).toContain("border-blue-600")
   })
 })

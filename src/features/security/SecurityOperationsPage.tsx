@@ -1,4 +1,4 @@
-import { Building2, Search } from "lucide-react"
+import { Search } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 
 import { Button } from "@/components/ui/button"
@@ -18,6 +18,7 @@ import {
   getExpectedSecurityVisits,
   getInsideSecurityVisits,
   getSecurityScopedVisits,
+  groupExpectedSecurityVisits,
   type SecurityVisitRow,
 } from "./security-operations"
 
@@ -50,13 +51,12 @@ export function SecurityOperationsPage() {
     return {
       companyId,
       facilityId,
-      companyName: referenceData.companies.find((company) => company.id === companyId)?.name ?? "—",
-      facilityName: referenceData.facilities.find((facility) => facility.id === facilityId && facility.companyId === companyId)?.name ?? "—",
     }
   }, [referenceData])
 
   const scopedVisits = useMemo(() => scope ? getSecurityScopedVisits(visits, scope.companyId, scope.facilityId) : [], [scope, visits])
   const expectedRows = useMemo(() => filterSecurityVisitRows(getExpectedSecurityVisits(scopedVisits, now), search), [now, scopedVisits, search])
+  const expectedGroups = useMemo(() => groupExpectedSecurityVisits(expectedRows), [expectedRows])
   const insideRows = useMemo(() => filterSecurityVisitRows(getInsideSecurityVisits(scopedVisits, now), search), [now, scopedVisits, search])
   const scopedCardIssues = useMemo(() => scope ? cardIssues.filter(({ visit }) => visit.hostCompanyId === scope.companyId && visit.facilityId === scope.facilityId) : [], [cardIssues, scope])
 
@@ -73,15 +73,7 @@ export function SecurityOperationsPage() {
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
       <h1 className="sr-only">Güvenlik Operasyonu</h1>
 
-      <div className="flex shrink-0 flex-col gap-2 rounded-lg border bg-white p-2.5 shadow-panel lg:flex-row lg:items-center">
-        <div className="flex min-w-0 shrink-0 items-center gap-2 border-b border-slate-100 pb-2 lg:w-[260px] lg:border-b-0 lg:border-r lg:pb-0 lg:pr-3">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-700"><Building2 className="size-4" aria-hidden="true" /></div>
-          <div className="min-w-0 leading-tight">
-            <p className="truncate text-xs font-semibold text-slate-900">{scope?.companyName ?? "Çalışma bağlamı"}</p>
-            <p className="mt-0.5 truncate text-[11px] text-slate-500">{scope?.facilityName ?? "Yükleniyor…"}</p>
-          </div>
-        </div>
-
+      <div className="flex shrink-0 items-center gap-2 py-1">
         <label className="relative min-w-0 flex-1">
           <span className="sr-only">Beklenen ve içerideki ziyaretlerde ara</span>
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
@@ -91,7 +83,7 @@ export function SecurityOperationsPage() {
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Ziyaretçi, firma veya ev sahibi ara"
             aria-label="Ziyaretçi, firma veya ev sahibi ara"
-            className="h-9 pl-9 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+            className="h-9 border-slate-200/70 bg-slate-50/80 pl-9 shadow-none transition-colors placeholder:text-slate-400 focus-visible:border-blue-400 focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-blue-100 focus-visible:ring-offset-0"
           />
         </label>
 
@@ -109,9 +101,10 @@ export function SecurityOperationsPage() {
           {isLoading ? <PanelState message="Yükleniyor…" />
             : error ? <PanelState message={error} tone="error" />
               : expectedRows.length === 0 ? <PanelState message={search.trim() ? "Aramayla eşleşen kayıt yok." : "Bugün beklenen ziyaret yok."} />
-                : <ul className="divide-y divide-slate-100">
-                    {expectedRows.map((row) => <ExpectedRow key={row.visit.id} row={row} onCheckIn={setCheckInTarget} />)}
-                  </ul>}
+                : <div className="py-1">
+                    {expectedGroups.delayed.length > 0 && <ExpectedVisitGroup title="Gecikenler" rows={expectedGroups.delayed} onCheckIn={setCheckInTarget} />}
+                    {expectedGroups.upcoming.length > 0 && <ExpectedVisitGroup title="Sıradakiler" rows={expectedGroups.upcoming} onCheckIn={setCheckInTarget} />}
+                  </div>}
         </OperationPanel>
 
         <OperationPanel title="İçeride" count={insideRows.length} ariaLabel="İçerideki ziyaretçiler">
@@ -164,26 +157,35 @@ function OperationPanel({ title, count, ariaLabel, children }: { title: string; 
   )
 }
 
-function RowActions({ children }: { children: React.ReactNode }) {
-  return <div className="flex shrink-0 items-center gap-1">{children}</div>
+function ExpectedVisitGroup({ title, rows, onCheckIn }: { title: string; rows: SecurityVisitRow[]; onCheckIn(visit: Visit): void }) {
+  return (
+    <section className="py-1.5" aria-label={title}>
+      <h3 className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{title}</h3>
+      <ul>
+        {rows.map((row, index) => <ExpectedRow key={row.visit.id} row={row} isFirst={index === 0} isLast={index === rows.length - 1} onCheckIn={onCheckIn} />)}
+      </ul>
+    </section>
+  )
 }
 
-function ExpectedRow({ row, onCheckIn }: { row: SecurityVisitRow; onCheckIn(visit: Visit): void }) {
+function ExpectedRow({ row, isFirst, isLast, onCheckIn }: { row: SecurityVisitRow; isFirst: boolean; isLast: boolean; onCheckIn(visit: Visit): void }) {
   const { visit, isDelayed } = row
   return (
-    <li>
-      <div className="flex w-full items-center gap-3 px-3">
-        <div className="h-14 min-w-0 flex-1 py-2">
-          <div className="flex items-center gap-2">
-            <span className="shrink-0 text-xs font-semibold tabular-nums text-slate-900">{formatVisitTime(visit.plannedStart)}</span>
-            <span className="truncate text-xs font-semibold text-slate-900">{visit.visitor.firstName} {visit.visitor.lastName} - {visit.visitTypeName}</span>
-            {isDelayed && <StatusPill tone="warning">Gecikti</StatusPill>}
-          </div>
-          <p className="mt-1 truncate text-[11px] text-slate-500">{visit.visitor.company} · {visit.hostEmployeeName}</p>
+    <li className="relative border-b border-slate-100 last:border-b-0">
+      <div className="grid h-14 w-full grid-cols-[3rem_1rem_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-center gap-x-2 px-3 py-2">
+        <span className="col-start-1 row-start-1 text-xs font-semibold tabular-nums text-slate-900">{formatVisitTime(visit.plannedStart)}</span>
+        {isDelayed && <span className="col-start-1 row-start-2 text-[10px] font-semibold text-amber-700">Gecikti</span>}
+        <div className="col-start-2 row-span-2 row-start-1 relative flex h-full items-center justify-center" aria-hidden="true">
+          <span className={cn("absolute left-1/2 w-px -translate-x-1/2 bg-slate-200/70", isFirst ? "top-1/2" : "top-0", isLast ? "bottom-1/2" : "bottom-0")} />
+          <span className="relative size-1.5 rounded-full border border-slate-300 bg-white" />
         </div>
-        <RowActions>
+        <div className="col-start-3 row-span-2 row-start-1 flex min-w-0 flex-col justify-center">
+          <span className="min-w-0 truncate text-xs font-semibold text-slate-900">{visit.visitor.firstName} {visit.visitor.lastName}</span>
+          <p className="mt-1 truncate text-[11px] text-slate-500">{visit.visitTypeName} · {visit.visitor.company} · {visit.hostEmployeeName}</p>
+        </div>
+        <div className="col-start-4 row-span-2 row-start-1 flex items-center justify-end">
           <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[11px]" onClick={() => onCheckIn(visit)}>Giriş yap</Button>
-        </RowActions>
+        </div>
       </div>
     </li>
   )
@@ -194,31 +196,21 @@ function InsideRow({ row, onCheckOut }: { row: SecurityVisitRow; onCheckOut(visi
   const checkInLabel = visit.actualCheckIn ? formatVisitTime(visit.actualCheckIn) : "—"
   return (
     <li>
-      <div className="flex w-full items-center gap-3 px-3">
-        <div className="h-14 min-w-0 flex-1 py-2">
-          <div className="flex items-center gap-2">
-            <span className="truncate text-xs font-semibold text-slate-900">{visit.visitor.firstName} {visit.visitor.lastName} - {visit.visitTypeName}</span>
-            {isDelayed && <StatusPill tone="danger">Süre aştı · {delayMinutes} dk</StatusPill>}
-          </div>
-          <p className="mt-1 flex items-center justify-between gap-2 text-[11px]">
-            <span className="min-w-0 flex-1 truncate text-slate-500">{visit.visitor.company} · {visit.hostEmployeeName}</span>
-            <span className="shrink-0 text-slate-400">Giriş {checkInLabel} · Beklenen çıkış {formatVisitTime(visit.plannedEnd)}</span>
-          </p>
+      <div className="grid h-14 w-full grid-cols-[minmax(0,1fr)_8.25rem_auto] grid-rows-[1fr_1fr] items-stretch gap-x-2 px-3 py-2">
+        <div className="col-start-1 row-start-1 flex min-w-0 items-center"><span className="min-w-0 truncate text-xs font-semibold text-slate-900">{visit.visitor.firstName} {visit.visitor.lastName}</span></div>
+        <p className="col-start-1 row-start-2 mt-1 min-w-0 truncate text-[11px] text-slate-500">
+          <span className="min-w-0 truncate text-slate-500">{visit.visitTypeName} · {visit.visitor.company} · {visit.hostEmployeeName}</span>
+        </p>
+        <div className="col-start-2 row-span-2 row-start-1 flex flex-col justify-center text-[11px] leading-4 tabular-nums text-slate-400">
+          <span>Giriş {checkInLabel}</span>
+          <span>Beklenen {formatVisitTime(visit.plannedEnd)}{isDelayed && <> · <strong className="font-semibold text-rose-700">+{delayMinutes} dk</strong></>}</span>
         </div>
-        <RowActions>
+        <div className="col-start-3 row-span-2 row-start-1 flex items-center justify-end">
           <Button type="button" size="sm" className="h-7 px-2 text-[11px]" onClick={() => onCheckOut(visit)}>Çıkış yap</Button>
-        </RowActions>
+        </div>
       </div>
     </li>
   )
-}
-
-function StatusPill({ children, tone }: { children: React.ReactNode; tone: "warning" | "danger" }) {
-  const tones = {
-    warning: "border-amber-200 bg-amber-50 text-amber-700",
-    danger: "border-rose-200 bg-rose-50 text-rose-700",
-  }
-  return <span className={cn("inline-flex shrink-0 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold", tones[tone])}>{children}</span>
 }
 
 function PanelState({ message, tone = "neutral" }: { message: string; tone?: "neutral" | "error" }) {
