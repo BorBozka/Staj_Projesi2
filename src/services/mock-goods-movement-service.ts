@@ -1,6 +1,6 @@
 import type { GoodsMovement, GoodsMovementInput } from "@/domain/goods-movements"
 import { initialMockGoodsMovements } from "@/services/mock-goods-movement-data"
-import type { GoodsMovementService } from "@/services/goods-movement-service"
+import type { CompleteGoodsMovementInput, GoodsMovementService } from "@/services/goods-movement-service"
 import type { VisitService } from "@/services/visit-service"
 
 const clone = <T,>(value: T): T => structuredClone(value)
@@ -11,6 +11,23 @@ export class MockGoodsMovementService implements GoodsMovementService {
   async createGoodsMovement(input: GoodsMovementInput) { const movement = await this.validate(input); this.movements = [...this.movements, movement]; return clone(movement) }
   async updateGoodsMovement(id: string, input: GoodsMovementInput) { const current = this.find(id); if (current.status !== "PLANNED") throw new Error("Bu kayıt artık düzenlenemez."); const movement = await this.validate(input, current); this.movements = this.movements.map((item) => item.id === id ? movement : item); return clone(movement) }
   async cancelGoodsMovement(id: string) { const current = this.find(id); if (current.status !== "PLANNED") throw new Error("Bu kayıt iptal edilemez."); const movement = { ...current, status: "CANCELLED" as const }; this.movements = this.movements.map((item) => item.id === id ? movement : item); return clone(movement) }
+  async completeGoodsMovement(id: string, input: CompleteGoodsMovementInput) {
+    const current = this.find(id)
+    if (current.status !== "PLANNED") throw new Error("Yalnızca planlanmış mal hareketleri tamamlanabilir.")
+    if (current.companyId !== input.companyId || current.facilityId !== input.facilityId) throw new Error("Bu mal hareketi Security kapsamı dışında.")
+
+    const actualPlate = input.actualPlate?.trim()
+    const actualDriverName = input.actualDriverName?.trim()
+    const completed: GoodsMovement = {
+      ...current,
+      status: "COMPLETED",
+      actualAt: new Date().toISOString(),
+      ...(actualPlate ? { actualPlate } : {}),
+      ...(actualDriverName ? { actualDriverName } : {}),
+    }
+    this.movements = this.movements.map((item) => item.id === id ? completed : item)
+    return clone(completed)
+  }
   private find(id: string) { const movement = this.movements.find((item) => item.id === id); if (!movement) throw new Error("Mal hareketi bulunamadı."); return movement }
   private async validate(input: GoodsMovementInput, current?: GoodsMovement): Promise<GoodsMovement> {
     if (!input.counterpartyName.trim() || !input.goodsDescription.trim()) throw new Error("Karşı firma ve mal/açıklama zorunludur.")

@@ -36,7 +36,9 @@ The closure order is fixed as follows:
 1. **Unplanned visit** — complete: Security creates and immediately checks in a one-visitor
    visit from the current company/facility scope, with an available card and desk rule
    acceptance.
-2. **Security Goods Movements** — pending.
+2. **Security Goods Movements** — complete: Security lists today's scoped planned inbound and
+   outbound goods movements, searches operational fields, and records scoped arrivals/departures
+   with optional actual plate/driver details.
 3. **Authentication UI** — pending:
    - shared `/login`,
    - role-based redirect,

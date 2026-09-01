@@ -371,7 +371,7 @@ Rescheduling may retain the same visit identity/QR.
    selected or shown at the desk.
 3. Security may phone host employee.
 4. Security records required name, surname, visitor company, a free-text host/person name,
-   and an active visit type; phone and plate are optional.
+   an active visit type, and an optional plate. The unplanned desk flow does not collect phone.
 5. Security uses the current time for both planned start and actual check-in. Planned end is
    calculated from a default one-hour estimate, with 30-minute, 1-hour, 2-hour, 4-hour and
    positive whole-minute custom durations available.
@@ -605,6 +605,22 @@ Primary actions:
 - check-in,
 - check-out,
 - card returned/not returned.
+
+### Security Goods Movements
+
+Security sees only today's `PLANNED` goods movements in its current company/facility scope;
+there is no company/facility selector, record creation, editing, cancellation, date filter, or
+pagination workflow on this operational screen. Inbound and outbound movements are presented
+separately. Within each direction, time-scheduled records whose planned datetime has passed are
+shown first as delayed, followed by the remaining records in planned-time order; records with no
+planned time remain in the latter group after timed records.
+
+Security can search counterparty, goods description, and reference number. Completing an inbound
+record means arrival; completing an outbound record means departure. A Security completion may
+capture an optional actual plate and driver name, records a service-generated actual timestamp,
+and changes the shared goods-movement record from `PLANNED` to `COMPLETED`. The operation rejects
+out-of-scope or non-planned records. Manager, Dashboard, and reporting views continue to read the
+same completed record.
 
 ---
 

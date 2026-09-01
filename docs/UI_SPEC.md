@@ -338,9 +338,9 @@ Main:
 ### Unplanned Visitor Dialog
 
 `+ Plansız ziyaret` opens one compact Security-desk dialog. It contains required first name,
-last name, visitor company, free-text host/person, active visit type, estimated duration,
-available visitor-card selection, and the required `Ziyaretçi kuralları okudu ve kabul etti`
-checkbox. Phone and plate remain optional; phone uses the local `05XX XXX XX XX` entry format.
+last name, visitor company, free-text host/person, active visit type, optional plate, estimated
+duration, available visitor-card selection, and the required `Ziyaretçi kuralları okudu ve kabul etti`
+checkbox. The unplanned desk flow does not collect phone.
 
 Estimated duration defaults to one hour. The dialog offers 30 minutes, 1 hour, 2 hours and
 4 hours as fast choices plus a positive whole-minute custom entry. It is presented as a Security
@@ -350,6 +350,26 @@ The dialog does not show e-mail, company/facility selection, planned start, or i
 Its sole primary action is `Kaydet ve giriş yap`; it disables repeat submission, renders validation
 and service errors in place, closes after success, and leaves existing search and panel state
 unchanged. The new visitor immediately appears in `İçeride`.
+
+---
+
+### Security Goods Movements
+
+Security `Mal Hareketleri` uses the same shell header, digital clock, and navigation as the
+operations route. A single compact search input uses the placeholder `Firma, mal veya referans ara`.
+There are no company/facility selectors, create/edit/cancel controls, date filters, or pagination.
+
+The main area is two equal operation panels: `Gelenler · N` and `Gidenler · N`. Each panel shows
+only today's scoped `PLANNED` records and renders `GECİKENLER` and/or `SIRADAKİLER` only when that
+subsection has records. Rows show planned time (or `Saat belirtilmedi`), counterparty, truncated
+goods description, optional muted reference number, and a light `Gecikti` state. The right-side
+action remains fixed: `Geldi` for inbound and `Çıkış yaptı` for outbound. Empty panels state
+`Bugün beklenen gelen hareket yok.` or `Bugün beklenen giden hareket yok.`.
+
+The action opens a compact confirmation dialog with direction, counterparty, goods/description,
+planned time, and optional `Plaka` / `Şoför adı` inputs. Its primary action is `Geldi olarak kaydet`
+for inbound or `Çıkışı tamamla` for outbound. Repeat submission is disabled, errors render in the
+dialog, and a successful completion immediately removes the record from the operational panel.
 
 ---
 
