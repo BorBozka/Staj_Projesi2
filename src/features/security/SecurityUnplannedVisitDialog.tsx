@@ -6,8 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select } from "@/components/ui/select"
 import type { Visit, VisitTypeOption } from "@/domain/visits"
-import { securityService } from "@/services"
-import { DEFAULT_UNPLANNED_DURATION_MINUTES, getUnplannedDurationError, unplannedDurationOptions } from "./unplanned-visit-utils"
+import { adminService, securityService } from "@/services"
+import { DEFAULT_UNPLANNED_DURATION_MINUTES, getTimeOptionMinutes, getClockMinutes, parseClockTime, UNPLANNED_UNTIL_NOON, UNPLANNED_UNTIL_WORKDAY_END, unplannedDurationOptions } from "./unplanned-visit-utils"
 
 interface SecurityUnplannedVisitDialogProps {
   open: boolean
@@ -17,12 +17,13 @@ interface SecurityUnplannedVisitDialogProps {
   visitTypes: VisitTypeOption[]
 }
 
-const emptyDraft = () => ({ firstName: "", lastName: "", company: "", hostEmployeeName: "", visitTypeId: "", vehiclePlate: "", durationMinutes: String(DEFAULT_UNPLANNED_DURATION_MINUTES), customDurationHours: "", visitorCardId: "", rulesAccepted: false })
+const emptyDraft = () => ({ firstName: "", lastName: "", company: "", hostEmployeeName: "", visitTypeId: "", vehiclePlate: "", durationMinutes: String(DEFAULT_UNPLANNED_DURATION_MINUTES), visitorCardId: "", rulesAccepted: false })
 
 export function SecurityUnplannedVisitDialog({ open, onOpenChange, onCreated, scope, visitTypes }: SecurityUnplannedVisitDialogProps) {
   const [draft, setDraft] = useState(emptyDraft)
   const [cards, setCards] = useState<Awaited<ReturnType<typeof securityService.getAvailableVisitorCards>>>([])
   const [activeRule, setActiveRule] = useState<Awaited<ReturnType<typeof securityService.getActiveVisitorRule>>>(null)
+  const [workdayEndTime, setWorkdayEndTime] = useState("18:15")
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
@@ -34,8 +35,8 @@ export function SecurityUnplannedVisitDialog({ open, onOpenChange, onCreated, sc
     setError("")
     setSubmitting(false)
     setLoading(true)
-    void Promise.all([securityService.getAvailableVisitorCards(), securityService.getActiveVisitorRule()])
-      .then(([nextCards, nextRule]) => { setCards(nextCards); setActiveRule(nextRule) })
+    void Promise.all([securityService.getAvailableVisitorCards(), securityService.getActiveVisitorRule(), adminService.getOperationalSettings()])
+      .then(([nextCards, nextRule, settings]) => { setCards(nextCards); setActiveRule(nextRule); setWorkdayEndTime(settings.workdayEndTime) })
       .catch((reason) => setError(reason instanceof Error ? reason.message : "Plansız ziyaret için gereken bilgiler yüklenemedi."))
       .finally(() => setLoading(false))
   }, [open])
@@ -49,8 +50,8 @@ export function SecurityUnplannedVisitDialog({ open, onOpenChange, onCreated, sc
     const required = [[draft.firstName, "Ad"], [draft.lastName, "Soyad"], [draft.company, "Firma / Kurum"], [draft.hostEmployeeName, "Ev sahibi / ilgili personel"], [draft.visitTypeId, "Ziyaret türü"], [draft.visitorCardId, "Ziyaretçi kartı"]] as const
     const missing = required.find(([value]) => !value.trim())
     if (missing) { setError(`${missing[1]} zorunludur.`); return }
-    const durationError = getUnplannedDurationError(draft.durationMinutes)
-    if (durationError) { setError(durationError); return }
+    const durationMinutes = getTimeOptionMinutes(draft.durationMinutes, new Date(), workdayEndTime)
+    if (durationMinutes === null) { setError("Geçerli bir tahmini süre seçin."); return }
     if (!draft.rulesAccepted) { setError("Ziyaretçi kuralları kabul edilmelidir."); return }
     if (!activeRule) { setError("Aktif ziyaretçi kuralı bulunamadı."); return }
 
@@ -64,7 +65,7 @@ export function SecurityUnplannedVisitDialog({ open, onOpenChange, onCreated, sc
         hostEmployeeName: draft.hostEmployeeName,
         visitTypeId: draft.visitTypeId,
         vehiclePlate: draft.vehiclePlate,
-        durationMinutes: Number(draft.durationMinutes),
+        durationMinutes,
         visitorCardId: draft.visitorCardId,
         rulesAccepted: draft.rulesAccepted,
         ...scope,
@@ -77,6 +78,10 @@ export function SecurityUnplannedVisitDialog({ open, onOpenChange, onCreated, sc
     }
   }
 
+  const now = new Date()
+  const nowMinutes = getClockMinutes(now)
+  const workdayEndMinutes = parseClockTime(workdayEndTime) ?? 18 * 60 + 15
+  const durationChoices = [...unplannedDurationOptions.map((minutes) => ({ value: String(minutes), label: minutes < 60 ? `${minutes} dk` : `${minutes / 60} saat` })), ...(nowMinutes < 12 * 60 ? [{ value: UNPLANNED_UNTIL_NOON, label: "Öğlene kadar" }] : []), ...(nowMinutes < workdayEndMinutes ? [{ value: UNPLANNED_UNTIL_WORKDAY_END, label: "Mesai sonuna kadar" }] : [])]
   const noCardsAvailable = !loading && cards.length === 0
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!submitting) onOpenChange(next) }}>
@@ -95,7 +100,7 @@ export function SecurityUnplannedVisitDialog({ open, onOpenChange, onCreated, sc
         </div>
         <fieldset className="space-y-1">
           <legend className="px-1 text-xs font-medium text-slate-700">Tahmini süre <span className="text-destructive">*</span></legend>
-          <div className="flex flex-nowrap items-center gap-1 overflow-x-auto pb-0.5">{unplannedDurationOptions.map((minutes) => <Button key={minutes} type="button" variant={draft.durationMinutes === String(minutes) ? "default" : "outline"} className="h-7 shrink-0 px-1.5 text-[11px]" onClick={() => setDraft((current) => ({ ...current, durationMinutes: String(minutes), customDurationHours: "" }))}>{minutes < 60 ? `${minutes} dk` : `${minutes / 60} saat`}</Button>)}<Button type="button" variant={unplannedDurationOptions.includes(Number(draft.durationMinutes) as typeof unplannedDurationOptions[number]) ? "outline" : "default"} className="h-7 shrink-0 px-1.5 text-[11px]" onClick={() => setDraft((current) => ({ ...current, durationMinutes: "", customDurationHours: "" }))}>Özel</Button>{!unplannedDurationOptions.includes(Number(draft.durationMinutes) as typeof unplannedDurationOptions[number]) && <><Input id="security-unplanned-custom-duration" inputMode="decimal" aria-label="Özel süre" className="h-7 w-14 shrink-0 px-1.5 text-xs" value={draft.customDurationHours} onChange={(event) => { const hours = event.target.value; setDraft((current) => ({ ...current, customDurationHours: hours, durationMinutes: hours.trim() ? String(Number(hours) * 60) : "" })); setError("") }} /><span className="shrink-0 text-[11px] text-slate-500">saat</span></>}</div>
+          <div className="flex flex-nowrap items-center gap-1 overflow-x-auto pb-0.5">{durationChoices.map((option) => <Button key={option.value} type="button" variant={draft.durationMinutes === option.value ? "default" : "outline"} className="h-7 shrink-0 px-1.5 text-[11px]" onClick={() => update("durationMinutes", option.value)}>{option.label}</Button>)}</div>
         </fieldset>
         <Field label="Ziyaretçi kartı" required>{loading ? <p className="h-9 pt-2 text-xs text-slate-500">Kartlar yükleniyor…</p> : noCardsAvailable ? <p className="pt-2 text-xs text-amber-700">Uygun ziyaretçi kartı yok.</p> : <Select value={draft.visitorCardId} onChange={(event) => update("visitorCardId", event.target.value)}><option value="">Kart seçin</option>{cards.map((card) => <option key={card.id} value={card.id}>{card.cardNumber}</option>)}</Select>}</Field>
         {activeRule && <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-700"><input type="checkbox" className="size-3.5" checked={draft.rulesAccepted} onChange={(event) => update("rulesAccepted", event.target.checked)} /><span>Ziyaretçi kuralları okudu ve kabul etti</span></label>}

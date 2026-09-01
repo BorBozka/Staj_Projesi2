@@ -174,6 +174,7 @@ export interface VisitorRuleVersion {
 export interface OperationalSettings {
   overdueToleranceMinutes: number
   overdueAlertRepeatMinutes: number
+  workdayEndTime: string
 }
 
 export const DEFAULT_OVERDUE_TOLERANCE_MINUTES = 15
@@ -181,6 +182,7 @@ export const DEFAULT_OVERDUE_TOLERANCE_MINUTES = 15
 export function isOperationalSettingsValid(settings: OperationalSettings): boolean {
   return Number.isInteger(settings.overdueToleranceMinutes) && settings.overdueToleranceMinutes >= 0
     && Number.isInteger(settings.overdueAlertRepeatMinutes) && settings.overdueAlertRepeatMinutes >= 1
+    && /^([01]\d|2[0-3]):[0-5]\d$/.test(settings.workdayEndTime)
 }
 
 export const authenticationSourceLabels: Record<AuthenticationSource, string> = {

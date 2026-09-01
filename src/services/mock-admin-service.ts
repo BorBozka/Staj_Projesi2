@@ -38,7 +38,7 @@ export class MockAdminService implements AdminService {
     { id: "user-4", fullName: "Orhan Yalçın", username: "orhan.yalcin", email: "orhan.yalcin@bplas.com", authenticationSource: "LOCAL", role: "EMPLOYEE", authorizationScope: { companyIds: ["bplas-otomotiv"], facilityIds: [], securityGateIds: [] }, active: false },
     { id: "user-5", fullName: "Deniz Acar", username: "deniz.acar", email: "deniz.acar@bplas.com", authenticationSource: "ACTIVE_DIRECTORY", role: "EMPLOYEE", authorizationScope: { companyIds: ["bplas"], facilityIds: [], securityGateIds: [] }, active: true },
   ]
-  private settings: OperationalSettings = { overdueToleranceMinutes: DEFAULT_OVERDUE_TOLERANCE_MINUTES, overdueAlertRepeatMinutes: 10 }
+  private settings: OperationalSettings = { overdueToleranceMinutes: DEFAULT_OVERDUE_TOLERANCE_MINUTES, overdueAlertRepeatMinutes: 10, workdayEndTime: "18:15" }
 
   constructor(
     private readonly organizationStore = new MockOrganizationStore(),

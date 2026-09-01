@@ -182,11 +182,12 @@ describe("MockAdminService other admin resources", () => {
 
   it("persists only valid operational settings at the service boundary", async () => {
     const service = new MockAdminService()
-    await expect(service.saveOperationalSettings({ overdueToleranceMinutes: 0, overdueAlertRepeatMinutes: 1 })).resolves.toEqual({ overdueToleranceMinutes: 0, overdueAlertRepeatMinutes: 1 })
-    await expect(service.saveOperationalSettings({ overdueToleranceMinutes: -1, overdueAlertRepeatMinutes: 10 })).rejects.toThrow("Operasyon parametreleri geçersiz.")
-    await expect(service.saveOperationalSettings({ overdueToleranceMinutes: 15, overdueAlertRepeatMinutes: 0 })).rejects.toThrow("Operasyon parametreleri geçersiz.")
-    await expect(service.saveOperationalSettings({ overdueToleranceMinutes: 1.5, overdueAlertRepeatMinutes: 10 })).rejects.toThrow("Operasyon parametreleri geçersiz.")
-    await expect(service.saveOperationalSettings({ overdueToleranceMinutes: 15, overdueAlertRepeatMinutes: 2.5 })).rejects.toThrow("Operasyon parametreleri geçersiz.")
+    await expect(service.saveOperationalSettings({ overdueToleranceMinutes: 0, overdueAlertRepeatMinutes: 1, workdayEndTime: "18:15" })).resolves.toEqual({ overdueToleranceMinutes: 0, overdueAlertRepeatMinutes: 1, workdayEndTime: "18:15" })
+    await expect(service.saveOperationalSettings({ overdueToleranceMinutes: -1, overdueAlertRepeatMinutes: 10, workdayEndTime: "18:15" })).rejects.toThrow("Operasyon parametreleri geçersiz.")
+    await expect(service.saveOperationalSettings({ overdueToleranceMinutes: 15, overdueAlertRepeatMinutes: 0, workdayEndTime: "18:15" })).rejects.toThrow("Operasyon parametreleri geçersiz.")
+    await expect(service.saveOperationalSettings({ overdueToleranceMinutes: 1.5, overdueAlertRepeatMinutes: 10, workdayEndTime: "18:15" })).rejects.toThrow("Operasyon parametreleri geçersiz.")
+    await expect(service.saveOperationalSettings({ overdueToleranceMinutes: 15, overdueAlertRepeatMinutes: 2.5, workdayEndTime: "18:15" })).rejects.toThrow("Operasyon parametreleri geçersiz.")
+    await expect(service.saveOperationalSettings({ overdueToleranceMinutes: 15, overdueAlertRepeatMinutes: 10, workdayEndTime: "1815" })).rejects.toThrow("Operasyon parametreleri geçersiz.")
   })
 
   it("keeps card inventory creation and editing inside the Admin-owned lifecycle", async () => {

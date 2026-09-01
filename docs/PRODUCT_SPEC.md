@@ -373,8 +373,8 @@ Rescheduling may retain the same visit identity/QR.
 4. Security records required name, surname, visitor company, a free-text host/person name,
    an active visit type, and an optional plate. The unplanned desk flow does not collect phone.
 5. Security uses the current time for both planned start and actual check-in. Planned end is
-   calculated from a default one-hour estimate, with 30-minute, 1-hour, 2-hour, 4-hour and
-   positive whole-minute custom durations available.
+   calculated from a default one-hour estimate. Fast choices are 30 minutes, 1 hour, 2 hours,
+   4 hours, until noon (when before 12:00), and until the configured workday end.
 6. Rules are shown at the security desk. Security records the active rule/version snapshot only
    after confirming that the visitor read and explicitly accepted it.
 7. Security assigns an `AVAILABLE` visitor card.

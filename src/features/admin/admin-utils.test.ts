@@ -217,8 +217,8 @@ describe("Edit dialog dirty-state", () => {
 
 describe("Admin configuration rules", () => {
   it("validates only the two defined operational parameters", () => {
-    expect(isOperationalSettingsValid({ overdueToleranceMinutes: 15, overdueAlertRepeatMinutes: 10 })).toBe(true)
-    expect(isOperationalSettingsValid({ overdueToleranceMinutes: -1, overdueAlertRepeatMinutes: 10 })).toBe(false)
-    expect(isOperationalSettingsValid({ overdueToleranceMinutes: 10, overdueAlertRepeatMinutes: 0 })).toBe(false)
+    expect(isOperationalSettingsValid({ overdueToleranceMinutes: 15, overdueAlertRepeatMinutes: 10, workdayEndTime: "18:15" })).toBe(true)
+    expect(isOperationalSettingsValid({ overdueToleranceMinutes: -1, overdueAlertRepeatMinutes: 10, workdayEndTime: "18:15" })).toBe(false)
+    expect(isOperationalSettingsValid({ overdueToleranceMinutes: 10, overdueAlertRepeatMinutes: 0, workdayEndTime: "18:15" })).toBe(false)
   })
 })

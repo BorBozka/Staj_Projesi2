@@ -68,7 +68,7 @@ export function useAdmin() {
 export function useOperationalSettings(): OperationalSettings {
   const { settings } = useAdmin()
   return useMemo(
-    () => settings ?? { overdueToleranceMinutes: DEFAULT_OVERDUE_TOLERANCE_MINUTES, overdueAlertRepeatMinutes: 10 },
+    () => settings ?? { overdueToleranceMinutes: DEFAULT_OVERDUE_TOLERANCE_MINUTES, overdueAlertRepeatMinutes: 10, workdayEndTime: "18:15" },
     [settings],
   )
 }

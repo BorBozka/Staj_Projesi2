@@ -3,12 +3,14 @@ import { isOperationalSettingsValid, type OperationalSettings } from "@/domain/a
 export interface OperationalSettingsDraft {
   overdueToleranceMinutes: string
   overdueAlertRepeatMinutes: string
+  workdayEndTime: string
 }
 
 export function createOperationalSettingsDraft(settings: OperationalSettings): OperationalSettingsDraft {
   return {
     overdueToleranceMinutes: String(settings.overdueToleranceMinutes),
     overdueAlertRepeatMinutes: String(settings.overdueAlertRepeatMinutes),
+    workdayEndTime: settings.workdayEndTime,
   }
 }
 
@@ -21,7 +23,7 @@ export function getOperationalSettingsDraftValue(draft: OperationalSettingsDraft
   const overdueToleranceMinutes = parseInteger(draft.overdueToleranceMinutes)
   const overdueAlertRepeatMinutes = parseInteger(draft.overdueAlertRepeatMinutes)
   if (overdueToleranceMinutes === null || overdueAlertRepeatMinutes === null) return null
-  const settings = { overdueToleranceMinutes, overdueAlertRepeatMinutes }
+  const settings = { overdueToleranceMinutes, overdueAlertRepeatMinutes, workdayEndTime: draft.workdayEndTime }
   return isOperationalSettingsValid(settings) ? settings : null
 }
 
@@ -41,4 +43,5 @@ export function isOperationalSettingsDraftDirty(persisted: OperationalSettings, 
     || draft.overdueAlertRepeatMinutes !== String(persisted.overdueAlertRepeatMinutes)
   return parsed.overdueToleranceMinutes !== persisted.overdueToleranceMinutes
     || parsed.overdueAlertRepeatMinutes !== persisted.overdueAlertRepeatMinutes
+    || parsed.workdayEndTime !== persisted.workdayEndTime
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import { createOperationalSettingsDraft, getOperationalSettingsDraftValue, getOverdueAlertRepeatError, getOverdueToleranceError, isOperationalSettingsDraftDirty } from "@/features/admin/operational-settings-form"
 
-const persisted = { overdueToleranceMinutes: 15, overdueAlertRepeatMinutes: 10 }
+const persisted = { overdueToleranceMinutes: 15, overdueAlertRepeatMinutes: 10, workdayEndTime: "18:15" }
 
 describe("Operational settings form", () => {
   it("validates tolerance as a non-negative integer without converting an empty input to zero", () => {
@@ -26,13 +26,14 @@ describe("Operational settings form", () => {
     expect(isOperationalSettingsDraftDirty(persisted, createOperationalSettingsDraft(persisted))).toBe(false)
     expect(isOperationalSettingsDraftDirty(persisted, { ...createOperationalSettingsDraft(persisted), overdueToleranceMinutes: "20" })).toBe(true)
     expect(isOperationalSettingsDraftDirty(persisted, { ...createOperationalSettingsDraft(persisted), overdueAlertRepeatMinutes: "20" })).toBe(true)
-    expect(isOperationalSettingsDraftDirty(persisted, { overdueToleranceMinutes: "20", overdueAlertRepeatMinutes: "20" })).toBe(true)
+    expect(isOperationalSettingsDraftDirty(persisted, { ...createOperationalSettingsDraft(persisted), workdayEndTime: "17:30" })).toBe(true)
+    expect(isOperationalSettingsDraftDirty(persisted, { overdueToleranceMinutes: "20", overdueAlertRepeatMinutes: "20", workdayEndTime: "18:15" })).toBe(true)
     expect(isOperationalSettingsDraftDirty(persisted, { ...createOperationalSettingsDraft(persisted), overdueToleranceMinutes: "" })).toBe(true)
   })
 
   it("produces a domain value only for a complete valid draft", () => {
     expect(getOperationalSettingsDraftValue(createOperationalSettingsDraft(persisted))).toEqual(persisted)
-    expect(getOperationalSettingsDraftValue({ overdueToleranceMinutes: "", overdueAlertRepeatMinutes: "10" })).toBeNull()
-    expect(getOperationalSettingsDraftValue({ overdueToleranceMinutes: "1.5", overdueAlertRepeatMinutes: "10" })).toBeNull()
+    expect(getOperationalSettingsDraftValue({ overdueToleranceMinutes: "", overdueAlertRepeatMinutes: "10", workdayEndTime: "18:15" })).toBeNull()
+    expect(getOperationalSettingsDraftValue({ overdueToleranceMinutes: "1.5", overdueAlertRepeatMinutes: "10", workdayEndTime: "18:15" })).toBeNull()
   })
 })

@@ -29,8 +29,9 @@ describe("SecurityUnplannedVisitDialog contract", () => {
     expect(source).toContain("DEFAULT_UNPLANNED_DURATION_MINUTES")
     expect(source).toContain("Ziyaretçi kuralları okudu ve kabul etti")
     expect(source).toContain("rulesAccepted")
-    expect(source).toContain('aria-label="Özel süre"')
-    expect(source).toContain("saat")
+    expect(source).not.toContain('aria-label="Özel süre"')
+    expect(source).toContain("Öğlene kadar")
+    expect(source).toContain("Mesai sonuna kadar")
   })
 
   it("prevents duplicate submits and uses the one SecurityService desk action", () => {
