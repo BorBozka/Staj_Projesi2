@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import type { GoodsMovement } from "@/domain/goods-movements"
-import { filterSecurityGoodsMovements, getSecurityScopedTodayPlannedGoodsMovements, groupSecurityGoodsMovements } from "@/features/security/security-goods-movements"
+import { filterSecurityGoodsMovements, formatSecurityGoodsMovementPlannedAt, getSecurityScopedTodayPlannedGoodsMovements, groupSecurityGoodsMovements } from "@/features/security/security-goods-movements"
 
 const now = new Date("2026-09-01T12:00:00")
 const scope = { companyId: "company-1", facilityId: "facility-1" }
@@ -24,6 +24,12 @@ function movement(id: string, overrides: Partial<GoodsMovement> = {}): GoodsMove
 }
 
 describe("Security goods movement operations", () => {
+  it("formats planned timestamps with shared Turkish date formatting", () => {
+    const today = movement("today", { plannedTime: "09:10" })
+    expect(formatSecurityGoodsMovementPlannedAt(today, new Date(2026, 8, 1, 11, 0))).toBe("Bugün · 09:10")
+    expect(formatSecurityGoodsMovementPlannedAt({ ...today, plannedDate: "2026-09-02", plannedTime: undefined }, new Date(2026, 8, 1, 11, 0))).toBe("2 Eyl 2026 · Saat belirtilmedi")
+  })
+
   it("keeps only today's planned records in the active Security scope", () => {
     const scoped = getSecurityScopedTodayPlannedGoodsMovements([
       movement("included"),
