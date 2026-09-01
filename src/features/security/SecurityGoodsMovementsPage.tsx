@@ -14,6 +14,7 @@ import {
   filterSecurityGoodsMovements,
   getSecurityScopedTodayPlannedGoodsMovements,
   groupSecurityGoodsMovements,
+  formatSecurityGoodsMovementPlannedAt,
   type SecurityGoodsMovementGroups,
   type SecurityGoodsMovementRow,
 } from "./security-goods-movements"
@@ -110,7 +111,7 @@ function GoodsRow({ row, onComplete }: { row: SecurityGoodsMovementRow; onComple
       <div className="grid min-h-14 grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-x-2 px-3 py-2">
         <div className="self-start text-xs font-semibold tabular-nums text-slate-900"><span>{movement.plannedTime ?? "Saat belirtilmedi"}</span>{isLate && <span className="mt-0.5 block text-[10px] text-amber-700">Gecikti</span>}</div>
         <div className="min-w-0"><p className="truncate text-xs font-semibold text-slate-900" title={movement.counterpartyName}>{movement.counterpartyName}</p><p className="mt-0.5 truncate text-[11px] text-slate-500" title={movement.goodsDescription}>{movement.goodsDescription}</p>{movement.referenceNumber && <p className="mt-0.5 truncate text-[10px] text-slate-400" title={movement.referenceNumber}>{movement.referenceNumber}</p>}</div>
-        <Button type="button" size="sm" variant={movement.direction === "INBOUND" ? "outline" : "default"} className="h-7 px-2 text-[11px]" onClick={() => onComplete(movement)}>{movement.direction === "INBOUND" ? "Geldi" : "Çıkış yaptı"}</Button>
+        <Button type="button" size="sm" variant="default" className="h-7 w-[5.25rem] px-2 text-[11px]" onClick={() => onComplete(movement)}>{movement.direction === "INBOUND" ? "Geldi" : "Çıkış yaptı"}</Button>
       </div>
     </li>
   )
@@ -149,7 +150,7 @@ function SecurityGoodsCompletionDialog({ movement, open, onOpenChange, onComplet
     <Dialog open={open} onOpenChange={(next) => { if (!submitting) onOpenChange(next) }}>
       <DialogContent className="max-w-sm">
         <DialogHeader><DialogTitle>{movement.direction === "INBOUND" ? "Gelen hareket" : "Giden hareket"}</DialogTitle><DialogDescription>{movement.counterpartyName} · {movement.goodsDescription}</DialogDescription></DialogHeader>
-        <div className="space-y-2 text-xs"><p className="text-slate-500">Planlanan: <span className="font-medium text-slate-700">{movement.plannedDate} · {movement.plannedTime ?? "Saat belirtilmedi"}</span></p><div className="grid gap-2 sm:grid-cols-2"><Field label="Plaka"><Input value={actualPlate} onChange={(event) => setActualPlate(event.target.value)} /></Field><Field label="Şoför adı"><Input value={actualDriverName} onChange={(event) => setActualDriverName(event.target.value)} /></Field></div></div>
+        <div className="space-y-2 text-xs"><p className="text-slate-500">Planlanan: <span className="font-medium text-slate-700">{formatSecurityGoodsMovementPlannedAt(movement)}</span></p><div className="grid gap-2 sm:grid-cols-2"><Field label="Plaka"><Input value={actualPlate} onChange={(event) => setActualPlate(event.target.value)} /></Field><Field label="Şoför adı"><Input value={actualDriverName} onChange={(event) => setActualDriverName(event.target.value)} /></Field></div></div>
         {error && <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
         <DialogFooter><Button type="button" variant="outline" disabled={submitting} onClick={() => onOpenChange(false)}>İptal</Button><Button type="button" disabled={submitting} onClick={() => void submit()}>{submitting ? "Kaydediliyor…" : actionLabel}</Button></DialogFooter>
       </DialogContent>

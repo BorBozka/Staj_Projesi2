@@ -1,10 +1,17 @@
-import { format } from "date-fns"
+import { format, parse } from "date-fns"
 
 import type { GoodsMovement } from "@/domain/goods-movements"
+import { formatTr } from "@/lib/date"
 
 export interface SecurityGoodsMovementScope {
   companyId: string
   facilityId: string
+}
+
+export function formatSecurityGoodsMovementPlannedAt(movement: Pick<GoodsMovement, "plannedDate" | "plannedTime">, now = new Date()): string {
+  const date = parse(movement.plannedDate, "yyyy-MM-dd", new Date())
+  const dateLabel = movement.plannedDate === formatTr(now, "yyyy-MM-dd") ? "Bugün" : formatTr(date, "d MMM yyyy")
+  return `${dateLabel} · ${movement.plannedTime ?? "Saat belirtilmedi"}`
 }
 
 export interface SecurityGoodsMovementRow {
