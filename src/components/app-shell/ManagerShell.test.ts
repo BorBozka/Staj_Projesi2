@@ -32,14 +32,22 @@ describe("Manager sidebar transition", () => {
 
   it("keeps the collapse control visible and the desktop navigation unscrollable", () => {
     expect(componentSource).toContain("onClick={() => onCollapsedChange(!collapsed)}")
-    expect(componentSource).toContain("onToggleCollapsed={() => onCollapsedChange(!collapsed)}")
-    expect(componentSource).toContain("if (onToggleCollapsed) return")
-    expect(componentSource).toContain("onClick={onToggleCollapsed}")
+    expect(componentSource).toContain('<AccountMenu variant="sidebar" collapsed={collapsed}')
+    expect(componentSource).not.toContain("onToggleCollapsed")
     expect(componentSource).not.toContain("ChevronLeft")
     expect(componentSource).not.toContain("ChevronRight")
     expect(componentSource).toContain('className="flex min-h-0 flex-1 cursor-pointer flex-col overflow-hidden px-2 py-1"')
     expect(componentSource).not.toContain("overflow-x-hidden overflow-y-auto px-2 py-1.5")
     expect(componentSource).not.toContain("mt-2 flex-1 cursor-pointer")
+  })
+})
+
+describe("Shared account menu", () => {
+  it("uses the account trigger in both sidebar states and the mobile header", () => {
+    expect(componentSource).toContain('import { AccountMenu } from "@/components/account/AccountMenu"')
+    expect(componentSource).toContain('<AccountMenu profile={account} className="ml-auto" />')
+    expect(componentSource).toContain("currentAccountProfiles.admin")
+    expect(componentSource).toContain("currentAccountProfiles.manager")
   })
 })
 

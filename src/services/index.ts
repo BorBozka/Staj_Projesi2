@@ -9,6 +9,10 @@ import { MockVisitorCardStore } from "@/services/mock-visitor-card-store"
 import { MockVisitorRuleStore } from "@/services/mock-visitor-rule-store"
 import { MockOrganizationStore } from "@/services/mock-organization-store"
 import { MockVisitTypeStore } from "@/services/mock-visit-type-store"
+import { MockAccountService } from "@/services/mock-account-service"
+import { MockSessionService } from "@/services/mock-session-service"
+import type { AccountService } from "@/services/account-service"
+import type { SessionService } from "@/services/session-service"
 import type { AdminService } from "@/services/admin-service"
 import type { SecurityService } from "@/services/security-service"
 import type { GoodsMovementService } from "@/services/goods-movement-service"
@@ -28,6 +32,8 @@ const _transportAssignmentService = new MockTransportAssignmentService(_visitSer
 const _goodsMovementService = new MockGoodsMovementService(_visitService)
 const _adminService = new MockAdminService(_organizationStore, undefined, _visitTypeStore, _visitorCardStore, _visitorRuleStore)
 const _securityService = new MockSecurityService(_visitorCardStore, _visitService, _visitorRuleStore)
+const _accountService = new MockAccountService()
+const _sessionService = new MockSessionService()
 
 // Break the circular dependency: visit service needs assignment service for
 // extension validation; assignment service needs visit service for meeting data.
@@ -40,5 +46,7 @@ export const transportAssignmentService: TransportAssignmentService = _transport
 export const goodsMovementService: GoodsMovementService = _goodsMovementService
 export const adminService: AdminService = _adminService
 export const securityService: SecurityService = _securityService
+export const accountService: AccountService = _accountService
+export const sessionService: SessionService = _sessionService
 
-export type { AdminService, GoodsMovementService, ResourceCatalogService, ResourceAssignmentService, SecurityService, TransportAssignmentService, VisitService }
+export type { AccountService, AdminService, GoodsMovementService, ResourceCatalogService, ResourceAssignmentService, SecurityService, SessionService, TransportAssignmentService, VisitService }

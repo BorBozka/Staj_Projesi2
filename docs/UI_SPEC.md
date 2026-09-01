@@ -141,6 +141,10 @@ May include:
 The Manager notification list may be cleared in bulk. Clearing only dismisses the current
 notification presentation and must not change Visit invitation domain states.
 
+All role shells use one compact account-menu trigger. It shows an image avatar with initials
+fallback and opens the same profile actions across Employee, Security, Manager, and Admin.
+The Manager/Admin sidebar profile trigger opens this menu; it does not toggle sidebar collapse.
+
 Example:
 
 `Company B / Factory 1 ▼`

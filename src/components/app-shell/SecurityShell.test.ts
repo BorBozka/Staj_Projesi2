@@ -8,6 +8,7 @@ describe("SecurityShell header", () => {
 
   it("renders through the shared sidebar-less shell with no collapse or drawer state", () => {
     expect(shellSource).toContain("FocusedShell")
+    expect(shellSource).toContain("currentAccountProfiles.security")
     expect(shellSource).not.toContain("security-navigation-collapsed")
     expect(shellSource).not.toContain("sessionStorage")
     expect(shellSource).not.toContain("collapsed")
@@ -28,6 +29,7 @@ describe("SecurityShell header", () => {
     expect(shellSource).toContain("tabular-nums")
     expect(shellSource).toContain("text-[38px]")
     expect(shellSource).toContain("text-[11px]")
+    expect(shellSource).toContain("headerCenter={<SecurityClock />}")
   })
 
   it("keeps the compact Security navigation beside the title", () => {

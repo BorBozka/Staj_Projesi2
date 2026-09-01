@@ -175,6 +175,15 @@ Where practical, Active Directory may provide:
 
 Authentication source and role are separate concepts.
 
+### Account self-service UI
+
+All authenticated role shells expose the same account menu with the current user's avatar,
+name, role, profile-photo action, and logout action. Only `LOCAL` users see password change;
+`ACTIVE_DIRECTORY` users must not be offered a local-password flow. In the frontend/mock phase,
+profile photos may persist per immutable user ID in local storage after client-side square crop
+and compression. The account service owns profile/password operations, while logout remains a
+session-service boundary until real authentication supplies session clearing and `/login` redirect.
+
 ---
 
 ## 6. Visitor vs Visit

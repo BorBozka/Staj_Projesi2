@@ -40,13 +40,9 @@ The closure order is fixed as follows:
 2. **Security Goods Movements** — complete: Security lists today's scoped planned inbound and
    outbound goods movements, searches operational fields, and records scoped arrivals/departures
    with optional actual plate/driver details.
-3. **Authentication UI** — pending:
-   - shared `/login`,
-   - role-based redirect,
-   - logout,
-   - avatar/account menu,
-   - profile photo update,
-   - password change for `LOCAL` users.
+3. **Authentication UI** — in progress:
+   - shared account/avatar menu, profile photo update, `LOCAL` password-change form, and logout service boundary are complete in the mock UI,
+   - shared `/login`, role-based redirect, and real session clearing remain pending for the authentication phase.
 4. **Backend + database** — pending.
 5. **Local + Active Directory authentication** — pending.
 6. **Mock service → real API adaptation** — pending.

@@ -13,7 +13,7 @@ describe("EmployeeShell", () => {
     expect(appSource).toContain("<Route element={<EmployeeShell />}>")
     expect(appSource).not.toContain("AppShell")
     expect(shellSource).toContain("FocusedShell")
-    expect(shellSource).toContain('roleLabel="Çalışan"')
+    expect(shellSource).toContain("currentAccountProfiles.employee")
   })
 
   it("has no sidebar, drawer or navigation for its single workspace", () => {
@@ -32,6 +32,8 @@ describe("FocusedShell", () => {
     expect(focusedShellSource).toContain("grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]")
     expect(focusedShellSource).toContain("headerNavigation?: ReactNode")
     expect(focusedShellSource).toContain("headerCenter?: ReactNode")
+    expect(focusedShellSource).toContain("account: AccountProfile")
+    expect(focusedShellSource).toContain("<AccountMenu profile={account} />")
     expect(focusedShellSource).toContain("FOCUSED_SHELL_HEADER_HEIGHT = 52")
     expect(focusedShellSource).not.toContain("<aside")
     expect(focusedShellSource).not.toContain("useState")

@@ -1,6 +1,8 @@
 import type { ReactNode } from "react"
 
 import bplasLogo from "@/assets/bplas-logo.svg"
+import { AccountMenu } from "@/components/account/AccountMenu"
+import type { AccountProfile } from "@/features/account/account-profile"
 
 /** Compact header height in px — single source for layout maths in child pages. */
 export const FOCUSED_SHELL_HEADER_HEIGHT = 52
@@ -8,9 +10,7 @@ export const FOCUSED_SHELL_HEADER_HEIGHT = 52
 interface FocusedShellProps {
   /** Short product/role name shown next to the logo. */
   title: string
-  userName: string
-  userInitials: string
-  roleLabel: string
+  account: AccountProfile
   /** Optional role-specific navigation rendered beside the title. */
   headerNavigation?: ReactNode
   /** Optional content pinned to the true center of the header. */
@@ -26,7 +26,7 @@ interface FocusedShellProps {
  * a profile slot plus a scroll-contained main area. Presentation only — role-specific
  * routing and business logic live in the wrapping shell.
  */
-export function FocusedShell({ title, userName, userInitials, roleLabel, headerNavigation, headerCenter, headerHeight = FOCUSED_SHELL_HEADER_HEIGHT, children }: FocusedShellProps) {
+export function FocusedShell({ title, account, headerNavigation, headerCenter, headerHeight = FOCUSED_SHELL_HEADER_HEIGHT, children }: FocusedShellProps) {
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-slate-50">
       <header
@@ -41,15 +41,7 @@ export function FocusedShell({ title, userName, userInitials, roleLabel, headerN
 
         <div className="flex items-center justify-center">{headerCenter}</div>
 
-        <div className="flex min-w-0 items-center justify-end gap-2">
-          <div className="hidden min-w-0 text-right leading-tight sm:block">
-            <p className="truncate text-xs font-semibold text-slate-900">{userName}</p>
-            <p className="truncate text-[11px] text-slate-500">{roleLabel}</p>
-          </div>
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
-            {userInitials}
-          </div>
-        </div>
+        <div className="flex min-w-0 items-center justify-end"><AccountMenu profile={account} /></div>
       </header>
 
       <main className="min-h-0 flex-1 overflow-hidden">

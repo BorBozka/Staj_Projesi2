@@ -16,6 +16,7 @@ import { lazy, Suspense, useCallback, useEffect, useState } from "react"
 import { NavLink, Outlet, useLocation } from "react-router-dom"
 
 import bplasLogo from "@/assets/bplas-logo.svg"
+import { AccountMenu } from "@/components/account/AccountMenu"
 import {
   Dialog,
   DialogContent,
@@ -26,6 +27,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { startMinuteClock } from "@/features/manager/manager-clock"
+import { currentAccountProfiles } from "@/features/account/account-profile"
 import { ManagerRefreshProvider } from "@/features/manager/manager-refresh-context"
 import { getSavedReportsHref } from "@/features/reports/reports-filters"
 import { getVisiblePendingInvitationVisits } from "@/features/visits/invitation-status"
@@ -65,6 +67,7 @@ export function ManagerShell({ role = "MANAGER" }: { role?: Extract<ApplicationR
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [refreshVersion, setRefreshVersion] = useState(0)
   const { reload } = useVisits()
+  const account = isAdmin ? currentAccountProfiles.admin : currentAccountProfiles.manager
 
   useEffect(() => {
     window.sessionStorage.setItem(`${role.toLowerCase()}-navigation-collapsed`, String(collapsed))
@@ -105,6 +108,7 @@ export function ManagerShell({ role = "MANAGER" }: { role?: Extract<ApplicationR
           >
             <Menu />
           </Button>
+          <AccountMenu profile={account} className="ml-auto" />
         </header>
 
         <main className="mx-auto w-full max-w-[1440px] min-w-0 px-4 py-2.5 md:px-5 md:py-3 lg:px-6"><Outlet /></main>
@@ -142,7 +146,7 @@ function ManagerSidebar({ collapsed, onCollapsedChange, role, basePath }: { coll
         onClick={(event) => { if (event.target === event.currentTarget) onCollapsedChange(!collapsed) }}
       >
         <ManagerNotifications collapsed={collapsed} />
-        <ManagerProfile collapsed={collapsed} role={role} onToggleCollapsed={() => onCollapsedChange(!collapsed)} />
+        <ManagerProfile collapsed={collapsed} role={role} />
       </div>
     </aside>
   )
@@ -251,38 +255,8 @@ function InvitationNotificationStatus({ status }: { status: InvitationStatus }) 
   return <span className={cn("mt-1 inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium", statusClass)}>{statusContent}</span>
 }
 
-function ManagerProfile({ collapsed = false, role = "MANAGER", onToggleCollapsed }: { collapsed?: boolean; role?: "MANAGER" | "ADMIN"; onToggleCollapsed?(): void }) {
-  const title = role === "ADMIN" ? "Admin" : "Yönetici"
-  const profileContent = <>
-    <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">AB</div>
-    <div aria-hidden={collapsed} className={cn("min-w-0 shrink-0 leading-tight transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-none", collapsed ? "translate-x-1 opacity-0" : "translate-x-0 opacity-100 delay-100")}>
-        <p className="truncate text-sm font-semibold text-white">Atahan Bozkurt</p>
-        <p className="mt-0.5 truncate text-xs text-slate-400">{title}</p>
-    </div>
-  </>
-  const profileClassName = "flex min-w-0 items-center gap-2.5 rounded-md px-1 py-2"
-
-  if (onToggleCollapsed) return (
-    <button
-      type="button"
-      className={`${profileClassName} w-full cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500`}
-      onClick={onToggleCollapsed}
-      aria-label={`Oturum açan kullanıcı: Atahan Bozkurt, ${title}. Menüyü ${collapsed ? "genişlet" : "daralt"}`}
-      title={collapsed ? `Atahan Bozkurt · ${title}` : undefined}
-    >
-      {profileContent}
-    </button>
-  )
-
-  return (
-    <div
-      className="flex min-w-0 items-center gap-2.5 rounded-md px-1 py-2"
-      aria-label={`Oturum açan kullanıcı: Atahan Bozkurt, ${title}`}
-      title={collapsed ? `Atahan Bozkurt · ${title}` : undefined}
-    >
-      {profileContent}
-    </div>
-  )
+function ManagerProfile({ collapsed = false, role = "MANAGER" }: { collapsed?: boolean; role?: "MANAGER" | "ADMIN" }) {
+  return <AccountMenu variant="sidebar" collapsed={collapsed} profile={role === "ADMIN" ? currentAccountProfiles.admin : currentAccountProfiles.manager} className="w-full" />
 }
 
 function ManagerMobileNavigation({ open, onOpenChange, role, basePath }: { open: boolean; onOpenChange(open: boolean): void; role: "MANAGER" | "ADMIN"; basePath: string }) {
