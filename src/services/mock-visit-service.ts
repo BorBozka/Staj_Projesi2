@@ -281,7 +281,7 @@ export class MockVisitService implements VisitService {
 
   createUnplannedCheckedInVisit(input: {
     firstName: string; lastName: string; company: string; hostEmployeeName: string; visitTypeId: string
-    phone?: string; vehiclePlate?: string; plannedStart: string; plannedEnd: string; creatorEmployeeId: string
+    vehiclePlate?: string; plannedStart: string; plannedEnd: string; creatorEmployeeId: string
     hostCompanyId: string; facilityId: string; visitorCardId: string; visitorCardNumber: string
     ruleAcceptance: VisitRecord["ruleAcceptance"]
   }): Visit {
@@ -313,7 +313,7 @@ export class MockVisitService implements VisitService {
     const visit: VisitRecord = {
       id: `v-${crypto.randomUUID()}`,
       meetingId: meeting.id,
-      visitor: { id: `visitor-${crypto.randomUUID()}`, firstName: input.firstName, lastName: input.lastName, company: input.company, phone: input.phone },
+      visitor: { id: `visitor-${crypto.randomUUID()}`, firstName: input.firstName, lastName: input.lastName, company: input.company },
       status: "CHECKED_IN",
       actualCheckIn: now,
       visitorCardId: input.visitorCardId,

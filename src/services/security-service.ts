@@ -20,7 +20,6 @@ export interface CreateUnplannedVisitInput {
   company: string
   hostEmployeeName: string
   visitTypeId: string
-  phone?: string
   vehiclePlate?: string
   durationMinutes: number
   visitorCardId: string

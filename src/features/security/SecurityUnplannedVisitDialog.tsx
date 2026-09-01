@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select } from "@/components/ui/select"
 import type { Visit, VisitTypeOption } from "@/domain/visits"
-import { formatLocalVisitorPhone, normalizeVisitorPhone } from "@/lib/phone"
 import { securityService } from "@/services"
 import { DEFAULT_UNPLANNED_DURATION_MINUTES, getUnplannedDurationError, unplannedDurationOptions } from "./unplanned-visit-utils"
 
@@ -18,7 +17,7 @@ interface SecurityUnplannedVisitDialogProps {
   visitTypes: VisitTypeOption[]
 }
 
-const emptyDraft = () => ({ firstName: "", lastName: "", company: "", hostEmployeeName: "", visitTypeId: "", phone: "", vehiclePlate: "", durationMinutes: String(DEFAULT_UNPLANNED_DURATION_MINUTES), customDurationHours: "", visitorCardId: "", rulesAccepted: false })
+const emptyDraft = () => ({ firstName: "", lastName: "", company: "", hostEmployeeName: "", visitTypeId: "", vehiclePlate: "", durationMinutes: String(DEFAULT_UNPLANNED_DURATION_MINUTES), customDurationHours: "", visitorCardId: "", rulesAccepted: false })
 
 export function SecurityUnplannedVisitDialog({ open, onOpenChange, onCreated, scope, visitTypes }: SecurityUnplannedVisitDialogProps) {
   const [draft, setDraft] = useState(emptyDraft)
@@ -64,7 +63,6 @@ export function SecurityUnplannedVisitDialog({ open, onOpenChange, onCreated, sc
         company: draft.company,
         hostEmployeeName: draft.hostEmployeeName,
         visitTypeId: draft.visitTypeId,
-        phone: draft.phone.trim() ? normalizeVisitorPhone(draft.phone) : undefined,
         vehiclePlate: draft.vehiclePlate,
         durationMinutes: Number(draft.durationMinutes),
         visitorCardId: draft.visitorCardId,
@@ -93,7 +91,6 @@ export function SecurityUnplannedVisitDialog({ open, onOpenChange, onCreated, sc
           <Field label="Firma / Kurum" required><Input value={draft.company} onChange={(event) => update("company", event.target.value)} /></Field>
           <Field label="Ev sahibi / ilgili personel" required><Input value={draft.hostEmployeeName} onChange={(event) => update("hostEmployeeName", event.target.value)} /></Field>
           <Field label="Ziyaret türü" required><Select value={draft.visitTypeId} onChange={(event) => update("visitTypeId", event.target.value)}><option value="">Seçin</option>{activeVisitTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}</Select></Field>
-          <Field label="Telefon"><Input type="tel" placeholder="05XX XXX XX XX" value={draft.phone} onChange={(event) => update("phone", formatLocalVisitorPhone(event.target.value))} /></Field>
           <Field label="Plaka"><Input value={draft.vehiclePlate} onChange={(event) => update("vehiclePlate", event.target.value)} /></Field>
         </div>
         <fieldset className="space-y-1">

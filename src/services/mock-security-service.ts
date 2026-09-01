@@ -43,7 +43,7 @@ export class MockSecurityService implements SecurityService {
     const plannedEnd = new Date(checkedInAt.getTime() + input.durationMinutes * 60_000).toISOString()
     const visit = this.visitService.createUnplannedCheckedInVisit({
       firstName, lastName, company, hostEmployeeName, visitTypeId: input.visitTypeId.trim(),
-      phone: input.phone?.trim() || undefined, vehiclePlate: normalizeVehiclePlate(input.vehiclePlate),
+      vehiclePlate: normalizeVehiclePlate(input.vehiclePlate),
       plannedStart, plannedEnd, creatorEmployeeId: input.creatorEmployeeId,
       hostCompanyId: input.companyId, facilityId: input.facilityId,
       visitorCardId: card.id, visitorCardNumber: card.cardNumber,

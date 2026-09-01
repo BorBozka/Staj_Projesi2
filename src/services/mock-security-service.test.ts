@@ -187,7 +187,7 @@ describe("MockSecurityService createAndCheckInUnplannedVisit", () => {
 
   const input = {
     firstName: "Aylin", lastName: "Yıldız", company: "Örnek A.Ş.", hostEmployeeName: "Serbest Metin Ev Sahibi",
-    visitTypeId: "supplier", phone: "+90 530 555 18 24", vehiclePlate: "34 abc 123", durationMinutes: 90,
+    visitTypeId: "supplier", vehiclePlate: "34 abc 123", durationMinutes: 90,
     visitorCardId: "card-1", rulesAccepted: true, companyId: "bplas", facilityId: "bplas-merkez", creatorEmployeeId: "security-desk-1",
   }
 
@@ -214,6 +214,7 @@ describe("MockSecurityService createAndCheckInUnplannedVisit", () => {
     expect(created.creatorEmployeeId).toBe("security-desk-1")
     expect(created.hostEmployeeId).toBe("")
     expect(created.invitationStatus).toBe("NOT_SENT")
+    expect(created.visitor.phone).toBeUndefined()
     expect(created.ruleAcceptance).toMatchObject({ method: "SECURITY_DESK", ruleId: "rule-2", ruleVersion: 2 })
     expect(cardStore.get("card-1")).toMatchObject({ status: "IN_USE", assignedVisitId: created.id })
     expect((await visitService.listVisits()).find((visit) => visit.id === created.id)?.invitationSentAt).toBeUndefined()
