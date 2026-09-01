@@ -53,6 +53,7 @@ export function MyVisitsPage() {
   if (isLoading) return <PageSkeleton />
 
   const ownVisits = getOwnVisits(visits, referenceData?.currentEmployee.employeeId)
+  const isEmployeeView = location.pathname.startsWith("/employee/")
   const isManagerView = location.pathname.startsWith("/manager/") || location.pathname.startsWith("/admin/")
 
   return (
@@ -70,7 +71,7 @@ export function MyVisitsPage() {
         </div>
       )}
 
-      <div className={"mb-[14px] grid gap-3 xl:mb-0 xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_320px] " + (isManagerView ? "xl:h-[calc(111.112dvh-27.5556px)]" : "xl:h-[calc(100dvh-76px)]")}>
+      <div className={"mb-[14px] grid gap-3 xl:mb-0 xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_320px] " + (isManagerView ? "xl:h-[calc(111.112dvh-27.5556px)]" : "xl:h-[calc(100dvh-76px)]") + (isEmployeeView ? " xl:[zoom:0.9] xl:h-[calc((100dvh-76px)/0.9)]" : "")}>
         <VisitTimeline
           visits={ownVisits}
           view={view}
