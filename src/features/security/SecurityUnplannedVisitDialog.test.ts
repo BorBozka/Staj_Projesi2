@@ -8,7 +8,7 @@ describe("SecurityUnplannedVisitDialog contract", () => {
   it("keeps the desk form compact and only exposes the approved fields", () => {
     expect(source).toContain("Ad")
     expect(source).toContain("Soyad")
-    expect(source).toContain("Firma")
+    expect(source).toContain("Firma / Kurum")
     expect(source).toContain("Ev sahibi / ilgili personel")
     expect(source).toContain("Ziyaret türü")
     expect(source).toContain("Telefon")
@@ -17,6 +17,10 @@ describe("SecurityUnplannedVisitDialog contract", () => {
     expect(source).not.toContain("Başlangıç")
     expect(source).not.toContain("Şirket seç")
     expect(source).not.toContain("Tesis seç")
+    expect(source).toContain("Ziyaretçi bilgilerini girerek giriş kaydını oluşturun.")
+    expect(source).not.toContain("Giriş zamanı şimdi alınır")
+    expect(source).not.toContain("Varsayılanı değiştirmeniz gerekmez")
+    expect(source).not.toContain("Kural sürümü")
   })
 
   it("uses active types, AVAILABLE cards, local-phone formatting, default duration, and required desk acceptance", () => {
@@ -28,6 +32,8 @@ describe("SecurityUnplannedVisitDialog contract", () => {
     expect(source).toContain("DEFAULT_UNPLANNED_DURATION_MINUTES")
     expect(source).toContain("Ziyaretçi kuralları okudu ve kabul etti")
     expect(source).toContain("rulesAccepted")
+    expect(source).toContain('aria-label="Özel süre"')
+    expect(source).toContain("saat")
   })
 
   it("prevents duplicate submits and uses the one SecurityService desk action", () => {
