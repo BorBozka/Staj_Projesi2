@@ -52,9 +52,10 @@ describe("SecurityOperationsPage contract", () => {
     expect(pageSource).not.toContain("LOST")
   })
 
-  it("keeps unplanned visits gated and stays off Manager/Admin UI", () => {
+  it("opens unplanned visits from Security while staying off Manager/Admin UI", () => {
     expect(pageSource).toContain("+ Plansız ziyaret")
-    expect(pageSource).toContain("disabled aria-describedby")
+    expect(pageSource).toContain("SecurityUnplannedVisitDialog")
+    expect(pageSource).toContain("setUnplannedVisitOpen(true)")
     expect(pageSource).not.toContain('from "@/features/manager/')
     expect(pageSource).not.toContain("adminService")
   })

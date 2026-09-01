@@ -366,13 +366,23 @@ Rescheduling may retain the same visit identity/QR.
 ## 13. Unplanned Visit
 
 1. Visitor arrives at security.
-2. Security creates visit.
+2. Security creates one unplanned Meeting and one Visit from the Security user's current
+   company/facility scope; company, facility, planned start and invitation controls are not
+   selected or shown at the desk.
 3. Security may phone host employee.
-4. Visitor data is completed.
-5. Rules are shown at security desk.
-6. Visitor explicitly accepts rules.
-7. Security assigns visitor card.
-8. Security checks visitor in.
+4. Security records required name, surname, visitor company, a free-text host/person name,
+   and an active visit type; phone and plate are optional.
+5. Security uses the current time for both planned start and actual check-in. Planned end is
+   calculated from a default one-hour estimate, with 30-minute, 1-hour, 2-hour, 4-hour and
+   positive whole-minute custom durations available.
+6. Rules are shown at the security desk. Security records the active rule/version snapshot only
+   after confirming that the visitor read and explicitly accepted it.
+7. Security assigns an `AVAILABLE` visitor card.
+8. One `Kaydet ve giriş yap` operation creates the Visit directly as `CHECKED_IN`, records the
+   `SECURITY_DESK` rule acceptance, moves the card to `IN_USE`, and does not send an invitation.
+
+An unplanned free-text host does not receive a fabricated employee identity. The display name is
+stored, while host-only lifecycle permission remains unavailable until a real employee link exists.
 
 No internal digital approval workflow is required.
 

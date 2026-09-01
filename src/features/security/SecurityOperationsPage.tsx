@@ -7,6 +7,7 @@ import type { Visit } from "@/domain/visits"
 import { SecurityCheckInDialog } from "@/features/security/SecurityCheckInDialog"
 import { SecurityCheckOutDialog } from "@/features/security/SecurityCheckOutDialog"
 import { SecurityPendingCardReturnsDialog } from "@/features/security/SecurityPendingCardReturnsDialog"
+import { SecurityUnplannedVisitDialog } from "@/features/security/SecurityUnplannedVisitDialog"
 import { formatTr } from "@/lib/date"
 import { cn } from "@/lib/utils"
 import { useVisits } from "@/features/visits/visit-context"
@@ -28,6 +29,7 @@ export function SecurityOperationsPage() {
   const [checkOutTarget, setCheckOutTarget] = useState<Visit | null>(null)
   const [cardIssues, setCardIssues] = useState<SecurityCardIssue[]>([])
   const [cardReturnsOpen, setCardReturnsOpen] = useState(false)
+  const [unplannedVisitOpen, setUnplannedVisitOpen] = useState(false)
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setNow(new Date()), 30_000)
@@ -99,8 +101,7 @@ export function SecurityOperationsPage() {
           </Button>
         )}
 
-        <Button type="button" className="h-9 shrink-0" disabled aria-describedby="unplanned-visit-note">+ Plansız ziyaret</Button>
-        <span id="unplanned-visit-note" className="sr-only">Plansız ziyaret işlemi sonraki aşamada kullanıma açılacaktır.</span>
+        <Button type="button" className="h-9 shrink-0" disabled={!scope} onClick={() => setUnplannedVisitOpen(true)}>+ Plansız ziyaret</Button>
       </div>
 
       <div className="grid min-h-0 flex-1 gap-3 overflow-hidden grid-rows-2 lg:grid-cols-2 lg:grid-rows-1">
@@ -141,6 +142,13 @@ export function SecurityOperationsPage() {
         onOpenChange={(next) => { if (!next) setCheckOutTarget(null) }}
         onCheckedOut={() => { setCheckOutTarget(null); void reload() }}
       />
+      {scope && referenceData && <SecurityUnplannedVisitDialog
+        open={unplannedVisitOpen}
+        onOpenChange={setUnplannedVisitOpen}
+        onCreated={() => { void reload() }}
+        scope={{ companyId: scope.companyId, facilityId: scope.facilityId, creatorEmployeeId: referenceData.currentEmployee.employeeId }}
+        visitTypes={referenceData.visitTypes}
+      />}
     </div>
   )
 }

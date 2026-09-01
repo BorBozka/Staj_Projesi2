@@ -272,9 +272,9 @@ describe("MockAdminService other admin resources", () => {
     const before = await service.getVisitorCards()
     const operational = before.find((card) => card.status === "IN_USE")!
     const available = before.find((card) => card.status === "AVAILABLE")!
-    await service.updateVisitorCardInventory(available.id, { cardNumber: "010", active: false })
+    await service.updateVisitorCardInventory(available.id, { cardNumber: "099", active: false })
     const after = await service.getVisitorCards()
     expect(after.find((card) => card.id === operational.id)).toEqual(operational)
-    expect(after.find((card) => card.id === available.id)).toMatchObject({ cardNumber: "010", status: "DISABLED" })
+    expect(after.find((card) => card.id === available.id)).toMatchObject({ cardNumber: "099", status: "DISABLED" })
   })
 })

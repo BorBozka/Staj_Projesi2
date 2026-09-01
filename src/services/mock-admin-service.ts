@@ -25,6 +25,7 @@ import type { AdminService, SaveAdminUserOptions } from "@/services/admin-servic
 import { MockOrganizationStore } from "@/services/mock-organization-store"
 import { MockVisitTypeStore } from "@/services/mock-visit-type-store"
 import { MockVisitorCardStore } from "@/services/mock-visitor-card-store"
+import { MockVisitorRuleStore } from "@/services/mock-visitor-rule-store"
 
 const clone = <T,>(value: T): T => structuredClone(value)
 const id = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 9)}`
@@ -37,7 +38,6 @@ export class MockAdminService implements AdminService {
     { id: "user-4", fullName: "Orhan Yalçın", username: "orhan.yalcin", email: "orhan.yalcin@bplas.com", authenticationSource: "LOCAL", role: "EMPLOYEE", authorizationScope: { companyIds: ["bplas-otomotiv"], facilityIds: [], securityGateIds: [] }, active: false },
     { id: "user-5", fullName: "Deniz Acar", username: "deniz.acar", email: "deniz.acar@bplas.com", authenticationSource: "ACTIVE_DIRECTORY", role: "EMPLOYEE", authorizationScope: { companyIds: ["bplas"], facilityIds: [], securityGateIds: [] }, active: true },
   ]
-  private rules: VisitorRuleVersion[]
   private settings: OperationalSettings = { overdueToleranceMinutes: DEFAULT_OVERDUE_TOLERANCE_MINUTES, overdueAlertRepeatMinutes: 10 }
 
   constructor(
@@ -45,7 +45,8 @@ export class MockAdminService implements AdminService {
     initialRules: VisitorRuleVersion[] = [{ id: "rule-2", version: 2, content: "Ziyaretçiler tesis güvenlik kurallarına ve yönlendirmelerine uymayı kabul eder.", publishedAt: "2026-08-01T09:30:00.000Z", active: true }, { id: "rule-1", version: 1, content: "Ziyaretçiler tesis kurallarına uyacağını kabul eder.", publishedAt: "2026-02-01T09:20:00.000Z", active: false }],
     private readonly visitTypeStore = new MockVisitTypeStore(),
     private readonly cardStore: MockVisitorCardStore = new MockVisitorCardStore(),
-  ) { this.rules = clone(initialRules) }
+    private readonly ruleStore: MockVisitorRuleStore = new MockVisitorRuleStore(initialRules),
+  ) {}
 
   async getUsers() { return clone(this.users) }
   async saveUser(input: Omit<AdminUser, "id"> & { id?: string }, options: SaveAdminUserOptions = {}) {
@@ -117,16 +118,8 @@ export class MockAdminService implements AdminService {
     const entity: VisitorCardInventoryItem = { id: existing.id, cardNumber: existing.cardNumber, status: "AVAILABLE" }
     return this.cardStore.replace(existing.id, entity)
   }
-  async getVisitorRuleVersions() { return clone(this.rules) }
-  async publishVisitorRule(content: string) {
-    const normalizedContent = content.trim()
-    if (!normalizedContent) throw new Error("Ziyaretçi kuralı boş bırakılamaz.")
-    const nextVersion = this.rules.reduce((maximum, item) => Math.max(maximum, item.version), 0) + 1
-    const now = new Date().toISOString()
-    const next: VisitorRuleVersion = { id: id("rule"), version: nextVersion, content: normalizedContent, publishedAt: now, active: true }
-    this.rules = [next, ...this.rules.map((item) => ({ ...item, active: false }))]
-    return clone(next)
-  }
+  async getVisitorRuleVersions() { return this.ruleStore.getAll() }
+  async publishVisitorRule(content: string) { return this.ruleStore.publish(content) }
   async getOperationalSettings() { return clone(this.settings) }
   async saveOperationalSettings(settings: OperationalSettings) {
     if (!isOperationalSettingsValid(settings)) throw new Error("Operasyon parametreleri geçersiz.")

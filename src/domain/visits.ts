@@ -54,6 +54,9 @@ export interface MeetingDetails {
   creatorEmployeeId: string
   visitTypeId: string
   visitTypeName: string
+  // A planned Meeting links its host to an employee. A security-desk unplanned visit that has
+  // only a confirmed free-text host name stores "" here: it is deliberately not a fabricated
+  // employee identifier and therefore grants no host-scoped lifecycle permission.
   hostEmployeeId: string
   hostEmployeeName: string
   hostCompanyId: string
@@ -110,6 +113,9 @@ export interface VisitRecord {
   visitorCardId?: string
   visitorCardNumber?: string
   vehiclePlate?: string
+  // Immutable snapshot of the active rule version accepted for this individual visit.
+  // The content snapshot keeps later rule publications from changing historical evidence.
+  ruleAcceptance?: VisitorRuleAcceptance
   // Security gate host-name correction audit. Set only when a gate correction changes the
   // displayed host name (hostEmployeeName); the linked hostEmployeeId is intentionally left
   // untouched. hostCorrectedBy is the acting security employee's name.
@@ -123,6 +129,14 @@ export interface VisitRecord {
   createdAt: string
   updatedAt: string
   cancelledAt?: string
+}
+
+export interface VisitorRuleAcceptance {
+  ruleId: string
+  ruleVersion: number
+  acceptedAt: string
+  method: "INVITATION_LINK" | "SECURITY_DESK"
+  contentSnapshot: string
 }
 
 // Read model used by existing visitor-based screens. Shared fields are projected from

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 import type { MeetingInput } from "@/domain/visits"
 import type { VisitorCardInventoryItem, VisitorCardStatus } from "@/domain/admin"
@@ -6,6 +6,8 @@ import { MockAdminService } from "@/services/mock-admin-service"
 import { MockSecurityService } from "@/services/mock-security-service"
 import { MockVisitService } from "@/services/mock-visit-service"
 import { MockVisitorCardStore } from "@/services/mock-visitor-card-store"
+import { MockVisitorRuleStore } from "@/services/mock-visitor-rule-store"
+import { getInsideSecurityVisits } from "@/features/security/security-operations"
 
 const meetingInput: MeetingInput = {
   visitors: [{ firstName: "Test", lastName: "Ziyaretci", email: "test@example.com", company: "Test A.Ş." }],
@@ -177,6 +179,56 @@ describe("MockSecurityService checkInVisit", () => {
     const noShow = (await visitService.listVisits()).find((visit) => visit.status === "NO_SHOW")!
 
     await expect(security.checkInVisit({ visitId: noShow.id, visitorCardId: "card-1" })).rejects.toThrow("planlanmış ziyaretler")
+  })
+})
+
+describe("MockSecurityService createAndCheckInUnplannedVisit", () => {
+  afterEach(() => vi.useRealTimers())
+
+  const input = {
+    firstName: "Aylin", lastName: "Yıldız", company: "Örnek A.Ş.", hostEmployeeName: "Serbest Metin Ev Sahibi",
+    visitTypeId: "supplier", phone: "+90 530 555 18 24", vehiclePlate: "34 abc 123", durationMinutes: 90,
+    visitorCardId: "card-1", rulesAccepted: true, companyId: "bplas", facilityId: "bplas-merkez", creatorEmployeeId: "security-desk-1",
+  }
+
+  it("validates every required desk input and rule acceptance", async () => {
+    const { security } = setup()
+    await expect(security.createAndCheckInUnplannedVisit({ ...input, firstName: " " })).rejects.toThrow("Ad zorunludur")
+    await expect(security.createAndCheckInUnplannedVisit({ ...input, rulesAccepted: false })).rejects.toThrow("kuralları kabul")
+    await expect(security.createAndCheckInUnplannedVisit({ ...input, durationMinutes: 0 })).rejects.toThrow("pozitif")
+  })
+
+  it("uses the Security scope, sets exact check-in/planned-end times, and never sends an invitation", async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date("2026-09-01T08:00:00.000Z"))
+    const { cardStore, visitService, security } = setup()
+
+    const created = await security.createAndCheckInUnplannedVisit(input)
+
+    expect(created.status).toBe("CHECKED_IN")
+    expect(created.actualCheckIn).toBe("2026-09-01T08:00:00.000Z")
+    expect(created.plannedStart).toBe("2026-09-01T08:00:00.000Z")
+    expect(created.plannedEnd).toBe("2026-09-01T09:30:00.000Z")
+    expect(created.hostCompanyId).toBe("bplas")
+    expect(created.facilityId).toBe("bplas-merkez")
+    expect(created.creatorEmployeeId).toBe("security-desk-1")
+    expect(created.hostEmployeeId).toBe("")
+    expect(created.invitationStatus).toBe("NOT_SENT")
+    expect(created.ruleAcceptance).toMatchObject({ method: "SECURITY_DESK", ruleId: "rule-2", ruleVersion: 2 })
+    expect(cardStore.get("card-1")).toMatchObject({ status: "IN_USE", assignedVisitId: created.id })
+    expect((await visitService.listVisits()).find((visit) => visit.id === created.id)?.invitationSentAt).toBeUndefined()
+    expect(getInsideSecurityVisits(await visitService.listVisits(), new Date("2026-09-01T08:01:00.000Z")).map((row) => row.visit.id)).toContain(created.id)
+  })
+
+  it("rejects a non-AVAILABLE card even when a caller bypasses the dialog", async () => {
+    const { security } = setup([{ id: "card-1", cardNumber: "001", status: "IN_USE" }])
+    await expect(security.createAndCheckInUnplannedVisit(input)).rejects.toThrow("kullanılabilir değil")
+  })
+
+  it("requires an active Admin-published rule version", async () => {
+    const cardStore = new MockVisitorCardStore([{ id: "card-1", cardNumber: "001", status: "AVAILABLE" }])
+    const security = new MockSecurityService(cardStore, new MockVisitService(), new MockVisitorRuleStore([]))
+    await expect(security.createAndCheckInUnplannedVisit(input)).rejects.toThrow("Aktif ziyaretçi kuralı")
   })
 })
 

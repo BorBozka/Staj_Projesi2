@@ -1,17 +1,56 @@
-import type { VisitorCardInventoryItem } from "@/domain/admin"
+import type { VisitorCardInventoryItem, VisitorRuleVersion } from "@/domain/admin"
 import { isValidVisitorEmail, normalizeVehiclePlate, normalizeVisitorEmail, type Visit } from "@/domain/visits"
 import type { MockVisitService } from "@/services/mock-visit-service"
 import type { MockVisitorCardStore } from "@/services/mock-visitor-card-store"
-import type { SecurityCardIssue, SecurityCheckInInput, SecurityCheckOutInput, SecurityService, SecurityVisitorCorrectionInput } from "@/services/security-service"
+import { MockVisitorRuleStore } from "@/services/mock-visitor-rule-store"
+import type { CreateUnplannedVisitInput, SecurityCardIssue, SecurityCheckInInput, SecurityCheckOutInput, SecurityService, SecurityVisitorCorrectionInput } from "@/services/security-service"
 
 export class MockSecurityService implements SecurityService {
   constructor(
     private readonly cardStore: MockVisitorCardStore,
     private readonly visitService: MockVisitService,
+    private readonly ruleStore: MockVisitorRuleStore = new MockVisitorRuleStore(),
   ) {}
 
   async getAvailableVisitorCards(): Promise<VisitorCardInventoryItem[]> {
     return this.cardStore.list().filter((card) => card.status === "AVAILABLE")
+  }
+
+  async getActiveVisitorRule(): Promise<VisitorRuleVersion | null> {
+    return this.ruleStore.getActive()
+  }
+
+  async createAndCheckInUnplannedVisit(input: CreateUnplannedVisitInput): Promise<Visit> {
+    const firstName = input.firstName.trim()
+    const lastName = input.lastName.trim()
+    const company = input.company.trim()
+    const hostEmployeeName = input.hostEmployeeName.trim()
+    if (!firstName) throw new Error("Ad zorunludur.")
+    if (!lastName) throw new Error("Soyad zorunludur.")
+    if (!company) throw new Error("Ziyaretçi şirketi zorunludur.")
+    if (!hostEmployeeName) throw new Error("Ev sahibi zorunludur.")
+    if (!Number.isInteger(input.durationMinutes) || input.durationMinutes <= 0) throw new Error("Tahmini süre pozitif bir tam sayı dakika olmalıdır.")
+    if (!input.rulesAccepted) throw new Error("Ziyaretçi kuralları kabul edilmelidir.")
+
+    const card = this.cardStore.get(input.visitorCardId)
+    if (!card) throw new Error("Ziyaretçi kartı bulunamadı.")
+    if (card.status !== "AVAILABLE") throw new Error("Seçilen kart şu anda kullanılabilir değil.")
+    const rule = this.ruleStore.getActive()
+    if (!rule) throw new Error("Aktif ziyaretçi kuralı bulunamadı.")
+
+    const checkedInAt = new Date()
+    const plannedStart = checkedInAt.toISOString()
+    const plannedEnd = new Date(checkedInAt.getTime() + input.durationMinutes * 60_000).toISOString()
+    const visit = this.visitService.createUnplannedCheckedInVisit({
+      firstName, lastName, company, hostEmployeeName, visitTypeId: input.visitTypeId.trim(),
+      phone: input.phone?.trim() || undefined, vehiclePlate: normalizeVehiclePlate(input.vehiclePlate),
+      plannedStart, plannedEnd, creatorEmployeeId: input.creatorEmployeeId,
+      hostCompanyId: input.companyId, facilityId: input.facilityId,
+      visitorCardId: card.id, visitorCardNumber: card.cardNumber,
+      ruleAcceptance: { ruleId: rule.id, ruleVersion: rule.version, acceptedAt: plannedStart, method: "SECURITY_DESK", contentSnapshot: rule.content },
+    })
+    this.cardStore.replace(card.id, { ...card, status: "IN_USE", assignedVisitId: visit.id, assignedVisitorName: `${visit.visitor.firstName} ${visit.visitor.lastName}` })
+    return visit
   }
 
   async checkInVisit(input: SecurityCheckInInput): Promise<Visit> {

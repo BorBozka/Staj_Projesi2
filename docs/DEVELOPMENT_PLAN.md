@@ -25,6 +25,36 @@ Mock data must be provided through replaceable service boundaries.
 
 ---
 
+## Current Closure Sequence
+
+Security Operations UI/polish is **complete**. The `Expected` and `Inside` operational
+workspace, gate correction, check-in/check-out and card-return flows are frozen except for
+targeted defects.
+
+The closure order is fixed as follows:
+
+1. **Unplanned visit** — complete: Security creates and immediately checks in a one-visitor
+   visit from the current company/facility scope, with an available card and desk rule
+   acceptance.
+2. **Security Goods Movements** — pending.
+3. **Authentication UI** — pending:
+   - shared `/login`,
+   - role-based redirect,
+   - logout,
+   - avatar/account menu,
+   - profile photo update,
+   - password change for `LOCAL` users.
+4. **Backend + database** — pending.
+5. **Local + Active Directory authentication** — pending.
+6. **Mock service → real API adaptation** — pending.
+7. **Authorization/scope enforcement** — pending.
+8. **Regression/E2E tests** — pending.
+9. **Final merge/deploy check** — pending.
+
+No item in this order authorizes implementation of a later item without an explicit request.
+
+---
+
 ## Approved Refinement — Meeting–Visit Frontend / Mock Service
 
 Goal:

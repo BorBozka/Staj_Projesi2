@@ -335,6 +335,22 @@ Tabs:
 Main:
 - visitor table.
 
+### Unplanned Visitor Dialog
+
+`+ Plansız ziyaret` opens one compact Security-desk dialog. It contains required first name,
+last name, visitor company, free-text host/person, active visit type, estimated duration,
+available visitor-card selection, and the required `Ziyaretçi kuralları okudu ve kabul etti`
+checkbox. Phone and plate remain optional; phone uses the local `05XX XXX XX XX` entry format.
+
+Estimated duration defaults to one hour. The dialog offers 30 minutes, 1 hour, 2 hours and
+4 hours as fast choices plus a positive whole-minute custom entry. It is presented as a Security
+default rather than as a question that must be asked of the visitor.
+
+The dialog does not show e-mail, company/facility selection, planned start, or invitation state.
+Its sole primary action is `Kaydet ve giriş yap`; it disables repeat submission, renders validation
+and service errors in place, closes after success, and leaves existing search and panel state
+unchanged. The new visitor immediately appears in `İçeride`.
+
 ---
 
 ## 15. Security Visitor Drawer

@@ -279,6 +279,56 @@ export class MockVisitService implements VisitService {
     return clone(this.projectVisit(updated))
   }
 
+  createUnplannedCheckedInVisit(input: {
+    firstName: string; lastName: string; company: string; hostEmployeeName: string; visitTypeId: string
+    phone?: string; vehiclePlate?: string; plannedStart: string; plannedEnd: string; creatorEmployeeId: string
+    hostCompanyId: string; facilityId: string; visitorCardId: string; visitorCardNumber: string
+    ruleAcceptance: VisitRecord["ruleAcceptance"]
+  }): Visit {
+    const reference = this.getReferenceDataSnapshot()
+    const visitType = reference.visitTypes.find((item) => item.id === input.visitTypeId)
+    const company = reference.companies.find((item) => item.id === input.hostCompanyId)
+    const facility = reference.facilities.find((item) => item.id === input.facilityId && item.companyId === input.hostCompanyId)
+    if (!visitType || !company || !facility) throw new Error("Geçersiz Security kapsamı veya ziyaret türü.")
+    if (!visitType.active) throw new Error("Pasif ziyaret türü seçilemez.")
+
+    const now = input.plannedStart
+    const meeting: Meeting = {
+      id: `meeting-${crypto.randomUUID()}`,
+      creatorEmployeeId: input.creatorEmployeeId,
+      visitTypeId: visitType.id,
+      visitTypeName: visitType.name,
+      hostEmployeeId: "",
+      hostEmployeeName: input.hostEmployeeName,
+      hostCompanyId: company.id,
+      hostCompanyName: company.name,
+      facilityId: facility.id,
+      facilityName: facility.name,
+      plannedStart: input.plannedStart,
+      plannedEnd: input.plannedEnd,
+      hasAdditionalRequirements: false,
+      createdAt: now,
+      updatedAt: now,
+    }
+    const visit: VisitRecord = {
+      id: `v-${crypto.randomUUID()}`,
+      meetingId: meeting.id,
+      visitor: { id: `visitor-${crypto.randomUUID()}`, firstName: input.firstName, lastName: input.lastName, company: input.company, phone: input.phone },
+      status: "CHECKED_IN",
+      actualCheckIn: now,
+      visitorCardId: input.visitorCardId,
+      visitorCardNumber: input.visitorCardNumber,
+      vehiclePlate: input.vehiclePlate,
+      ruleAcceptance: input.ruleAcceptance,
+      invitationStatus: "NOT_SENT",
+      createdAt: now,
+      updatedAt: now,
+    }
+    this.meetings = [...this.meetings, meeting]
+    this.visits = [...this.visits, visit]
+    return clone(this.projectVisit(visit))
+  }
+
   applyVisitorCorrection(
     visitId: string,
     correction: { firstName: string; lastName: string; company: string; email?: string; phone?: string; hostEmployeeName?: string; visitTypeId?: string },

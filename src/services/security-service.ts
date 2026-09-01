@@ -1,4 +1,4 @@
-import type { VisitorCardInventoryItem } from "@/domain/admin"
+import type { VisitorCardInventoryItem, VisitorRuleVersion } from "@/domain/admin"
 import type { Visit } from "@/domain/visits"
 
 export interface SecurityCheckInInput {
@@ -12,6 +12,23 @@ export interface SecurityCheckInInput {
 export interface SecurityCheckOutInput {
   visitId: string
   cardReturned: boolean
+}
+
+export interface CreateUnplannedVisitInput {
+  firstName: string
+  lastName: string
+  company: string
+  hostEmployeeName: string
+  visitTypeId: string
+  phone?: string
+  vehiclePlate?: string
+  durationMinutes: number
+  visitorCardId: string
+  rulesAccepted: boolean
+  /** Resolved from Security's current scope rather than chosen in the dialog. */
+  companyId: string
+  facilityId: string
+  creatorEmployeeId: string
 }
 
 export interface SecurityCardIssue {
@@ -43,6 +60,15 @@ export interface SecurityVisitorCorrectionInput {
 export interface SecurityService {
   /** Cards Security can currently hand out — status === AVAILABLE only. */
   getAvailableVisitorCards(): Promise<VisitorCardInventoryItem[]>
+
+  /** The single active Admin-published rule version used by the desk flow. */
+  getActiveVisitorRule(): Promise<VisitorRuleVersion | null>
+
+  /**
+   * Security desk use-case: creates a one-visitor unplanned Meeting/Visit and checks it in
+   * atomically. It never sends an invitation and records SECURITY_DESK rule acceptance.
+   */
+  createAndCheckInUnplannedVisit(input: CreateUnplannedVisitInput): Promise<Visit>
 
   /**
    * Checks a planned visitor into the facility (PLANNED → CHECKED_IN). Rejects any visit not
