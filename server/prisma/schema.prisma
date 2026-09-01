@@ -1,0 +1,476 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id             String   @id @default(cuid()) @db.VarChar(36)
+  name           String   @db.NVarChar(200)
+  nameNormalized String   @db.NVarChar(200)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @db.DateTime2
+  updatedAt      DateTime @updatedAt @db.DateTime2
+
+  facilities           Facility[]
+  departments          Department[]
+  userScopes           UserCompanyScope[]
+  employees            Employee[]
+  hostedMeetings       Meeting[]              @relation("MeetingHostCompany")
+  resources            Resource[]
+  transportAssignments TransportAssignment[]
+  goodsMovements       GoodsMovement[]
+
+  @@unique([nameNormalized], map: "Company_nameNormalized_key")
+}
+
+model Facility {
+  id             String   @id @default(cuid()) @db.VarChar(36)
+  companyId      String   @db.VarChar(36)
+  name           String   @db.NVarChar(200)
+  nameNormalized String   @db.NVarChar(200)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @db.DateTime2
+  updatedAt      DateTime @updatedAt @db.DateTime2
+
+  company              Company                     @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  securityGates        SecurityGate[]
+  userScopes           UserFacilityScope[]
+  employeeScopes       EmployeeFacilityScope[]
+  hostedMeetings       Meeting[]                   @relation("MeetingFacility")
+  resources            Resource[]
+  transportAssignments TransportAssignment[]
+  goodsMovements       GoodsMovement[]
+
+  @@unique([companyId, nameNormalized], map: "Facility_companyId_nameNormalized_key")
+  @@index([companyId])
+}
+
+model Department {
+  id             String   @id @default(cuid()) @db.VarChar(36)
+  companyId      String   @db.VarChar(36)
+  name           String   @db.NVarChar(200)
+  nameNormalized String   @db.NVarChar(200)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @db.DateTime2
+  updatedAt      DateTime @updatedAt @db.DateTime2
+
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees Employee[]
+
+  @@unique([companyId, nameNormalized], map: "Department_companyId_nameNormalized_key")
+  @@index([companyId])
+}
+
+model SecurityGate {
+  id             String   @id @default(cuid()) @db.VarChar(36)
+  facilityId     String   @db.VarChar(36)
+  name           String   @db.NVarChar(200)
+  nameNormalized String   @db.NVarChar(200)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @db.DateTime2
+  updatedAt      DateTime @updatedAt @db.DateTime2
+
+  facility   Facility               @relation(fields: [facilityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  userScopes UserSecurityGateScope[]
+
+  @@unique([facilityId, nameNormalized], map: "SecurityGate_facilityId_nameNormalized_key")
+  @@index([facilityId])
+}
+
+model User {
+  id                String               @id @default(cuid()) @db.VarChar(36)
+  username          String               @db.VarChar(100)
+  usernameNormalized String              @unique(map: "User_usernameNormalized_key") @db.VarChar(100)
+  fullName          String               @db.NVarChar(200)
+  email             String               @db.VarChar(320)
+  emailNormalized   String               @unique(map: "User_emailNormalized_key") @db.VarChar(320)
+  passwordHash      String?              @db.VarChar(255)
+  role              String               @db.VarChar(20)
+  authenticationSource String             @default("LOCAL") @db.VarChar(32)
+  active            Boolean              @default(true)
+  createdAt         DateTime             @default(now()) @db.DateTime2
+  updatedAt         DateTime             @updatedAt @db.DateTime2
+
+  sessions           Session[]
+  companyScopes      UserCompanyScope[]
+  facilityScopes     UserFacilityScope[]
+  securityGateScopes UserSecurityGateScope[]
+  employeeProfile    Employee?           @relation("UserEmployeeProfile")
+  cancelledVisits    Visit[]              @relation("VisitCancelledBy")
+  hostCorrections    HostCorrectionAudit[] @relation("HostCorrectedBy")
+
+  @@index([active, role])
+}
+
+model UserCompanyScope {
+  userId    String   @db.VarChar(36)
+  companyId String   @db.VarChar(36)
+  createdAt DateTime @default(now()) @db.DateTime2
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  company Company @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([userId, companyId])
+  @@index([companyId])
+}
+
+model UserFacilityScope {
+  userId     String   @db.VarChar(36)
+  facilityId String   @db.VarChar(36)
+  createdAt  DateTime @default(now()) @db.DateTime2
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([userId, facilityId])
+  @@index([facilityId])
+}
+
+model UserSecurityGateScope {
+  userId       String   @db.VarChar(36)
+  securityGateId String @db.VarChar(36)
+  createdAt    DateTime @default(now()) @db.DateTime2
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  securityGate SecurityGate @relation(fields: [securityGateId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([userId, securityGateId])
+  @@index([securityGateId])
+}
+
+model Employee {
+  id           String   @id @default(cuid()) @db.VarChar(36)
+  userId       String?  @unique(map: "Employee_userId_key") @db.VarChar(36)
+  fullName     String   @db.NVarChar(200)
+  companyId    String   @db.VarChar(36)
+  departmentId String?  @db.VarChar(36)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @db.DateTime2
+  updatedAt    DateTime @updatedAt @db.DateTime2
+
+  user               User?                  @relation("UserEmployeeProfile", fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  company            Company                @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  department         Department?            @relation(fields: [departmentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  facilityScopes     EmployeeFacilityScope[]
+  createdMeetings    Meeting[]              @relation("MeetingCreator")
+  hostedMeetings     Meeting[]              @relation("MeetingHost")
+  hostCorrectionActs HostCorrectionAudit[]  @relation("HostCorrectedByEmployee")
+
+  @@index([companyId])
+  @@index([departmentId])
+}
+
+model EmployeeFacilityScope {
+  employeeId String   @db.VarChar(36)
+  facilityId String   @db.VarChar(36)
+  createdAt  DateTime @default(now()) @db.DateTime2
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([employeeId, facilityId])
+  @@index([facilityId])
+}
+
+model VisitType {
+  id             String   @id @default(cuid()) @db.VarChar(36)
+  name           String   @db.NVarChar(200)
+  nameNormalized String   @unique(map: "VisitType_nameNormalized_key") @db.NVarChar(200)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @db.DateTime2
+  updatedAt      DateTime @updatedAt @db.DateTime2
+
+  meetings Meeting[]
+}
+
+model OperationalSettings {
+  id                          String   @id @default("default") @db.VarChar(36)
+  overdueToleranceMinutes     Int      @default(15)
+  overdueAlertRepeatMinutes   Int      @default(10)
+  workdayEndTime              String   @default("18:15") @db.VarChar(5)
+  updatedAt                   DateTime @updatedAt @db.DateTime2
+}
+
+model Visitor {
+  id        String   @id @default(cuid()) @db.VarChar(36)
+  firstName String   @db.NVarChar(100)
+  lastName  String   @db.NVarChar(100)
+  email     String?  @db.VarChar(320)
+  company   String   @db.NVarChar(200)
+  phone     String?  @db.VarChar(40)
+  createdAt DateTime @default(now()) @db.DateTime2
+  updatedAt DateTime @updatedAt @db.DateTime2
+
+  visits           Visit[]
+  ruleAcceptances  VisitRuleAcceptance[]
+
+  @@index([lastName, firstName])
+  @@index([company])
+}
+
+model Meeting {
+  id                         String           @id @default(cuid()) @db.VarChar(36)
+  creatorEmployeeId          String           @db.VarChar(36)
+  visitTypeId                String           @db.VarChar(36)
+  hostEmployeeId             String?          @db.VarChar(36)
+  hostEmployeeName           String           @db.NVarChar(200)
+  hostCompanyId              String           @db.VarChar(36)
+  facilityId                 String           @db.VarChar(36)
+  plannedStart               DateTime         @db.DateTime2
+  plannedEnd                 DateTime         @db.DateTime2
+  note                       String?          @db.NVarChar(2000)
+  hasAdditionalRequirements  Boolean          @default(false)
+  additionalRequirementNote  String?          @db.NVarChar(2000)
+  actualMeetingEnd           DateTime?        @db.DateTime2
+  meetingEndSource           String?           @db.VarChar(32)
+  createdAt                  DateTime         @default(now()) @db.DateTime2
+  updatedAt                  DateTime         @updatedAt @db.DateTime2
+
+  creator             Employee              @relation("MeetingCreator", fields: [creatorEmployeeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  visitType           VisitType             @relation(fields: [visitTypeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  hostEmployee        Employee?             @relation("MeetingHost", fields: [hostEmployeeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  hostCompany         Company               @relation("MeetingHostCompany", fields: [hostCompanyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  facility            Facility              @relation("MeetingFacility", fields: [facilityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  visits              Visit[]
+  resourceAssignments ResourceAssignment[]
+  transportAssignments TransportAssignment[]
+
+  @@index([facilityId, plannedStart])
+  @@index([hostEmployeeId, plannedStart])
+}
+
+model Visit {
+  id                    String           @id @default(cuid()) @db.VarChar(36)
+  meetingId             String           @db.VarChar(36)
+  visitorId             String           @db.VarChar(36)
+  actualCheckIn         DateTime?        @db.DateTime2
+  actualCheckOut        DateTime?        @db.DateTime2
+  visitorCardReturned   Boolean?
+  visitorCardId         String?          @db.VarChar(36)
+  visitorCardNumber     String?          @db.VarChar(100)
+  vehiclePlate          String?          @db.VarChar(32)
+  status                String           @db.VarChar(20)
+  invitationStatus      String           @default("NOT_SENT") @db.VarChar(20)
+  invitationSentAt      DateTime?        @db.DateTime2
+  invitationError       String?          @db.NVarChar(1000)
+  cancelledAt           DateTime?        @db.DateTime2
+  cancelledByUserId     String?          @db.VarChar(36)
+  cancellationReason    String?          @db.NVarChar(1000)
+  createdAt             DateTime         @default(now()) @db.DateTime2
+  updatedAt             DateTime         @updatedAt @db.DateTime2
+
+  meeting              Meeting               @relation(fields: [meetingId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  visitor              Visitor               @relation(fields: [visitorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  visitorCard          VisitorCard?          @relation("VisitorCardHistory", fields: [visitorCardId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  currentOnCard        VisitorCard?          @relation("CurrentVisitorCard")
+  cancelledByUser      User?                  @relation("VisitCancelledBy", fields: [cancelledByUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ruleAcceptances      VisitRuleAcceptance[]
+  hostCorrectionAudits HostCorrectionAudit[]
+  transportAssignments TransportAssignment[]
+
+  @@index([meetingId])
+  @@index([visitorId])
+  @@index([status, actualCheckIn])
+}
+
+model VisitorCard {
+  id                    String            @id @default(cuid()) @db.VarChar(36)
+  cardNumber            String            @db.VarChar(100)
+  cardNumberNormalized  String            @unique(map: "VisitorCard_cardNumberNormalized_key") @db.VarChar(100)
+  status                String            @default("AVAILABLE") @db.VarChar(20)
+  assignedVisitorName   String?           @db.NVarChar(200)
+  currentVisitId        String?           @unique(map: "VisitorCard_currentVisitId_key") @db.VarChar(36)
+  createdAt             DateTime          @default(now()) @db.DateTime2
+  updatedAt             DateTime          @updatedAt @db.DateTime2
+
+  visits       Visit[] @relation("VisitorCardHistory")
+  currentVisit Visit?   @relation("CurrentVisitorCard", fields: [currentVisitId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([status])
+}
+
+model VisitorRuleVersion {
+  id          String   @id @default(cuid()) @db.VarChar(36)
+  version     Int      @unique(map: "VisitorRuleVersion_version_key")
+  content     String   @db.NVarChar(4000)
+  publishedAt DateTime @db.DateTime2
+  active      Boolean  @default(false)
+
+  acceptances VisitRuleAcceptance[]
+
+  @@index([active])
+}
+
+model VisitRuleAcceptance {
+  id                    String               @id @default(cuid()) @db.VarChar(36)
+  visitId               String               @db.VarChar(36)
+  visitorId             String               @db.VarChar(36)
+  visitorRuleVersionId  String               @db.VarChar(36)
+  ruleVersion           Int
+  acceptedAt            DateTime             @db.DateTime2
+  method                String               @db.VarChar(32)
+  contentSnapshot       String               @db.NVarChar(4000)
+  integrityHash         String?              @db.VarChar(128)
+  ipAddress             String?              @db.VarChar(64)
+
+  visit              Visit               @relation(fields: [visitId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  visitor            Visitor             @relation(fields: [visitorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  visitorRuleVersion VisitorRuleVersion  @relation(fields: [visitorRuleVersionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([visitId, visitorRuleVersionId], map: "VisitRuleAcceptance_visitId_ruleVersionId_key")
+  @@index([visitorId])
+}
+
+model HostCorrectionAudit {
+  id                  String   @id @default(cuid()) @db.VarChar(36)
+  visitId             String   @db.VarChar(36)
+  previousHostName    String   @db.NVarChar(200)
+  correctedHostName   String   @db.NVarChar(200)
+  correctedByUserId   String?  @db.VarChar(36)
+  correctedByEmployeeId String? @db.VarChar(36)
+  correctedAt         DateTime @default(now()) @db.DateTime2
+
+  visit                Visit      @relation(fields: [visitId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  correctedByUser      User?      @relation("HostCorrectedBy", fields: [correctedByUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  correctedByEmployee  Employee?  @relation("HostCorrectedByEmployee", fields: [correctedByEmployeeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([visitId, correctedAt])
+}
+
+model Resource {
+  id                         String       @id @default(cuid()) @db.VarChar(36)
+  type                       String       @db.VarChar(32)
+  companyId                  String       @db.VarChar(36)
+  facilityId                 String       @db.VarChar(36)
+  name                       String?      @db.NVarChar(200)
+  totalQuantity              Int?
+  brand                      String?      @db.NVarChar(100)
+  model                      String?      @db.NVarChar(100)
+  licensePlate               String?      @db.VarChar(32)
+  fullName                   String?      @db.NVarChar(200)
+  canDriveCommercialVehicles Boolean?
+  active                     Boolean      @default(true)
+  createdAt                  DateTime     @default(now()) @db.DateTime2
+  updatedAt                  DateTime     @updatedAt @db.DateTime2
+
+  company                  Company                       @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  facility                 Facility                      @relation(fields: [facilityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  driverLicenseClasses     DriverLicenseClass[]
+  driverDocuments          DriverDocument[]
+  resourceAssignments      ResourceAssignment[]
+  vehicleTransportAssignments TransportAssignment[]      @relation("TransportVehicle")
+  driverTransportAssignments  TransportAssignment[]      @relation("TransportDriver")
+
+  @@index([companyId, facilityId, type, active])
+}
+
+model DriverLicenseClass {
+  resourceId String @db.VarChar(36)
+  value      String @db.VarChar(20)
+
+  resource Resource @relation(fields: [resourceId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([resourceId, value])
+}
+
+model DriverDocument {
+  id         String @id @default(cuid()) @db.VarChar(36)
+  resourceId String @db.VarChar(36)
+  name       String @db.NVarChar(200)
+
+  resource Resource @relation(fields: [resourceId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([resourceId, name], map: "DriverDocument_resourceId_name_key")
+}
+
+model ResourceAssignment {
+  id                String       @id @default(cuid()) @db.VarChar(36)
+  meetingId         String       @db.VarChar(36)
+  resourceId        String       @db.VarChar(36)
+  resourceType      String       @db.VarChar(32)
+  resourceName      String       @db.NVarChar(200)
+  companyId         String       @db.VarChar(36)
+  facilityId        String       @db.VarChar(36)
+  totalQuantity     Int?
+  requestedQuantity Int?
+  createdAt         DateTime     @default(now()) @db.DateTime2
+
+  meeting  Meeting  @relation(fields: [meetingId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  resource Resource @relation(fields: [resourceId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([meetingId, resourceId], map: "ResourceAssignment_meetingId_resourceId_key")
+  @@index([resourceId])
+}
+
+model TransportAssignment {
+  id                  String                    @id @default(cuid()) @db.VarChar(36)
+  companyId           String                    @db.VarChar(36)
+  facilityId          String                    @db.VarChar(36)
+  plannedStart        DateTime                  @db.DateTime2
+  plannedEnd          DateTime                  @db.DateTime2
+  purpose             String                    @db.NVarChar(1000)
+  vehicleResourceId   String                    @db.VarChar(36)
+  vehicleName         String                    @db.NVarChar(200)
+  vehicleLicensePlate String                    @db.VarChar(32)
+  driverResourceId    String                    @db.VarChar(36)
+  driverName          String                    @db.NVarChar(200)
+  relatedMeetingId    String?                   @db.VarChar(36)
+  relatedVisitId      String?                   @db.VarChar(36)
+  status              String                    @default("ACTIVE") @db.VarChar(20)
+  createdAt           DateTime                  @default(now()) @db.DateTime2
+  updatedAt           DateTime                  @updatedAt @db.DateTime2
+
+  company        Company   @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  facility       Facility  @relation(fields: [facilityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  vehicle        Resource  @relation("TransportVehicle", fields: [vehicleResourceId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  driver         Resource  @relation("TransportDriver", fields: [driverResourceId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  relatedMeeting Meeting?  @relation(fields: [relatedMeetingId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  relatedVisit   Visit?    @relation(fields: [relatedVisitId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([facilityId, plannedStart])
+  @@index([vehicleResourceId, plannedStart])
+  @@index([driverResourceId, plannedStart])
+}
+
+model GoodsMovement {
+  id               String                 @id @default(cuid()) @db.VarChar(36)
+  direction        String                 @db.VarChar(20)
+  companyId        String                 @db.VarChar(36)
+  facilityId       String                 @db.VarChar(36)
+  counterpartyName String                 @db.NVarChar(200)
+  plannedDate      DateTime               @db.Date
+  plannedTime      String?                @db.VarChar(5)
+  goodsDescription String                 @db.NVarChar(2000)
+  referenceNumber  String?                @db.VarChar(200)
+  note             String?                @db.NVarChar(2000)
+  status           String                 @default("PLANNED") @db.VarChar(20)
+  actualAt         DateTime?              @db.DateTime2
+  actualPlate      String?                @db.VarChar(32)
+  actualDriverName String?                @db.NVarChar(200)
+  createdAt        DateTime               @default(now()) @db.DateTime2
+  updatedAt        DateTime               @updatedAt @db.DateTime2
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([facilityId, plannedDate, status])
+}
+
+model Session {
+  id          String   @id @default(cuid()) @db.VarChar(36)
+  userId      String   @db.VarChar(36)
+  tokenHash   String   @unique(map: "Session_tokenHash_key") @db.VarChar(128)
+  createdAt   DateTime @default(now()) @db.DateTime2
+  expiresAt   DateTime @db.DateTime2
+  lastUsedAt  DateTime? @db.DateTime2
+  revokedAt   DateTime? @db.DateTime2
+
+  user User @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
+}

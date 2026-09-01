@@ -1,0 +1,4 @@
+# Local environment — never commit real credentials or DATABASE_URL.
+.env
+.env.*
+!.env.example

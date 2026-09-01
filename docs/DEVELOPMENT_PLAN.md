@@ -684,7 +684,54 @@ No production backend implementation begins until this phase is approved.
 
 ---
 
-# Track B — Functional Implementation
+# Track B — Backend Delivery
+
+The numbered backend outline below is retained only as historical context and is superseded by
+the five backend phases in this section.
+
+## Backend Phase 1 — Foundation, MSSQL schema, LOCAL auth and password change
+
+**Status: Complete.**
+
+Includes the separate Node.js/TypeScript/Fastify service, Prisma SQL Server schema, LOCAL user
+persistence model, opaque HttpOnly server sessions, role middleware, development-only demo seed
+definitions, password change endpoint, and contract documentation. Frontend mock services remain
+the active UI data source.
+
+Active Directory integration is explicitly outside this phase. `authenticationSource` remains in
+the schema only as a future compatibility boundary; the login endpoint accepts LOCAL users only.
+
+---
+
+## Backend Phase 2 — Organization, admin, settings, and resource APIs
+
+Implement HTTP APIs for organization hierarchy, users and authorization scopes, visit types,
+visitor cards, visitor rules, operational settings, and resource catalog management.
+
+---
+
+## Backend Phase 3 — Meetings, visits, invitations, security, cards, and rules APIs
+
+Implement Meeting/Visit workflows, invitations and pre-registration, Security desk operations,
+visitor-card transitions, host-correction audits, and immutable visitor-rule acceptance APIs.
+
+---
+
+## Backend Phase 4 — Goods, transport, resource assignments, and reporting data APIs
+
+Implement goods movements, vehicle/driver and Meeting resource assignments, and reporting data
+endpoints while retaining the approved frontend domain semantics.
+
+---
+
+## Backend Phase 5 — Frontend HTTP adapters, authorization integration, and regression/E2E
+
+Replace frontend mocks with HTTP adapters, wire authorization/scope enforcement into frontend
+flows, and complete regression and end-to-end coverage. No backend phase begins automatically.
+
+---
+
+## Legacy backend outline (superseded)
 
 ## Phase 8 — Backend Foundation + MSSQL + LOCAL Authentication and Users
 

@@ -1,0 +1,115 @@
+import "dotenv/config"
+
+import { PrismaClient } from "@prisma/client"
+
+import { hashPassword } from "../src/auth/password.js"
+import { normalizeIdentity } from "../src/lib/names.js"
+import { getDemoSeedUsers, shouldSeedDemoData } from "./seed-data.js"
+
+const prisma = new PrismaClient()
+
+async function seed() {
+  if (!shouldSeedDemoData(process.env)) {
+    console.info("Demo seed skipped: it runs only when NODE_ENV=development and DEMO_SEED_ENABLED=true.")
+    return
+  }
+
+  const company = await prisma.company.upsert({
+    where: { id: "bplas" },
+    update: { name: "BPLAS A.Ş.", nameNormalized: "bplas a.ş.", active: true },
+    create: { id: "bplas", name: "BPLAS A.Ş.", nameNormalized: "bplas a.ş.", active: true },
+  })
+  const facility = await prisma.facility.upsert({
+    where: { id: "bplas-merkez" },
+    update: { companyId: company.id, name: "Merkez Tesis", nameNormalized: "merkez tesis", active: true },
+    create: { id: "bplas-merkez", companyId: company.id, name: "Merkez Tesis", nameNormalized: "merkez tesis", active: true },
+  })
+  const department = await prisma.department.upsert({
+    where: { id: "department-bplas-yonetim" },
+    update: { companyId: company.id, name: "Yönetim", nameNormalized: "yönetim", active: true },
+    create: { id: "department-bplas-yonetim", companyId: company.id, name: "Yönetim", nameNormalized: "yönetim", active: true },
+  })
+  const gate = await prisma.securityGate.upsert({
+    where: { id: "gate-bplas-merkez-ana-giris" },
+    update: { facilityId: facility.id, name: "Ana Giriş", nameNormalized: "ana giriş", active: true },
+    create: { id: "gate-bplas-merkez-ana-giris", facilityId: facility.id, name: "Ana Giriş", nameNormalized: "ana giriş", active: true },
+  })
+
+  await prisma.visitType.upsert({
+    where: { id: "meeting" },
+    update: { name: "Toplantı", nameNormalized: "toplantı", active: true },
+    create: { id: "meeting", name: "Toplantı", nameNormalized: "toplantı", active: true },
+  })
+  await prisma.operationalSettings.upsert({
+    where: { id: "default" },
+    update: {},
+    create: { id: "default", overdueToleranceMinutes: 15, overdueAlertRepeatMinutes: 10, workdayEndTime: "18:15" },
+  })
+
+  for (const definition of getDemoSeedUsers(process.env)) {
+    const passwordHash = await hashPassword(definition.password)
+    await prisma.user.upsert({
+      where: { id: definition.id },
+      update: {
+        username: definition.username,
+        usernameNormalized: normalizeIdentity(definition.username),
+        fullName: definition.fullName,
+        email: definition.email,
+        emailNormalized: normalizeIdentity(definition.email),
+        role: definition.role,
+        authenticationSource: "LOCAL",
+        active: true,
+        passwordHash,
+      },
+      create: {
+        id: definition.id,
+        username: definition.username,
+        usernameNormalized: normalizeIdentity(definition.username),
+        fullName: definition.fullName,
+        email: definition.email,
+        emailNormalized: normalizeIdentity(definition.email),
+        role: definition.role,
+        authenticationSource: "LOCAL",
+        active: true,
+        passwordHash,
+      },
+    })
+
+    await prisma.userCompanyScope.upsert({
+      where: { userId_companyId: { userId: definition.id, companyId: company.id } },
+      update: {},
+      create: { userId: definition.id, companyId: company.id },
+    })
+    await prisma.userFacilityScope.upsert({
+      where: { userId_facilityId: { userId: definition.id, facilityId: facility.id } },
+      update: {},
+      create: { userId: definition.id, facilityId: facility.id },
+    })
+    await prisma.userSecurityGateScope.upsert({
+      where: { userId_securityGateId: { userId: definition.id, securityGateId: gate.id } },
+      update: {},
+      create: { userId: definition.id, securityGateId: gate.id },
+    })
+
+    if (definition.employeeId) {
+      await prisma.employee.upsert({
+        where: { id: definition.employeeId },
+        update: { userId: definition.id, fullName: definition.fullName, companyId: company.id, departmentId: department.id, active: true },
+        create: { id: definition.employeeId, userId: definition.id, fullName: definition.fullName, companyId: company.id, departmentId: department.id, active: true },
+      })
+      await prisma.employeeFacilityScope.upsert({
+        where: { employeeId_facilityId: { employeeId: definition.employeeId, facilityId: facility.id } },
+        update: {},
+        create: { employeeId: definition.employeeId, facilityId: facility.id },
+      })
+    }
+  }
+
+  console.info("Development demo seed completed.")
+}
+
+try {
+  await seed()
+} finally {
+  await prisma.$disconnect()
+}
