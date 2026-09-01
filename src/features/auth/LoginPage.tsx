@@ -38,11 +38,10 @@ export function LoginPage() {
   }
 
   return <main className="flex min-h-dvh items-center justify-center bg-slate-100 p-4">
-    <section className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7" aria-labelledby="login-title">
+    <section className="w-full max-w-[420px] rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7" aria-labelledby="login-title">
       <div className="mb-6 flex flex-col items-center text-center">
         <img src={bplasLogo} alt="BPLAS" className="size-12 rounded-lg object-cover shadow-sm" />
         <h1 id="login-title" className="mt-3 text-lg font-semibold text-slate-900">Ziyaret Yönetim Sistemi</h1>
-        <p className="mt-1 text-xs text-slate-500">BPLAS</p>
       </div>
       <form className="space-y-4" onSubmit={(event) => { void submit(event) }}>
         <div className="space-y-1.5"><Label htmlFor="login-username">Kullanıcı adı</Label><Input id="login-username" autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} disabled={loading} /></div>
