@@ -2,7 +2,8 @@ import { NavLink, Outlet, useLocation } from "react-router-dom"
 import { useEffect, useState } from "react"
 
 import { FocusedShell } from "@/components/app-shell/FocusedShell"
-import { currentAccountProfiles } from "@/features/account/account-profile"
+import { toAccountProfile } from "@/features/account/account-profile"
+import { useAuth } from "@/features/auth/auth-context"
 import { cn } from "@/lib/utils"
 
 const securityNavigationItems = [
@@ -11,10 +12,12 @@ const securityNavigationItems = [
 ] as const
 
 export function SecurityShell() {
+  const { currentUser } = useAuth()
+  if (!currentUser) return null
   return (
     <FocusedShell
       title="Güvenlik"
-      account={currentAccountProfiles.security}
+      account={toAccountProfile(currentUser)}
       headerHeight={64}
       headerNavigation={<SecurityNavigation />}
       headerCenter={<SecurityClock />}

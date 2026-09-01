@@ -1,4 +1,5 @@
 import type { AccountService, ChangePasswordInput } from "@/services/account-service"
+import { MockAuthenticationStore } from "@/services/mock-authentication-store"
 
 const avatarStoragePrefix = "visitor-management:account-avatar:"
 const avatarChangedEvent = "visitor-management:account-avatar-changed"
@@ -18,13 +19,14 @@ function announceAvatarChange(userId: string) {
 
 /** Mock-only account adapter. The production adapter will call authenticated account endpoints. */
 export class MockAccountService implements AccountService {
+  constructor(private readonly authStore = new MockAuthenticationStore()) {}
   async getAvatar(userId: string) {
     return getStorage()?.getItem(avatarStorageKey(userId)) ?? undefined
   }
 
-  async changePassword({ currentPassword, newPassword }: ChangePasswordInput) {
-    // Credential verification deliberately belongs to the future authentication backend.
+  async changePassword({ userId, currentPassword, newPassword }: ChangePasswordInput) {
     if (!currentPassword.trim() || !newPassword.trim()) throw new Error("Parola alanları boş olamaz.")
+    this.authStore.changePassword(userId, currentPassword, newPassword)
   }
 
   async updateAvatar(userId: string, avatar: string) {

@@ -1,11 +1,14 @@
 import { Outlet } from "react-router-dom"
 
 import { FocusedShell } from "@/components/app-shell/FocusedShell"
-import { currentAccountProfiles } from "@/features/account/account-profile"
+import { toAccountProfile } from "@/features/account/account-profile"
+import { useAuth } from "@/features/auth/auth-context"
 
 export function EmployeeShell() {
+  const { currentUser } = useAuth()
+  if (!currentUser) return null
   return (
-    <FocusedShell title="Ziyaret Yönetimi" account={currentAccountProfiles.employee}>
+    <FocusedShell title="Ziyaret Yönetimi" account={toAccountProfile(currentUser)}>
       <Outlet />
     </FocusedShell>
   )

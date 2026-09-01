@@ -20,7 +20,7 @@ describe("MockAccountService", () => {
     expect(await service.getAvatar("user-42")).toBeUndefined()
   })
 
-  it("does not pretend to verify credentials but rejects an empty current password", async () => {
+  it("validates required password fields before delegating to the mock credential store", async () => {
     const service = new MockAccountService()
     await expect(service.changePassword({ userId: "user-42", currentPassword: "", newPassword: "password1" })).rejects.toThrow("Parola alanları boş olamaz.")
   })

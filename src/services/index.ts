@@ -11,6 +11,7 @@ import { MockOrganizationStore } from "@/services/mock-organization-store"
 import { MockVisitTypeStore } from "@/services/mock-visit-type-store"
 import { MockAccountService } from "@/services/mock-account-service"
 import { MockSessionService } from "@/services/mock-session-service"
+import { MockAuthenticationStore } from "@/services/mock-authentication-store"
 import type { AccountService } from "@/services/account-service"
 import type { SessionService } from "@/services/session-service"
 import type { AdminService } from "@/services/admin-service"
@@ -32,8 +33,9 @@ const _transportAssignmentService = new MockTransportAssignmentService(_visitSer
 const _goodsMovementService = new MockGoodsMovementService(_visitService)
 const _adminService = new MockAdminService(_organizationStore, undefined, _visitTypeStore, _visitorCardStore, _visitorRuleStore)
 const _securityService = new MockSecurityService(_visitorCardStore, _visitService, _visitorRuleStore)
-const _accountService = new MockAccountService()
-const _sessionService = new MockSessionService()
+const _authenticationStore = new MockAuthenticationStore()
+const _accountService = new MockAccountService(_authenticationStore)
+const _sessionService = new MockSessionService(_authenticationStore)
 
 // Break the circular dependency: visit service needs assignment service for
 // extension validation; assignment service needs visit service for meeting data.

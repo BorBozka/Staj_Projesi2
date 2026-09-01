@@ -8,12 +8,15 @@ const focusedShellSource = read("src/components/app-shell/FocusedShell.tsx")
 const appSource = read("src/app/App.tsx")
 
 describe("EmployeeShell", () => {
-  it("renders /my-visits through the sidebar-less shared shell", () => {
+  it("renders the canonical employee route through the sidebar-less shared shell", () => {
     expect(appSource).toContain('import { EmployeeShell } from "@/components/app-shell/EmployeeShell"')
     expect(appSource).toContain("<Route element={<EmployeeShell />}>")
+    expect(appSource).toContain('path="/employee/my-visits"')
+    expect(appSource).not.toContain('path="/my-visits"')
     expect(appSource).not.toContain("AppShell")
     expect(shellSource).toContain("FocusedShell")
-    expect(shellSource).toContain("currentAccountProfiles.employee")
+    expect(shellSource).toContain("useAuth")
+    expect(shellSource).toContain("toAccountProfile(currentUser)")
   })
 
   it("has no sidebar, drawer or navigation for its single workspace", () => {

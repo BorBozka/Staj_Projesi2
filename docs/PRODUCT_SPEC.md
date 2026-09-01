@@ -158,22 +158,17 @@ Manages:
 
 ## 5. Authentication
 
-Support:
+This frontend/mock phase implements `LOCAL` users only. The next implementation phase is a
+real backend + MSSQL + `LOCAL` authentication. Authentication source and role remain separate
+concepts so the model can be extended later.
 
-- Active Directory users,
-- Local users.
+Active Directory integration is not in this project's implementation scope. If required, an
+organization may integrate its own Active Directory environment in a future delivery; this UI
+does not offer an AD choice or simulate AD authentication.
 
-All users may also be created locally if needed.
-
-Where practical, Active Directory may provide:
-
-- name,
-- surname,
-- username,
-- email,
-- department.
-
-Authentication source and role are separate concepts.
+The mock session is persisted only in browser `sessionStorage`: it survives a refresh in the
+same browser session and is cleared on logout. Mock credentials stay in the in-memory service
+store and are never persisted as plain credentials.
 
 ### Account self-service UI
 
@@ -181,8 +176,8 @@ All authenticated role shells expose the same account menu with the current user
 name, role, profile-photo action, and logout action. Only `LOCAL` users see password change;
 `ACTIVE_DIRECTORY` users must not be offered a local-password flow. In the frontend/mock phase,
 profile photos may persist per immutable user ID in local storage after client-side square crop
-and compression. The account service owns profile/password operations, while logout remains a
-session-service boundary until real authentication supplies session clearing and `/login` redirect.
+and compression. The account service owns profile/password operations, while logout is handled
+through the session-service boundary and redirects to `/login`.
 
 ---
 

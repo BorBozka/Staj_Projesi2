@@ -8,7 +8,8 @@ describe("SecurityShell header", () => {
 
   it("renders through the shared sidebar-less shell with no collapse or drawer state", () => {
     expect(shellSource).toContain("FocusedShell")
-    expect(shellSource).toContain("currentAccountProfiles.security")
+    expect(shellSource).toContain("useAuth")
+    expect(shellSource).toContain("toAccountProfile(currentUser)")
     expect(shellSource).not.toContain("security-navigation-collapsed")
     expect(shellSource).not.toContain("sessionStorage")
     expect(shellSource).not.toContain("collapsed")

@@ -1,17 +1,19 @@
 import { Camera, KeyRound, LogOut, Trash2 } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
+import { useNavigate } from "react-router-dom"
 
 import { UserAvatar } from "@/components/account/UserAvatar"
 import { normalizeAvatarFile } from "@/components/account/avatar-utils"
 import type { AccountProfile } from "@/features/account/account-profile"
 import { validatePasswordChange } from "@/features/account/account-utils"
+import { useAuth } from "@/features/auth/auth-context"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
-import { accountService, sessionService } from "@/services"
+import { accountService } from "@/services"
 import { avatarChangedEvent } from "@/services/mock-account-service"
 
 type AccountMenuVariant = "header" | "sidebar"
@@ -24,6 +26,8 @@ interface AccountMenuProps {
 }
 
 export function AccountMenu({ profile, variant = "header", collapsed = false, className }: AccountMenuProps) {
+  const navigate = useNavigate()
+  const { logout } = useAuth()
   const [avatar, setAvatar] = useState(profile.avatar)
   const [photoOpen, setPhotoOpen] = useState(false)
   const [passwordOpen, setPasswordOpen] = useState(false)
@@ -41,6 +45,10 @@ export function AccountMenu({ profile, variant = "header", collapsed = false, cl
       triggerRef.current?.blur()
     }
     lastInteractionRef.current = null
+  }
+  const handleLogout = async () => {
+    await logout()
+    navigate("/login", { replace: true })
   }
 
   useEffect(() => {
@@ -81,7 +89,7 @@ export function AccountMenu({ profile, variant = "header", collapsed = false, cl
         <DropdownMenuItem onSelect={() => setPhotoOpen(true)}><Camera className="size-4 text-slate-500" />Profil fotoğrafını değiştir</DropdownMenuItem>
         {profile.authenticationSource === "LOCAL" && <DropdownMenuItem onSelect={() => setPasswordOpen(true)}><KeyRound className="size-4 text-slate-500" />Şifreyi değiştir</DropdownMenuItem>}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => { void sessionService.logout() }} className="text-red-600 focus:bg-red-50 focus:text-red-700"><LogOut className="size-4" />Çıkış yap</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => { void handleLogout() }} className="text-red-600 focus:bg-red-50 focus:text-red-700"><LogOut className="size-4" />Çıkış yap</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
     <AvatarDialog open={photoOpen} onOpenChange={setPhotoOpen} profile={profile} avatar={avatar} onSaved={() => setFeedback("Profil fotoğrafı güncellendi.")} />

@@ -46,8 +46,9 @@ describe("Shared account menu", () => {
   it("uses the account trigger in both sidebar states and the mobile header", () => {
     expect(componentSource).toContain('import { AccountMenu } from "@/components/account/AccountMenu"')
     expect(componentSource).toContain('<AccountMenu profile={account} className="ml-auto" />')
-    expect(componentSource).toContain("currentAccountProfiles.admin")
-    expect(componentSource).toContain("currentAccountProfiles.manager")
+    expect(componentSource).toContain("useAuth")
+    expect(componentSource).toContain("toAccountProfile(currentUser)")
+    expect(componentSource).not.toContain("currentAccountProfiles")
   })
 })
 

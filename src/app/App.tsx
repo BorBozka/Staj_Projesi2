@@ -4,6 +4,8 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom"
 import { EmployeeShell } from "@/components/app-shell/EmployeeShell"
 import { ManagerShell } from "@/components/app-shell/ManagerShell"
 import { SecurityShell } from "@/components/app-shell/SecurityShell"
+import { LoginPage } from "@/features/auth/LoginPage"
+import { RoleGuard, RoleHomeRedirect } from "@/features/auth/RoleGuard"
 
 const MyVisitsPage = lazy(() =>
   import("@/features/visits/MyVisitsPage").then((module) => ({ default: module.MyVisitsPage })),
@@ -61,51 +63,58 @@ export function App() {
       "/admin/system-settings": "BPLAS — Sistem Ayarları",
       "/security/operations": "BPLAS — Güvenlik Operasyonu",
       "/security/goods-movements": "BPLAS — Güvenlik Mal Hareketleri",
-      "/my-visits": "BPLAS — Ziyaretlerim",
+      "/employee/my-visits": "BPLAS — Ziyaretlerim",
+      "/login": "BPLAS — Giriş",
     }
     document.title = pageTitles[pathname] ?? "BPLAS — Ziyaret Yönetimi"
   }, [pathname])
 
   return (
     <Routes>
-      <Route element={<EmployeeShell />}>
-        <Route
-          path="/my-visits"
-          element={
-            <Suspense fallback={<RouteSkeleton />}>
-              <MyVisitsPage />
-            </Suspense>
-          }
-        />
+      <Route path="/login" element={<LoginPage />} />
+      <Route element={<RoleGuard role="EMPLOYEE" />}>
+        <Route element={<EmployeeShell />}>
+          <Route path="/employee/my-visits" element={<Suspense fallback={<RouteSkeleton />}><MyVisitsPage /></Suspense>} />
+        </Route>
       </Route>
-      <Route path="/manager/*" element={<ManagerRouteRedirect />} />
-      <Route path="/security" element={<SecurityShell />}>
-        <Route index element={<Navigate to="operations" replace />} />
-        <Route path="operations" element={<Suspense fallback={<RouteSkeleton />}><SecurityOperationsPage /></Suspense>} />
-        <Route path="goods-movements" element={<Suspense fallback={<RouteSkeleton />}><SecurityGoodsMovementsPage /></Suspense>} />
+      <Route element={<RoleGuard role="MANAGER" />}>
+        <Route path="/manager" element={<ManagerShell role="MANAGER" />}>
+          <Route path="my-visits" element={<Suspense fallback={<RouteSkeleton />}><MyVisitsPage /></Suspense>} />
+          <Route path="dashboard" element={<Suspense fallback={<RouteSkeleton />}><ManagerDashboard /></Suspense>} />
+          <Route path="all-visits" element={<Suspense fallback={<RouteSkeleton />}><AllVisitsPage /></Suspense>} />
+          <Route path="resources" element={<Suspense fallback={<RouteSkeleton />}><ResourceCatalogPage /></Suspense>} />
+          <Route path="transport-planning" element={<Suspense fallback={<RouteSkeleton />}><TransportPlanningPage /></Suspense>} />
+          <Route path="goods-movements" element={<Suspense fallback={<RouteSkeleton />}><GoodsMovementsPage /></Suspense>} />
+          <Route path="reports" element={<Suspense fallback={<RouteSkeleton />}><ReportsPage /></Suspense>} />
+          <Route index element={<Navigate to="dashboard" replace />} />
+        </Route>
       </Route>
-      <Route path="/admin" element={<ManagerShell role="ADMIN" />}>
-        <Route path="my-visits" element={<Suspense fallback={<RouteSkeleton />}><MyVisitsPage /></Suspense>} />
-        <Route path="dashboard" element={<Suspense fallback={<RouteSkeleton />}><ManagerDashboard /></Suspense>} />
-        <Route path="all-visits" element={<Suspense fallback={<RouteSkeleton />}><AllVisitsPage /></Suspense>} />
-        <Route path="resources" element={<Suspense fallback={<RouteSkeleton />}><ResourceCatalogPage /></Suspense>} />
-        <Route path="transport-planning" element={<Suspense fallback={<RouteSkeleton />}><TransportPlanningPage /></Suspense>} />
-        <Route path="goods-movements" element={<Suspense fallback={<RouteSkeleton />}><GoodsMovementsPage /></Suspense>} />
-        <Route path="reports" element={<Suspense fallback={<RouteSkeleton />}><ReportsPage /></Suspense>} />
-        <Route path="users" element={<Suspense fallback={<RouteSkeleton />}><AdminUsersPage /></Suspense>} />
-        <Route path="organization" element={<Suspense fallback={<RouteSkeleton />}><OrganizationPage /></Suspense>} />
-        <Route path="system-settings" element={<Suspense fallback={<RouteSkeleton />}><SystemSettingsPage /></Suspense>} />
-        <Route index element={<Navigate to="dashboard" replace />} />
+      <Route element={<RoleGuard role="SECURITY" />}>
+        <Route path="/security" element={<SecurityShell />}>
+          <Route index element={<Navigate to="operations" replace />} />
+          <Route path="operations" element={<Suspense fallback={<RouteSkeleton />}><SecurityOperationsPage /></Suspense>} />
+          <Route path="goods-movements" element={<Suspense fallback={<RouteSkeleton />}><SecurityGoodsMovementsPage /></Suspense>} />
+        </Route>
       </Route>
-      <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+      <Route element={<RoleGuard role="ADMIN" />}>
+        <Route path="/admin" element={<ManagerShell role="ADMIN" />}>
+          <Route path="my-visits" element={<Suspense fallback={<RouteSkeleton />}><MyVisitsPage /></Suspense>} />
+          <Route path="dashboard" element={<Suspense fallback={<RouteSkeleton />}><ManagerDashboard /></Suspense>} />
+          <Route path="all-visits" element={<Suspense fallback={<RouteSkeleton />}><AllVisitsPage /></Suspense>} />
+          <Route path="resources" element={<Suspense fallback={<RouteSkeleton />}><ResourceCatalogPage /></Suspense>} />
+          <Route path="transport-planning" element={<Suspense fallback={<RouteSkeleton />}><TransportPlanningPage /></Suspense>} />
+          <Route path="goods-movements" element={<Suspense fallback={<RouteSkeleton />}><GoodsMovementsPage /></Suspense>} />
+          <Route path="reports" element={<Suspense fallback={<RouteSkeleton />}><ReportsPage /></Suspense>} />
+          <Route path="users" element={<Suspense fallback={<RouteSkeleton />}><AdminUsersPage /></Suspense>} />
+          <Route path="organization" element={<Suspense fallback={<RouteSkeleton />}><OrganizationPage /></Suspense>} />
+          <Route path="system-settings" element={<Suspense fallback={<RouteSkeleton />}><SystemSettingsPage /></Suspense>} />
+          <Route index element={<Navigate to="dashboard" replace />} />
+        </Route>
+      </Route>
+      <Route path="/" element={<RoleHomeRedirect />} />
+      <Route path="*" element={<RoleHomeRedirect />} />
     </Routes>
   )
-}
-
-function ManagerRouteRedirect() {
-  const location = useLocation()
-  const pathname = location.pathname.replace(/^\/manager(?=\/|$)/, "/admin")
-  return <Navigate to={{ pathname, search: location.search, hash: location.hash }} replace />
 }
 
 function RouteSkeleton() {

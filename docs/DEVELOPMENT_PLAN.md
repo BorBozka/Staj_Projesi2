@@ -40,11 +40,11 @@ The closure order is fixed as follows:
 2. **Security Goods Movements** — complete: Security lists today's scoped planned inbound and
    outbound goods movements, searches operational fields, and records scoped arrivals/departures
    with optional actual plate/driver details.
-3. **Authentication UI** — in progress:
-   - shared account/avatar menu, profile photo update, `LOCAL` password-change form, and logout service boundary are complete in the mock UI,
-   - shared `/login`, role-based redirect, and real session clearing remain pending for the authentication phase.
-4. **Backend + database** — pending.
-5. **Local + Active Directory authentication** — pending.
+3. **Authentication UI** — complete:
+   - shared `/login`, mock `LOCAL` demo authentication, browser-session hydration, role-based route guards, role-home redirects, and real mock logout are complete,
+   - all role shells read their account menu profile from the current session; `LOCAL` password changes update the in-memory mock credential store for the active browser runtime.
+4. **Backend + MSSQL + LOCAL authentication** — pending.
+5. **Active Directory integration** — not in this project's implementation scope. A customer may integrate it in its own environment when needed.
 6. **Mock service → real API adaptation** — pending.
 7. **Authorization/scope enforcement** — pending.
 8. **Regression/E2E tests** — pending.
@@ -686,7 +686,7 @@ No production backend implementation begins until this phase is approved.
 
 # Track B — Functional Implementation
 
-## Phase 8 — Backend Foundation + Authentication and Users
+## Phase 8 — Backend Foundation + MSSQL + LOCAL Authentication and Users
 
 Intended stack:
 
@@ -700,8 +700,11 @@ Includes:
 - user persistence,
 - local authentication,
 - role enforcement,
-- Active Directory integration foundation,
 - user-to-company/department relationships.
+
+Active Directory integration is explicitly outside this project's implementation scope. The
+authentication-source model remains extensible so an organization can add its own integration in
+a later, separately approved delivery.
 
 At this point TanStack Query may be introduced on the frontend if useful for real server-state management.
 

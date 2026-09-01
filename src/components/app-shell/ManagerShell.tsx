@@ -27,7 +27,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { startMinuteClock } from "@/features/manager/manager-clock"
-import { currentAccountProfiles } from "@/features/account/account-profile"
+import { toAccountProfile } from "@/features/account/account-profile"
+import { useAuth } from "@/features/auth/auth-context"
 import { ManagerRefreshProvider } from "@/features/manager/manager-refresh-context"
 import { getSavedReportsHref } from "@/features/reports/reports-filters"
 import { getVisiblePendingInvitationVisits } from "@/features/visits/invitation-status"
@@ -67,7 +68,9 @@ export function ManagerShell({ role = "MANAGER" }: { role?: Extract<ApplicationR
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [refreshVersion, setRefreshVersion] = useState(0)
   const { reload } = useVisits()
-  const account = isAdmin ? currentAccountProfiles.admin : currentAccountProfiles.manager
+  const { currentUser } = useAuth()
+  if (!currentUser) return null
+  const account = toAccountProfile(currentUser)
 
   useEffect(() => {
     window.sessionStorage.setItem(`${role.toLowerCase()}-navigation-collapsed`, String(collapsed))
@@ -255,8 +258,10 @@ function InvitationNotificationStatus({ status }: { status: InvitationStatus }) 
   return <span className={cn("mt-1 inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium", statusClass)}>{statusContent}</span>
 }
 
-function ManagerProfile({ collapsed = false, role = "MANAGER" }: { collapsed?: boolean; role?: "MANAGER" | "ADMIN" }) {
-  return <AccountMenu variant="sidebar" collapsed={collapsed} profile={role === "ADMIN" ? currentAccountProfiles.admin : currentAccountProfiles.manager} className="w-full" />
+function ManagerProfile({ collapsed = false }: { collapsed?: boolean; role?: "MANAGER" | "ADMIN" }) {
+  const { currentUser } = useAuth()
+  if (!currentUser) return null
+  return <AccountMenu variant="sidebar" collapsed={collapsed} profile={toAccountProfile(currentUser)} className="w-full" />
 }
 
 function ManagerMobileNavigation({ open, onOpenChange, role, basePath }: { open: boolean; onOpenChange(open: boolean): void; role: "MANAGER" | "ADMIN"; basePath: string }) {
