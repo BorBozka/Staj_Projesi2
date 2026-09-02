@@ -11,7 +11,8 @@ export default defineConfig({
   },
   // The backend is its own workspace with a Node-only Vitest configuration.
   // Keeping its Fastify dependency graph out of frontend tests avoids cross-project resolution.
+  // `e2e/**` holds Playwright `*.spec.ts` files, run only by `pnpm e2e`, never Vitest.
   test: {
-    exclude: [...configDefaults.exclude, "server/**"],
+    exclude: [...configDefaults.exclude, "server/**", "e2e/**"],
   },
 })
