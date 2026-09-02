@@ -6,7 +6,7 @@
 
 ![Admin dashboard; aktif ziyaretler, durum dağılımı ve günlük operasyon görünümü](visitor-operations-dashboard.jpg)
 
-> **Güncel durum:** Frontend mock servis katmanını kullanmaya devam eder. Ayrı Fastify/Prisma backend'i LOCAL kimlik doğrulama, ziyaret operasyonları, hashed invitation tokenları ve environment-based e-posta teslim altyapısını içerir; frontend HTTP adaptörleri sonraki fazdadır.
+> **Güncel durum:** Frontend, ayrı Fastify/Prisma/MSSQL backend'ine HTTP adaptörleri üzerinden bağlıdır; runtime'da mock servis yoktur ve sessiz mock fallback yoktur. Backend LOCAL kimlik doğrulama, server-side yetki/kapsam denetimi, hashed invitation tokenları ve environment-based e-posta teslim altyapısını içerir. Tarayıcı E2E testi için Playwright suite'i `pnpm e2e` ile çalışır.
 
 ## Problem ve Ürün Yaklaşımı
 
@@ -57,12 +57,19 @@ Bu proje, ziyaret yaşam döngüsünü tek bir sistemde görünür ve yönetileb
 
 ## Yerel Çalıştırma
 
-    pnpm install
-    pnpm dev
+Frontend verisini gerçek backend'den alır; önce backend + veritabanı ayağa kalkmalıdır.
 
-Frontend artık verisini gerçek Fastify/Prisma backend'inden alır; sessiz mock fallback yoktur.
-Tam yerel dizi: (1) MSSQL, (2) `server/.env`, (3) `pnpm db:migrate` / `pnpm db:seed`,
-(4) `pnpm dev:api` (`http://localhost:3001`), (5) `pnpm dev` (`http://localhost:5173`).
+1. **MSSQL** — yerel bir SQL Server örneği çalışır durumda olsun.
+2. **Backend env** — `server/.env` içinde en az `DATABASE_URL` (Prisma SQL Server formatı).
+   `EMAIL_DELIVERY_MODE` varsayılanı `log`'dur (gerçek SMTP gerekmez).
+3. **Bağımlılıklar + migrate + seed**
+
+       pnpm install
+       pnpm db:migrate
+       pnpm db:seed          # NODE_ENV=development + DEMO_SEED_ENABLED=true iken çalışır; idempotenttir
+
+4. **Backend** — `pnpm dev:api` → `http://localhost:3001`
+5. **Frontend** — `pnpm dev` → `http://localhost:5173`
 
 ### Frontend API yapılandırması
 
@@ -72,10 +79,14 @@ kök dizinde `.env.example` dosyasını `.env.local` olarak kopyalayın:
 
     cp .env.example .env.local
 
-Temel doğrulama komutları:
+### Doğrulama komutları
 
-    pnpm test
-    pnpm typecheck
+    pnpm test              # frontend unit/component
+    pnpm typecheck         # frontend
+    pnpm test:api          # backend unit (MSSQL gerektirmez)
+    pnpm --filter @visitor-management/api exec vitest run --config vitest.config.ts src/integration
+                           # ↑ MSSQL entegrasyon suite'i (RUN_MSSQL_INTEGRATION=true ortam değişkeniyle)
+    pnpm e2e               # Playwright tarayıcı E2E (backend + vite preview + MSSQL + seed)
     pnpm lint
     pnpm build
 

@@ -2,10 +2,11 @@
 
 ## Base path and versioning
 
-Backend Phase 1 uses the unversioned base path `/api`. No frontend adapter consumes it yet.
-The first externally deployed breaking contract will introduce a versioned base path (for example
-`/api/v1`) as an explicit API-integration decision; this phase deliberately does not expose
-parallel aliases.
+The unversioned base path is `/api`. As of Phase 5 the frontend consumes it through
+`src/lib/http` (base URL from `VITE_API_BASE_URL`, default `http://localhost:3001/api`); every
+authenticated request sends `credentials: "include"`. The first externally deployed breaking
+contract will introduce a versioned base path (for example `/api/v1`) as an explicit
+API-integration decision; this phase deliberately does not expose parallel aliases.
 
 All timestamps returned by future API endpoints will be ISO-8601 UTC strings. Time-only values,
 such as `workdayEndTime`, remain `HH:mm` semantic values rather than timestamps.
@@ -46,10 +47,16 @@ On success the endpoint sets the configured `HttpOnly` opaque-session cookie and
     "initials": "MK",
     "role": "EMPLOYEE",
     "roleLabel": "Çalışan",
-    "authenticationSource": "LOCAL"
+    "authenticationSource": "LOCAL",
+    "authorizationScope": { "companyIds": ["bplas"], "facilityIds": ["bplas-merkez"], "securityGateIds": ["gate-bplas-merkez-ana-giris"] },
+    "employeeId": "maya-kara"
   }
 }
 ```
+
+`authorizationScope` and `employeeId` (Phase 5) are the raw assigned scope and the linked
+Employee id (`null` for a pure Admin). The backend is the authorization source of truth; the
+frontend uses them only for scope-aware UI defaults.
 
 The browser receives only a cryptographically random token. The server stores its SHA-256 hash,
 expiry, last-use timestamp, and optional revocation timestamp. Cookies are `HttpOnly`,
@@ -299,10 +306,48 @@ an unresolved race returns `409 TRANSPORT_ASSIGNMENT_CONFLICT` without SQL Serve
 `MANAGER` or `ADMIN` (read only) and return the raw records the frontend report utilities
 consume — `{ visits }`, `{ assignments }`, `{ movements }` respectively. No KPI/chart aggregation
 or CSV/XLSX/PDF generation is done server-side. Query filters: `startDate`, `endDate`
-(`yyyy-MM-dd`), `companyId`, `facilityId` (`all`/omitted means no filter). The date range is
-inclusive local-day boundaries (`startOfDay(start) .. endOfDay(end)`) on the record's planned
-instant — `Meeting.plannedStart` for visits, `plannedStart` for fleet, `plannedDate` for goods —
-matching the frontend `reports-filters` semantics; an inverted range yields an empty dataset.
+(`yyyy-MM-dd`), `companyId`, `facilityId`. As of Phase 5, `all`/omitted means "everything inside
+the caller's authorization scope", never everything; a concrete out-of-scope id yields an empty
+dataset (see Phase 5 authorization). The date range is inclusive local-day boundaries
+(`startOfDay(start) .. endOfDay(end)`) on the record's planned instant — `Meeting.plannedStart`
+for visits, `plannedStart` for fleet, `plannedDate` for goods — matching the frontend
+`reports-filters` semantics; an inverted range yields an empty dataset. `startDate`/`endDate`
+are validated with a strict calendar-date parser: `2026-02-31` and other well-formed but
+non-existent dates are rejected.
+
+## Phase 5 authorization and scope enforcement
+
+The session projection carries `authorizationScope` (`{ companyIds, facilityIds,
+securityGateIds }`) and `employeeId` (`null` for a pure Admin). Route role guards are not the
+security boundary — every read is scope-filtered and every mutation is scope- and
+ownership-checked server-side, derived entirely from the session:
+
+- **`companyId=all` / `facilityId=all` / omitted** on any list or report resolves to the
+  caller's assigned scope. Every role is company-scoped; an empty assigned scope sees nothing.
+- **`GET /api/meetings`, `GET /api/visits`, `GET /api/visits/reference-data`** accept
+  `EMPLOYEE|MANAGER|ADMIN|SECURITY`. EMPLOYEE receives only meetings it created or hosts;
+  MANAGER/ADMIN their full scope; SECURITY the operational (`PLANNED`/`CHECKED_IN`) subset inside
+  its company/facility. Reference-data company/facility/employee option lists are narrowed to
+  scope; visit types stay global.
+- **Meeting/visit mutations** (`POST/PATCH /api/meetings`, reschedule, cancel, invitations):
+  the meeting must be in the actor's scope; EMPLOYEE and MANAGER may mutate only meetings they
+  created; ADMIN may mutate any in-scope meeting. Host lifecycle (`/extend`, `/close`) stays
+  gated on host identity.
+- **Security operations** (`/api/security/*` visits, unplanned, correction, card return, goods
+  completion): confined to the gate user's scope. The `companyId`/`facilityId` sent with an
+  unplanned create or a goods completion are verified against that scope, not trusted.
+- **Goods, resource assignments, transport assignments, resource catalog**: reads scope-filtered;
+  create/update/cancel reject a company/facility outside scope.
+- **`404` vs `403`**: an out-of-scope entity id is reported as `404 NOT_FOUND` (no cross-scope
+  existence leak); an in-scope meeting owned by another non-admin user is `403
+  VISIT_MUTATION_FORBIDDEN`. Security operations outside scope return `403 OUT_OF_SCOPE`.
+
+`DELETE /api/resources/:id` (`MANAGER`/`ADMIN`) hard-deletes a catalog resource and its owned
+driver license-class / document rows; a resource still referenced by an immutable assignment
+snapshot returns `409 RESOURCE_IN_USE` and must be deactivated instead.
+
+`AUTH_RATE_LIMIT_MAX` (default `10`) sets the per-minute-per-IP login attempt limit; an E2E run
+raises it so its many rapid seeded logins are not throttled.
 
 ## Email delivery configuration
 

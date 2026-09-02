@@ -734,8 +734,53 @@ endpoints while retaining the approved frontend domain semantics.
 
 ## Backend Phase 5 — Frontend HTTP adapters, authorization integration, and regression/E2E
 
-Replace frontend mocks with HTTP adapters, wire authorization/scope enforcement into frontend
-flows, and complete regression and end-to-end coverage. No backend phase begins automatically.
+**Status: Complete.**
+
+The frontend now runs entirely against the Fastify/MSSQL backend — `src/services/index.ts`
+instantiates only `Http*` adapters and there is no silent mock fallback; a backend that cannot
+be reached surfaces an error, never seed data. The `Mock*` implementations remain in the tree
+solely as unit/component test fixtures.
+
+Delivered:
+
+- **Central HTTP client** (`src/lib/http`): `VITE_API_BASE_URL`-driven base URL,
+  `credentials: "include"`, query serialization, `204` handling, one typed `ApiClientError`
+  model for every backend `{ error: { code, message } }` and every transport failure (5xx
+  detail is scrubbed), a 401 hook for the session layer, and no automatic retry of mutations.
+- **HTTP adapters** behind the existing service interfaces: Session, Account, Admin, Visit,
+  Security, GoodsMovement, ResourceCatalog, ResourceAssignment, TransportAssignment, plus a new
+  `ReportsService` boundary over `/api/reports/*`. Server DTOs are mapped to the frontend
+  domain model (nested `Visit.meeting` flattened, `hostEmployeeId → ""`, lookup timestamps and
+  the rule-acceptance id dropped, a neutral `currentEmployee` synthesised for an Admin session).
+  Frontend `userId` / `actingUserId` / `creatorEmployeeId` are never sent — the backend derives
+  the actor from the session. Password change is real; avatars stay a client-side
+  `localStorage` preference.
+- **Server-side authorization / scope enforcement** (`server/src/lib/authorization.ts`):
+  `AccessContext` built from the session, `scopeAllows` / `resolveScopeFilter` /
+  `matchesScopeFilter`. `companyId=all` / `facilityId=all` resolve to the caller's assigned
+  scope, never a global bypass. `listMeetings` / `listVisits` / reference data are role- and
+  scope-aware (EMPLOYEE sees only meetings it created or hosts; MANAGER/ADMIN their full scope;
+  SECURITY its operational, in-scope subset). Meeting/visit mutations require the meeting in
+  scope and, for EMPLOYEE/MANAGER, ownership; ADMIN may mutate any in-scope meeting; host
+  lifecycle stays host-identity gated. Reports, goods, resource assignments, transport
+  assignments and the resource catalog all scope-filter reads and reject cross-scope mutations.
+  An out-of-scope entity id is reported as `404`, an owned-by-another in-scope meeting as `403`.
+- **Hardening**: a reusable strict `YYYY-MM-DD` calendar-date validator
+  (`server/src/lib/calendar-date.ts`) used by goods `plannedDate` and reports `startDate`/
+  `endDate` (`2026-02-31` is now rejected); `DELETE /api/resources/:id`; an
+  `AUTH_RATE_LIMIT_MAX` env knob.
+- **Tests**: HTTP client + adapter unit tests; a `phase5.authz.mssql.smoke` authorization
+  matrix against MSSQL; strict-date regressions; a two-company demo seed (idempotent) so
+  cross-scope behaviour is testable; a Playwright browser E2E suite (`pnpm e2e`) over the real
+  Vite build + Fastify + MSSQL + cookie sessions covering login/role routing, employee visit
+  creation, manager scoped read + mutation denial, admin CRUD, security check-in/out + unplanned
+  + goods completion, resource/transport save/cancel, the three report tabs, and post-logout
+  route protection.
+
+Known follow-ups: `pnpm lint` still reports the 28 pre-existing errors this branch inherited
+(server `any`, `ManagerShell` conditional hooks) — none introduced by Phase 5;
+`/api/organization` reads are ADMIN-only but not scope-filtered, so an admin manages the whole
+org tree (the alternative would make the second seed company unmanageable).
 
 ---
 
