@@ -1,8 +1,7 @@
 import { ApiError } from "../../lib/api-error.js"
+import { isValidCalendarDate } from "../../lib/calendar-date.js"
 import type { DateRangeFilter, InstantRangeFilter, ReportsRepository } from "../../repositories/reports-repository.js"
 import type { FleetReportDataset, GoodsReportDataset, ReportsQuery, VisitsReportDataset } from "./types.js"
-
-const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
 /**
  * Serves raw record datasets for the Manager Reports screen. Date-range semantics mirror the
@@ -36,7 +35,7 @@ export class ReportsService {
 
   private parseDate(value: string | undefined): string | undefined {
     if (value === undefined || value === "") return undefined
-    if (!DATE_PATTERN.test(value) || Number.isNaN(new Date(`${value}T12:00:00`).getTime())) {
+    if (!isValidCalendarDate(value)) {
       throw new ApiError(400, "VALIDATION_ERROR", "Geçersiz rapor tarih aralığı.")
     }
     return value

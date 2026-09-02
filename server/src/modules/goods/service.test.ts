@@ -60,6 +60,14 @@ describe("GoodsMovementService create/update/cancel", () => {
     await expect(service.create({ ...validInput, facilityId: "unknown" })).rejects.toMatchObject({ code: "INVALID_SCOPE" })
   })
 
+  it("rejects a well-formed but non-existent calendar plannedDate (strict validation regression)", async () => {
+    const { service } = makeService()
+    await expect(service.create({ ...validInput, plannedDate: "2026-02-31" })).rejects.toMatchObject({ code: "VALIDATION_ERROR" })
+    await expect(service.create({ ...validInput, plannedDate: "2025-02-29" })).rejects.toMatchObject({ code: "VALIDATION_ERROR" })
+    // A real leap day still passes.
+    await expect(service.create({ ...validInput, plannedDate: "2028-02-29" })).resolves.toMatchObject({ plannedDate: "2028-02-29" })
+  })
+
   it("updates only while PLANNED and blocks edits after completion", async () => {
     const { service } = makeService()
     const created = await service.create(validInput)

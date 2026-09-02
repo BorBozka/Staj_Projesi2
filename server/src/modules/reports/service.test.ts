@@ -100,4 +100,11 @@ describe("ReportsService — date / company / facility filtering", () => {
     const service = makeService()
     await expect(service.getVisitsReport({ startDate: "2026-13-40" })).rejects.toMatchObject({ code: "VALIDATION_ERROR" })
   })
+
+  it("rejects a well-formed but non-existent calendar date on either bound (strict validation regression)", async () => {
+    const service = makeService()
+    await expect(service.getVisitsReport({ startDate: "2026-02-31" })).rejects.toMatchObject({ code: "VALIDATION_ERROR" })
+    await expect(service.getGoodsReport({ endDate: "2025-02-29" })).rejects.toMatchObject({ code: "VALIDATION_ERROR" })
+    await expect(service.getFleetReport({ startDate: "2026-04-31", endDate: "2026-05-01" })).rejects.toMatchObject({ code: "VALIDATION_ERROR" })
+  })
 })

@@ -1,8 +1,8 @@
 import { ApiError } from "../../lib/api-error.js"
+import { isValidCalendarDate } from "../../lib/calendar-date.js"
 import { isWithinAuthorizationScope, type AuthorizationScope } from "../../lib/scope.js"
 import type { GoodsMovementRepository, PersistGoodsMovementInput } from "../../repositories/goods-movement-repository.js"
 import {
-  GOODS_DATE_PATTERN,
   GOODS_TIME_PATTERN,
   goodsMovementDirections,
   normalizeOptionalText,
@@ -98,11 +98,7 @@ export class GoodsMovementService {
     if (!counterpartyName || !goodsDescription) {
       throw new ApiError(400, "VALIDATION_ERROR", "Karşı firma ve mal/açıklama zorunludur.")
     }
-    if (
-      !goodsMovementDirections.includes(input.direction)
-      || !GOODS_DATE_PATTERN.test(input.plannedDate)
-      || Number.isNaN(new Date(`${input.plannedDate}T12:00:00`).getTime())
-    ) {
+    if (!goodsMovementDirections.includes(input.direction) || !isValidCalendarDate(input.plannedDate)) {
       throw new ApiError(400, "VALIDATION_ERROR", "Yön ve planlanan tarih zorunludur.")
     }
     const plannedTime = normalizeOptionalText(input.plannedTime)
