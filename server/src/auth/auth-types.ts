@@ -4,6 +4,14 @@ export type ApplicationRole = (typeof applicationRoles)[number]
 export const authenticationSources = ["ACTIVE_DIRECTORY", "LOCAL"] as const
 export type AuthenticationSource = (typeof authenticationSources)[number]
 
+export function parseApplicationRole(value: string): ApplicationRole | null {
+  return applicationRoles.find((role) => role === value) ?? null
+}
+
+export function parseAuthenticationSource(value: string): AuthenticationSource | null {
+  return authenticationSources.find((source) => source === value) ?? null
+}
+
 export interface AuthUserRecord {
   id: string
   username: string

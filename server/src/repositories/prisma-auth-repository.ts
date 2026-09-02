@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@prisma/client"
 
-import type { AuthUserRecord, SessionRecord, SessionWithUser } from "../auth/auth-types.js"
+import { parseApplicationRole, parseAuthenticationSource, type AuthUserRecord, type SessionRecord, type SessionWithUser } from "../auth/auth-types.js"
 import type { AuthRepository, CreateSessionInput } from "./auth-repository.js"
 
 const userSelect = {
@@ -22,10 +22,13 @@ function toUserRecord(user: {
   active: boolean
   passwordHash: string | null
 }): AuthUserRecord {
+  const role = parseApplicationRole(user.role)
+  const authenticationSource = parseAuthenticationSource(user.authenticationSource)
+  if (!role || !authenticationSource) throw new Error("Unsupported persisted user role or authentication source.")
   return {
     ...user,
-    role: user.role as AuthUserRecord["role"],
-    authenticationSource: user.authenticationSource as AuthUserRecord["authenticationSource"],
+    role,
+    authenticationSource,
   }
 }
 
