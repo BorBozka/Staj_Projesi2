@@ -49,10 +49,12 @@ import {
   type ReportsScopeFilters,
 } from "@/features/reports/reports-filters"
 import type { ReportExportHandle } from "@/features/reports/report-export"
+import { useReportsDataset } from "@/features/reports/use-reports-dataset"
 import {
   VisitsReportTab,
 } from "@/features/reports/VisitsReportTab"
 import { useVisits } from "@/features/visits/visit-context"
+import { reportsService } from "@/services"
 import { formatTr } from "@/lib/date"
 import { useFillViewportHeight } from "@/lib/use-fill-viewport-height"
 import { cn } from "@/lib/utils"
@@ -73,7 +75,12 @@ const comparisonOptions: { value: ReportComparisonMode; label: string }[] = [
 ]
 
 export function ReportsPage() {
-  const { meetings, visits, referenceData, isLoading, error, reload } = useVisits()
+  const { meetings, referenceData, isLoading: referenceLoading, error: referenceError, reload } = useVisits()
+  // The Ziyaretler tab's dataset comes from the canonical, scope-filtered reports endpoint.
+  const visitsDataset = useReportsDataset(useCallback(() => reportsService.getVisitsDataset({}), []))
+  const visits = visitsDataset.data
+  const isLoading = referenceLoading || visitsDataset.isLoading
+  const error = referenceError ?? visitsDataset.error
   const [searchParams, setSearchParams] = useSearchParams()
   const [now] = useState(() => new Date())
   const exportRef = useRef<ReportExportHandle>(null)
@@ -112,7 +119,7 @@ export function ReportsPage() {
         <AlertCircle className="mx-auto size-8 text-red-600" />
         <h1 className="mt-3 text-base font-semibold text-slate-900">Raporlar yüklenemedi</h1>
         <p className="mt-1 text-sm text-slate-600">{error ?? "Referans verileri alınamadı."}</p>
-        <Button className="mt-4" onClick={() => void reload()}>Tekrar dene</Button>
+        <Button className="mt-4" onClick={() => { void reload(); visitsDataset.retry() }}>Tekrar dene</Button>
       </section>
     )
   }

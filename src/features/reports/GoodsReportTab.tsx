@@ -39,7 +39,7 @@ import {
 import type { ReportsScopeFilters } from "@/features/reports/reports-filters"
 import { formatTr } from "@/lib/date"
 import { toggleSingleSort } from "@/lib/sort"
-import { goodsMovementService } from "@/services"
+import { reportsService } from "@/services"
 
 const statusBadgeClass: Record<ReturnType<typeof getGoodsMovementDisplayStatus>, string> = {
   PLANNED: "border-blue-200 bg-blue-50 text-blue-700", COMPLETED: "border-emerald-200 bg-emerald-50 text-emerald-700", CANCELLED: "border-slate-200 bg-slate-100 text-slate-600", LATE: "border-amber-200 bg-amber-50 text-amber-700",
@@ -57,6 +57,8 @@ interface GoodsReportTabProps {
 export const GoodsReportTab = forwardRef<ReportExportHandle, GoodsReportTabProps>(function GoodsReportTab({ filters, dateRangeInvalid, selectedGranularity, comparisonFilters = null, comparisonLabel = "Önceki dönem", onExportAvailabilityChange }, ref) {
   const [movements, setMovements] = useState<GoodsMovement[]>([])
   const [movementsLoaded, setMovementsLoaded] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [reloadNonce, setReloadNonce] = useState(0)
   const [selectedMovement, setSelectedMovement] = useState<GoodsMovement | null>(null)
   const detailTriggerRef = useRef<HTMLTableRowElement | null>(null)
   const [searchParams, setSearchParams] = useSearchParams()
@@ -64,14 +66,12 @@ export const GoodsReportTab = forwardRef<ReportExportHandle, GoodsReportTabProps
 
   useEffect(() => {
     let cancelled = false
-    void goodsMovementService.listGoodsMovements().then((next) => {
-      if (!cancelled) {
-        setMovements(next)
-        setMovementsLoaded(true)
-      }
-    })
+    setLoadError(null)
+    void reportsService.getGoodsDataset({})
+      .then((next) => { if (!cancelled) { setMovements(next); setMovementsLoaded(true) } })
+      .catch((cause: unknown) => { if (!cancelled) setLoadError(cause instanceof Error ? cause.message : "Mal hareketi raporu alınamadı.") })
     return () => { cancelled = true }
-  }, [])
+  }, [reloadNonce])
 
   const reportMovements = useMemo(() => filterGoodsMovementsForReport(movements, filters), [movements, filters])
   const recordMovements = useMemo(() => sortGoodsReportRecords(searchGoodsReportRecords(reportMovements, workspace.search), workspace.sort), [reportMovements, workspace.search, workspace.sort])
@@ -111,6 +111,15 @@ export const GoodsReportTab = forwardRef<ReportExportHandle, GoodsReportTabProps
     exportPdf: () => { void downloadReportPdf("Mal Hareketi Raporu", headers, exportRows(), `${exportFilenameBase}.pdf`) },
     exportChartPng: () => { const card = document.getElementById("goods-analysis-card"); if (card) void downloadElementAsPng(card, `mal-hareketi-analizi_${filters.startDate || "tumu"}_${filters.endDate || "tumu"}.png`) },
   }))
+
+  if (loadError) return (
+    <section className="flex h-full min-h-0 flex-col items-center justify-center rounded-lg border border-red-200 bg-card p-6 text-center shadow-panel" role="alert">
+      <p className="text-sm font-semibold text-slate-900">Mal hareketi raporu yüklenemedi</p>
+      <p className="mt-1 text-xs text-slate-600">{loadError}</p>
+      <button type="button" className="mt-4 inline-flex h-9 items-center rounded-md bg-slate-900 px-4 text-xs font-medium text-white hover:bg-slate-700" onClick={() => setReloadNonce((value) => value + 1)}>Tekrar dene</button>
+    </section>
+  )
+  if (!movementsLoaded) return <section className="h-full animate-pulse rounded-lg border bg-slate-100" aria-label="Rapor yükleniyor" role="status" />
 
   if (workspace.view === "records") return <><section className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border bg-card shadow-panel" aria-label="Mal hareketi kayıtları">{dateRangeInvalid ? <EmptyState title="Geçersiz tarih aralığı" description="Başlangıç tarihi bitiş tarihinden sonra olamaz." /> : recordMovements.length === 0 ? <EmptyState title={workspace.search ? "Eşleşen kayıt bulunamadı" : "Eşleşen mal hareketi bulunamadı"} description={workspace.search ? "Arama ifadesini değiştirerek yeniden deneyin." : "Filtre ölçütlerini değiştirerek yeniden deneyin."} showSearch /> : <><div className="min-h-0 flex-1 overflow-hidden"><div className="h-full overflow-x-auto overflow-y-hidden scrollbar-thin"><table className="h-full w-full min-w-[1100px] table-fixed text-left text-xs"><thead className="border-b bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"><tr><SortableHeader className="w-[9%]" label="Yön" field="direction" sort={workspace.sort} onChange={(sort) => setSearchParams(setGoodsReportWorkspace(searchParams, { sort }))} /><SortableHeader className="w-[16%]" label="Şirket / Tesis" field="scope" sort={workspace.sort} onChange={(sort) => setSearchParams(setGoodsReportWorkspace(searchParams, { sort }))} /><SortableHeader className="w-[15%]" label="Karşı Taraf" field="counterparty" sort={workspace.sort} onChange={(sort) => setSearchParams(setGoodsReportWorkspace(searchParams, { sort }))} /><SortableHeader className="w-[14%]" label="Planlanan Tarih / Saat" field="planned" sort={workspace.sort} onChange={(sort) => setSearchParams(setGoodsReportWorkspace(searchParams, { sort }))} /><SortableHeader className="w-[14%]" label="Gerçek Zaman" field="actual" sort={workspace.sort} onChange={(sort) => setSearchParams(setGoodsReportWorkspace(searchParams, { sort }))} /><SortableHeader className="w-[10%]" label="Durum" field="status" sort={workspace.sort} onChange={(sort) => setSearchParams(setGoodsReportWorkspace(searchParams, { sort }))} /><SortableHeader className="w-[11%]" label="Referans No" field="reference" sort={workspace.sort} onChange={(sort) => setSearchParams(setGoodsReportWorkspace(searchParams, { sort }))} /><SortableHeader className="w-[11%]" label="Plaka / Şoför" field="driver" sort={workspace.sort} onChange={(sort) => setSearchParams(setGoodsReportWorkspace(searchParams, { sort }))} /></tr></thead><tbody>{paginatedMovements.map((movement) => <GoodsRecordRow key={movement.id} movement={movement} onOpen={(row) => { detailTriggerRef.current = row; setSelectedMovement(movement) }} />)}{Array.from({ length: Math.max(0, GOODS_REPORT_PAGE_SIZE - paginatedMovements.length) }).map((_, index) => <GoodsReportFillerRow key={`goods-filler-${index}`} />)}</tbody></table></div></div><div className="shrink-0"><ReportPagination page={page} pageCount={pageCount} visibleStart={visibleStart} visibleEnd={visibleEnd} total={recordMovements.length} visiblePageNumbers={getVisibleGoodsReportPageNumbers(page, pageCount)} onPageChange={(nextPage) => setSearchParams(setGoodsReportPage(searchParams, nextPage))} ariaLabel="Mal hareketi rapor sayfaları" /></div></>}</section><GoodsMovementDetailDialog movement={selectedMovement} open={selectedMovement !== null} onOpenChange={(open) => { if (!open) setSelectedMovement(null) }} returnFocusRef={detailTriggerRef} /></>
 

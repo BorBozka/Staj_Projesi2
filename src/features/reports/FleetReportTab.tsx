@@ -40,11 +40,13 @@ import {
 import type { ReportsScopeFilters } from "@/features/reports/reports-filters"
 import { formatTr } from "@/lib/date"
 import { toggleSingleSort } from "@/lib/sort"
-import { transportAssignmentService } from "@/services"
+import { reportsService } from "@/services"
 
 export const FleetReportTab = forwardRef<ReportExportHandle, { meetings: Meeting[]; visits: Visit[]; filters: ReportsScopeFilters; dateRangeInvalid: boolean; comparisonFilters?: ReportsScopeFilters | null; comparisonLabel?: string; onExportAvailabilityChange?(canExport: boolean): void }>(function FleetReportTab({ meetings, visits, filters, dateRangeInvalid, comparisonFilters = null, comparisonLabel = "Önceki dönem", onExportAvailabilityChange }, ref) {
   const [assignments, setAssignments] = useState<PlannedTransportAssignment[]>([])
   const [assignmentsLoaded, setAssignmentsLoaded] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [reloadNonce, setReloadNonce] = useState(0)
   const [selectedAssignment, setSelectedAssignment] = useState<PlannedTransportAssignment | null>(null)
   const detailTriggerRef = useRef<HTMLTableRowElement | null>(null)
   const [searchParams, setSearchParams] = useSearchParams()
@@ -52,14 +54,12 @@ export const FleetReportTab = forwardRef<ReportExportHandle, { meetings: Meeting
 
   useEffect(() => {
     let cancelled = false
-    void transportAssignmentService.listAssignments().then((next) => {
-      if (!cancelled) {
-        setAssignments(next)
-        setAssignmentsLoaded(true)
-      }
-    })
+    setLoadError(null)
+    void reportsService.getFleetDataset({})
+      .then((next) => { if (!cancelled) { setAssignments(next); setAssignmentsLoaded(true) } })
+      .catch((cause: unknown) => { if (!cancelled) setLoadError(cause instanceof Error ? cause.message : "Araç-şoför raporu alınamadı.") })
     return () => { cancelled = true }
-  }, [])
+  }, [reloadNonce])
 
   const reportAssignments = useMemo(() => filterAssignmentsForReport(assignments, filters), [assignments, filters])
   const recordAssignments = useMemo(() => sortFleetReportRecords(searchFleetReportRecords(reportAssignments, workspace.search, (assignment) => getRelatedRecordLabel(assignment, meetings, visits)), workspace.sort), [meetings, reportAssignments, visits, workspace.search, workspace.sort])
@@ -110,6 +110,19 @@ export const FleetReportTab = forwardRef<ReportExportHandle, { meetings: Meeting
     exportPdf: () => { void downloadReportPdf("Araç / Şoför Raporu", headers, exportRows(), `${exportFilenameBase}.pdf`) },
     exportChartPng: () => { const card = document.getElementById("fleet-analysis-card"); if (card) void downloadElementAsPng(card, `arac-sofor-analizi_${filters.startDate || "tumu"}_${filters.endDate || "tumu"}.png`) },
   }))
+
+  if (loadError) {
+    return (
+      <section className="flex h-full min-h-0 flex-col items-center justify-center rounded-lg border border-red-200 bg-card p-6 text-center shadow-panel" role="alert">
+        <p className="text-sm font-semibold text-slate-900">Araç-şoför raporu yüklenemedi</p>
+        <p className="mt-1 text-xs text-slate-600">{loadError}</p>
+        <button type="button" className="mt-4 inline-flex h-9 items-center rounded-md bg-slate-900 px-4 text-xs font-medium text-white hover:bg-slate-700" onClick={() => setReloadNonce((value) => value + 1)}>Tekrar dene</button>
+      </section>
+    )
+  }
+  if (!assignmentsLoaded) {
+    return <section className="h-full animate-pulse rounded-lg border bg-slate-100" aria-label="Rapor yükleniyor" role="status" />
+  }
 
   if (workspace.view === "records") {
     return (
