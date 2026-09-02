@@ -60,6 +60,18 @@ Bu proje, ziyaret yaşam döngüsünü tek bir sistemde görünür ve yönetileb
     pnpm install
     pnpm dev
 
+Frontend artık verisini gerçek Fastify/Prisma backend'inden alır; sessiz mock fallback yoktur.
+Tam yerel dizi: (1) MSSQL, (2) `server/.env`, (3) `pnpm db:migrate` / `pnpm db:seed`,
+(4) `pnpm dev:api` (`http://localhost:3001`), (5) `pnpm dev` (`http://localhost:5173`).
+
+### Frontend API yapılandırması
+
+Frontend, backend adresini `VITE_API_BASE_URL` ortam değişkeninden okur (`/api` yolu dahil).
+Değişken tanımlı değilse `http://localhost:3001/api` varsayılanına düşer. Yerel değişiklik için
+kök dizinde `.env.example` dosyasını `.env.local` olarak kopyalayın:
+
+    cp .env.example .env.local
+
 Temel doğrulama komutları:
 
     pnpm test
