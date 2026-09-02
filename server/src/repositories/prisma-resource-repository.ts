@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client"
+import type { Prisma, PrismaClient } from "@prisma/client"
 import { parseResourceType, type FacilityResource, type ResourceInput } from "../modules/resources/types.js"
 import type { ResourceRepository } from "./resource-repository.js"
 
@@ -16,12 +16,22 @@ function toResource(row: Row): FacilityResource {
   }
 }
 
-function inputData(input: ResourceInput) {
+function createData(input: ResourceInput, active: boolean): Prisma.ResourceUncheckedCreateInput {
   const empty = { name: null, totalQuantity: null, brand: null, model: null, licensePlate: null, fullName: null, canDriveCommercialVehicles: null }
   switch (input.type) {
-    case "ROOM": return { ...empty, type: input.type, companyId: input.companyId, facilityId: input.facilityId, name: input.name, driverLicenseClasses: { deleteMany: {} }, driverDocuments: { deleteMany: {} } }
-    case "POOLED_EQUIPMENT": return { ...empty, type: input.type, companyId: input.companyId, facilityId: input.facilityId, name: input.name, totalQuantity: input.totalQuantity, driverLicenseClasses: { deleteMany: {} }, driverDocuments: { deleteMany: {} } }
-    case "VEHICLE": return { ...empty, type: input.type, companyId: input.companyId, facilityId: input.facilityId, brand: input.brand, model: input.model, licensePlate: input.licensePlate, driverLicenseClasses: { deleteMany: {} }, driverDocuments: { deleteMany: {} } }
+    case "ROOM": return { ...empty, type: input.type, companyId: input.companyId, facilityId: input.facilityId, name: input.name, active }
+    case "POOLED_EQUIPMENT": return { ...empty, type: input.type, companyId: input.companyId, facilityId: input.facilityId, name: input.name, totalQuantity: input.totalQuantity, active }
+    case "VEHICLE": return { ...empty, type: input.type, companyId: input.companyId, facilityId: input.facilityId, brand: input.brand, model: input.model, licensePlate: input.licensePlate, active }
+    case "DRIVER": return { ...empty, type: input.type, companyId: input.companyId, facilityId: input.facilityId, fullName: input.fullName, canDriveCommercialVehicles: input.canDriveCommercialVehicles, active, driverLicenseClasses: { create: input.licenseClasses.map((value) => ({ value })) }, driverDocuments: { create: input.documents.map((name) => ({ name })) } }
+  }
+}
+
+function updateData(input: ResourceInput): Prisma.ResourceUncheckedUpdateInput {
+  const empty = { name: null, totalQuantity: null, brand: null, model: null, licensePlate: null, fullName: null, canDriveCommercialVehicles: null }
+  switch (input.type) {
+    case "ROOM": return { ...empty, type: input.type, companyId: input.companyId, facilityId: input.facilityId, name: input.name }
+    case "POOLED_EQUIPMENT": return { ...empty, type: input.type, companyId: input.companyId, facilityId: input.facilityId, name: input.name, totalQuantity: input.totalQuantity }
+    case "VEHICLE": return { ...empty, type: input.type, companyId: input.companyId, facilityId: input.facilityId, brand: input.brand, model: input.model, licensePlate: input.licensePlate }
     case "DRIVER": return { ...empty, type: input.type, companyId: input.companyId, facilityId: input.facilityId, fullName: input.fullName, canDriveCommercialVehicles: input.canDriveCommercialVehicles, driverLicenseClasses: { deleteMany: {}, create: input.licenseClasses.map((value) => ({ value })) }, driverDocuments: { deleteMany: {}, create: input.documents.map((name) => ({ name })) } }
   }
 }
@@ -30,7 +40,7 @@ export class PrismaResourceRepository implements ResourceRepository {
   constructor(private readonly prisma: PrismaClient) {}
   async list(filters: { includeInactive: boolean; companyId?: string; facilityId?: string; type?: string }) { const rows = await this.prisma.resource.findMany({ where: { ...(filters.includeInactive ? {} : { active: true }), ...(filters.companyId ? { companyId: filters.companyId } : {}), ...(filters.facilityId ? { facilityId: filters.facilityId } : {}), ...(filters.type ? { type: filters.type } : {}) }, include, orderBy: { createdAt: "asc" } }); return rows.map(toResource) }
   async find(id: string) { const row = await this.prisma.resource.findUnique({ where: { id }, include }); return row ? toResource(row) : null }
-  async save(input: ResourceInput, id?: string, active = true) { const data = inputData(input); const row = id ? await this.prisma.resource.update({ where: { id }, data, include }) : await this.prisma.resource.create({ data: { ...data, active }, include }); return toResource(row) }
+  async save(input: ResourceInput, id?: string, active = true) { const row = id ? await this.prisma.resource.update({ where: { id }, data: updateData(input), include }) : await this.prisma.resource.create({ data: createData(input, active), include }); return toResource(row) }
   async setActive(id: string, active: boolean) { return toResource(await this.prisma.resource.update({ where: { id }, data: { active }, include })) }
   async companyAndFacilityExist(companyId: string, facilityId: string) { return Boolean(await this.prisma.facility.findFirst({ where: { id: facilityId, companyId }, select: { id: true } })) }
   async findVehicleByCompanyAndPlate(companyId: string, licensePlate: string, excludeId?: string) { const row = await this.prisma.resource.findFirst({ where: { type: "VEHICLE", companyId, licensePlate, ...(excludeId ? { id: { not: excludeId } } : {}) }, include }); return row ? toResource(row) : null }

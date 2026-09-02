@@ -703,17 +703,20 @@ the schema only as a future compatibility boundary; the login endpoint accepts L
 
 ---
 
-## Backend Phase 2 — Organization, admin, settings, and resource APIs
+## Backend Phase 2 — Organization, admin, operational settings, and resource catalog APIs
 
-Implement HTTP APIs for organization hierarchy, users and authorization scopes, visit types,
-visitor cards, visitor rules, operational settings, and resource catalog management.
+**Status: Complete.**
+
+Implements HTTP APIs for organization hierarchy, admin users and authorization scopes,
+singleton operational settings, and resource catalog management.
 
 ---
 
-## Backend Phase 3 — Meetings, visits, invitations, security, cards, and rules APIs
+## Backend Phase 3 — Visit types, meetings, visits, invitations, security, cards, and rules APIs
 
-Implement Meeting/Visit workflows, invitations and pre-registration, Security desk operations,
-visitor-card transitions, host-correction audits, and immutable visitor-rule acceptance APIs.
+Implement visit types, Meeting/Visit workflows, invitations and pre-registration, Security desk
+operations, visitor-card transitions, host-correction audits, and immutable visitor-rule
+acceptance APIs.
 
 ---
 
