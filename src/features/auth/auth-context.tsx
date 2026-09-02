@@ -1,14 +1,20 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 
+import { isApiClientError } from "@/lib/http"
 import type { SessionService, SessionUser } from "@/services/session-service"
 
 interface AuthContextValue {
   currentUser: SessionUser | null
   authenticated: boolean
+  /** True until the first `GET /api/auth/session` settles (success or failure). */
   initializing: boolean
+  /** Set when session hydration could not reach the backend — the app is neither in nor out. */
+  initError: string | null
   loading: boolean
   login(username: string, password: string): Promise<SessionUser>
   logout(): Promise<void>
+  /** Re-run session hydration after an `initError` (or to refresh the current session). */
+  retryHydration(): void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -16,23 +22,41 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 export function AuthProvider({ service, children }: { service: SessionService; children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<SessionUser | null>(null)
   const [initializing, setInitializing] = useState(true)
+  const [initError, setInitError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [hydrationNonce, setHydrationNonce] = useState(0)
 
   useEffect(() => {
     let active = true
-    void service.getCurrentSession().then((session) => {
+    setInitializing(true)
+    setInitError(null)
+    void service
+      .getCurrentSession()
+      .then((session) => {
+        if (!active) return
+        setCurrentUser(session)
+        setInitializing(false)
+      })
+      .catch((error: unknown) => {
+        if (!active) return
+        // A hydration failure is a reachability problem, not "logged out" — do not bounce to a
+        // login form that also cannot reach the backend. Surface it and offer a retry.
+        setInitError(
+          isApiClientError(error) ? error.message : "Oturum bilgisi alınamadı. Bağlantınızı kontrol edin.",
+        )
+        setInitializing(false)
+      })
+    const unsubscribe = service.subscribe((session) => {
       if (active) {
         setCurrentUser(session)
         setInitializing(false)
       }
     })
-    return service.subscribe((session) => {
-      if (active) {
-        setCurrentUser(session)
-        setInitializing(false)
-      }
-    })
-  }, [service])
+    return () => {
+      active = false
+      unsubscribe()
+    }
+  }, [service, hydrationNonce])
 
   const login = useCallback(async (username: string, password: string) => {
     setLoading(true)
@@ -55,7 +79,21 @@ export function AuthProvider({ service, children }: { service: SessionService; c
     }
   }, [service])
 
-  const value = useMemo(() => ({ currentUser, authenticated: currentUser !== null, initializing, loading, login, logout }), [currentUser, initializing, loading, login, logout])
+  const retryHydration = useCallback(() => setHydrationNonce((value) => value + 1), [])
+
+  const value = useMemo(
+    () => ({
+      currentUser,
+      authenticated: currentUser !== null,
+      initializing,
+      initError,
+      loading,
+      login,
+      logout,
+      retryHydration,
+    }),
+    [currentUser, initializing, initError, loading, login, logout, retryHydration],
+  )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

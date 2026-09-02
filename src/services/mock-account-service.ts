@@ -1,27 +1,12 @@
+import { avatarChangedEvent, clearStoredAvatar, readStoredAvatar, writeStoredAvatar } from "@/services/account-avatar-store"
 import type { AccountService, ChangePasswordInput } from "@/services/account-service"
 import { MockAuthenticationStore } from "@/services/mock-authentication-store"
 
-const avatarStoragePrefix = "visitor-management:account-avatar:"
-const avatarChangedEvent = "visitor-management:account-avatar-changed"
-
-function getStorage() {
-  if (typeof window === "undefined") return undefined
-  try { return window.localStorage } catch { return undefined }
-}
-
-function avatarStorageKey(userId: string) {
-  return `${avatarStoragePrefix}${userId}`
-}
-
-function announceAvatarChange(userId: string) {
-  if (typeof window !== "undefined" && typeof CustomEvent !== "undefined") window.dispatchEvent(new CustomEvent(avatarChangedEvent, { detail: { userId } }))
-}
-
-/** Mock-only account adapter. The production adapter will call authenticated account endpoints. */
+/** Mock-only account adapter (test/dev fixture). Avatars share the same client-side store. */
 export class MockAccountService implements AccountService {
   constructor(private readonly authStore = new MockAuthenticationStore()) {}
   async getAvatar(userId: string) {
-    return getStorage()?.getItem(avatarStorageKey(userId)) ?? undefined
+    return readStoredAvatar(userId)
   }
 
   async changePassword({ userId, currentPassword, newPassword }: ChangePasswordInput) {
@@ -30,14 +15,11 @@ export class MockAccountService implements AccountService {
   }
 
   async updateAvatar(userId: string, avatar: string) {
-    if (!avatar.startsWith("data:image/")) throw new Error("Geçerli bir görsel kaydedilemedi.")
-    getStorage()?.setItem(avatarStorageKey(userId), avatar)
-    announceAvatarChange(userId)
+    writeStoredAvatar(userId, avatar)
   }
 
   async removeAvatar(userId: string) {
-    getStorage()?.removeItem(avatarStorageKey(userId))
-    announceAvatarChange(userId)
+    clearStoredAvatar(userId)
   }
 }
 
