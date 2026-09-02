@@ -4,7 +4,7 @@ import { PrismaClient } from "@prisma/client"
 
 import { hashPassword } from "../src/auth/password.js"
 import { normalizeIdentity } from "../src/lib/names.js"
-import { getDemoSeedUsers, shouldSeedDemoData } from "./seed-data.js"
+import { demoSeedUserScopes, getDemoSeedUsers, shouldSeedDemoData } from "./seed-data.js"
 
 const prisma = new PrismaClient()
 
@@ -35,6 +35,32 @@ async function seed() {
     create: { id: "gate-bplas-merkez-ana-giris", facilityId: facility.id, name: "Ana Giriş", nameNormalized: "ana giriş", active: true },
   })
 
+  // Secondary company — isolated scope target for authorization / cross-scope tests.
+  const otomotivCompany = await prisma.company.upsert({
+    where: { id: "bplas-otomotiv" },
+    update: { name: "BPLAS Otomotiv A.Ş.", nameNormalized: "bplas otomotiv a.ş.", active: true },
+    create: { id: "bplas-otomotiv", name: "BPLAS Otomotiv A.Ş.", nameNormalized: "bplas otomotiv a.ş.", active: true },
+  })
+  const otomotivFacility = await prisma.facility.upsert({
+    where: { id: "bplas-otomotiv-merkez" },
+    update: { companyId: otomotivCompany.id, name: "Otomotiv Tesisi", nameNormalized: "otomotiv tesisi", active: true },
+    create: { id: "bplas-otomotiv-merkez", companyId: otomotivCompany.id, name: "Otomotiv Tesisi", nameNormalized: "otomotiv tesisi", active: true },
+  })
+  const otomotivDepartment = await prisma.department.upsert({
+    where: { id: "department-bplas-otomotiv-yonetim" },
+    update: { companyId: otomotivCompany.id, name: "Yönetim", nameNormalized: "yönetim", active: true },
+    create: { id: "department-bplas-otomotiv-yonetim", companyId: otomotivCompany.id, name: "Yönetim", nameNormalized: "yönetim", active: true },
+  })
+  await prisma.securityGate.upsert({
+    where: { id: "gate-bplas-otomotiv-merkez-ana-giris" },
+    update: { facilityId: otomotivFacility.id, name: "Ana Giriş", nameNormalized: "ana giriş", active: true },
+    create: { id: "gate-bplas-otomotiv-merkez-ana-giris", facilityId: otomotivFacility.id, name: "Ana Giriş", nameNormalized: "ana giriş", active: true },
+  })
+  const orgById = {
+    bplas: { companyId: company.id, facilityId: facility.id, departmentId: department.id, gateId: gate.id },
+    "bplas-otomotiv": { companyId: otomotivCompany.id, facilityId: otomotivFacility.id, departmentId: otomotivDepartment.id, gateId: "gate-bplas-otomotiv-merkez-ana-giris" },
+  } as const
+
   await prisma.visitType.upsert({
     where: { id: "meeting" },
     update: { name: "Toplantı", nameNormalized: "toplantı", active: true },
@@ -59,6 +85,8 @@ async function seed() {
   }
 
   for (const definition of getDemoSeedUsers(process.env)) {
+    const scopeKey = demoSeedUserScopes[definition.id]?.companyId === "bplas-otomotiv" ? "bplas-otomotiv" : "bplas"
+    const org = orgById[scopeKey]
     const passwordHash = await hashPassword(definition.password)
     await prisma.user.upsert({
       where: { id: definition.id },
@@ -88,31 +116,31 @@ async function seed() {
     })
 
     await prisma.userCompanyScope.upsert({
-      where: { userId_companyId: { userId: definition.id, companyId: company.id } },
+      where: { userId_companyId: { userId: definition.id, companyId: org.companyId } },
       update: {},
-      create: { userId: definition.id, companyId: company.id },
+      create: { userId: definition.id, companyId: org.companyId },
     })
     await prisma.userFacilityScope.upsert({
-      where: { userId_facilityId: { userId: definition.id, facilityId: facility.id } },
+      where: { userId_facilityId: { userId: definition.id, facilityId: org.facilityId } },
       update: {},
-      create: { userId: definition.id, facilityId: facility.id },
+      create: { userId: definition.id, facilityId: org.facilityId },
     })
     await prisma.userSecurityGateScope.upsert({
-      where: { userId_securityGateId: { userId: definition.id, securityGateId: gate.id } },
+      where: { userId_securityGateId: { userId: definition.id, securityGateId: org.gateId } },
       update: {},
-      create: { userId: definition.id, securityGateId: gate.id },
+      create: { userId: definition.id, securityGateId: org.gateId },
     })
 
     if (definition.employeeId) {
       await prisma.employee.upsert({
         where: { id: definition.employeeId },
-        update: { userId: definition.id, fullName: definition.fullName, companyId: company.id, departmentId: department.id, active: true },
-        create: { id: definition.employeeId, userId: definition.id, fullName: definition.fullName, companyId: company.id, departmentId: department.id, active: true },
+        update: { userId: definition.id, fullName: definition.fullName, companyId: org.companyId, departmentId: org.departmentId, active: true },
+        create: { id: definition.employeeId, userId: definition.id, fullName: definition.fullName, companyId: org.companyId, departmentId: org.departmentId, active: true },
       })
       await prisma.employeeFacilityScope.upsert({
-        where: { employeeId_facilityId: { employeeId: definition.employeeId, facilityId: facility.id } },
+        where: { employeeId_facilityId: { employeeId: definition.employeeId, facilityId: org.facilityId } },
         update: {},
-        create: { employeeId: definition.employeeId, facilityId: facility.id },
+        create: { employeeId: definition.employeeId, facilityId: org.facilityId },
       })
     }
   }

@@ -30,7 +30,7 @@ describe("server configuration", () => {
 })
 
 describe("development demo seed definitions", () => {
-  it("exposes the four demo credentials only with the explicit development flag", () => {
+  it("exposes the demo credentials only with the explicit development flag", () => {
     expect(shouldSeedDemoData({ NODE_ENV: "production", DEMO_SEED_ENABLED: "true" })).toBe(false)
     expect(getDemoSeedUsers({ NODE_ENV: "production", DEMO_SEED_ENABLED: "true" })).toEqual([])
     expect(getDemoSeedUsers({ NODE_ENV: "development", DEMO_SEED_ENABLED: "false" })).toEqual([])
@@ -39,6 +39,8 @@ describe("development demo seed definitions", () => {
       "yonetici/yonetici",
       "admin/admin",
       "guvenlik/guvenlik",
+      "calisan2/calisan2",
+      "yonetici2/yonetici2",
     ])
   })
 })

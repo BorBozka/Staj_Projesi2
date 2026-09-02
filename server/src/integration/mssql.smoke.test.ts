@@ -13,7 +13,7 @@ import { PrismaOrganizationRepository } from "../repositories/prisma-organizatio
 import { PrismaResourceRepository } from "../repositories/prisma-resource-repository.js"
 import { PrismaSettingsRepository } from "../repositories/prisma-settings-repository.js"
 import { PrismaVisitorOperationsRepository } from "../repositories/visitor-operations-repository.js"
-import { demoSeedUsers } from "../../prisma/seed-data.js"
+import { demoSeedUsers, demoSeedUserScopes } from "../../prisma/seed-data.js"
 import type { EmailMessage, EmailSender } from "../delivery/email-sender.js"
 
 const describeMssql = process.env.RUN_MSSQL_INTEGRATION === "true" ? describe : describe.skip
@@ -125,11 +125,12 @@ describeMssql.sequential("Phase 1-3 MSSQL smoke", () => {
       })
       expect(user?.passwordHash).toBeTruthy()
       expect(await verifyPassword(user!.passwordHash!, definition.password)).toBe(true)
-      expect(user?.companyScopes).toEqual([expect.objectContaining({ companyId: "bplas" })])
-      expect(user?.facilityScopes).toEqual([expect.objectContaining({ facilityId: "bplas-merkez" })])
-      expect(user?.securityGateScopes).toEqual([
-        expect.objectContaining({ securityGateId: "gate-bplas-merkez-ana-giris" }),
-      ])
+      const expectedCompany = demoSeedUserScopes[definition.id]?.companyId ?? "bplas"
+      const expectedFacility = demoSeedUserScopes[definition.id]?.facilityId ?? "bplas-merkez"
+      const expectedGate = expectedCompany === "bplas-otomotiv" ? "gate-bplas-otomotiv-merkez-ana-giris" : "gate-bplas-merkez-ana-giris"
+      expect(user?.companyScopes).toEqual([expect.objectContaining({ companyId: expectedCompany })])
+      expect(user?.facilityScopes).toEqual([expect.objectContaining({ facilityId: expectedFacility })])
+      expect(user?.securityGateScopes).toEqual([expect.objectContaining({ securityGateId: expectedGate })])
     }
   })
 
@@ -164,12 +165,11 @@ describeMssql.sequential("Phase 1-3 MSSQL smoke", () => {
     ])
 
     expect(organization.statusCode).toBe(200)
-    expect(organization.json()).toMatchObject({
-      companies: [expect.objectContaining({ id: "bplas" })],
-      facilities: [expect.objectContaining({ id: "bplas-merkez", parentId: "bplas" })],
-      departments: [expect.objectContaining({ id: "department-bplas-yonetim", parentId: "bplas" })],
-      securityGates: [expect.objectContaining({ id: "gate-bplas-merkez-ana-giris", parentId: "bplas-merkez" })],
-    })
+    const organizationBody = organization.json()
+    expect(organizationBody.companies).toEqual(expect.arrayContaining([expect.objectContaining({ id: "bplas" })]))
+    expect(organizationBody.facilities).toEqual(expect.arrayContaining([expect.objectContaining({ id: "bplas-merkez", parentId: "bplas" })]))
+    expect(organizationBody.departments).toEqual(expect.arrayContaining([expect.objectContaining({ id: "department-bplas-yonetim", parentId: "bplas" })]))
+    expect(organizationBody.securityGates).toEqual(expect.arrayContaining([expect.objectContaining({ id: "gate-bplas-merkez-ana-giris", parentId: "bplas-merkez" })]))
     expect(users.statusCode).toBe(200)
     expect(users.json()).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: "current-admin-atahan-bozkurt", role: "ADMIN" }),

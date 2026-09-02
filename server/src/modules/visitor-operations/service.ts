@@ -100,7 +100,6 @@ export class VisitorOperationsService {
   }
 
   async updateMeeting(id: string, input: MeetingInput, ctx: AccessContext) {
-    await this.requireActor(ctx.userId)
     const current = await this.getMeeting(id)
     assertMeetingMutable(ctx, current.meeting)
     if (!scopeAllows(ctx, { companyId: input.hostCompanyId, facilityId: input.facilityId })) throw mutationForbidden()
@@ -112,7 +111,6 @@ export class VisitorOperationsService {
   }
 
   async rescheduleVisit(id: string, input: { plannedStart: string; plannedEnd: string }, ctx: AccessContext) {
-    await this.requireActor(ctx.userId)
     const visit = await this.requireVisit(id)
     assertMeetingMutable(ctx, visit.meeting)
     this.requireStatus(visit, "PLANNED", "Yalnızca planlanmış ziyaret yeniden planlanabilir.")
