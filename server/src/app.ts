@@ -17,6 +17,14 @@ import { registerResourceRoutes } from "./modules/resources/routes.js"
 import { ResourceService } from "./modules/resources/service.js"
 import { registerVisitorOperationsRoutes } from "./modules/visitor-operations/routes.js"
 import { VisitorOperationsService } from "./modules/visitor-operations/service.js"
+import { registerGoodsMovementRoutes } from "./modules/goods/routes.js"
+import { GoodsMovementService } from "./modules/goods/service.js"
+import { registerResourceAssignmentRoutes } from "./modules/resource-assignments/routes.js"
+import { ResourceAssignmentService } from "./modules/resource-assignments/service.js"
+import { registerTransportAssignmentRoutes } from "./modules/transport-assignments/routes.js"
+import { TransportAssignmentService } from "./modules/transport-assignments/service.js"
+import { registerReportsRoutes } from "./modules/reports/routes.js"
+import { ReportsService } from "./modules/reports/service.js"
 import { registerSecurityPlugins } from "./plugins/security.js"
 import type { EmailSender } from "./delivery/email-sender.js"
 import type { AuthRepository } from "./repositories/auth-repository.js"
@@ -25,6 +33,10 @@ import type { AdminRepository } from "./repositories/admin-repository.js"
 import type { SettingsRepository } from "./repositories/settings-repository.js"
 import type { ResourceRepository } from "./repositories/resource-repository.js"
 import type { VisitorOperationsRepository } from "./repositories/visitor-operations-repository.js"
+import type { GoodsMovementRepository } from "./repositories/goods-movement-repository.js"
+import type { ResourceAssignmentRepository } from "./repositories/resource-assignment-repository.js"
+import type { TransportAssignmentRepository } from "./repositories/transport-assignment-repository.js"
+import type { ReportsRepository } from "./repositories/reports-repository.js"
 
 export interface AppDependencies {
   authRepository: AuthRepository
@@ -33,6 +45,10 @@ export interface AppDependencies {
   settingsRepository?: SettingsRepository
   resourceRepository?: ResourceRepository
   visitorOperationsRepository?: VisitorOperationsRepository
+  goodsMovementRepository?: GoodsMovementRepository
+  resourceAssignmentRepository?: ResourceAssignmentRepository
+  transportAssignmentRepository?: TransportAssignmentRepository
+  reportsRepository?: ReportsRepository
   emailSender?: EmailSender
   checkDatabase?: () => Promise<void>
   authService?: AuthService
@@ -64,6 +80,18 @@ export async function buildApp(config: AppConfig, dependencies: AppDependencies)
   if (dependencies.resourceRepository) await registerResourceRoutes(app, { service: new ResourceService(dependencies.resourceRepository), guards })
   if (dependencies.visitorOperationsRepository && dependencies.emailSender) {
     await registerVisitorOperationsRoutes(app, { service: new VisitorOperationsService(dependencies.visitorOperationsRepository, dependencies.emailSender, config.webOrigin), guards })
+  }
+  if (dependencies.goodsMovementRepository) {
+    await registerGoodsMovementRoutes(app, { service: new GoodsMovementService(dependencies.goodsMovementRepository), guards })
+  }
+  if (dependencies.resourceAssignmentRepository) {
+    await registerResourceAssignmentRoutes(app, { service: new ResourceAssignmentService(dependencies.resourceAssignmentRepository), guards })
+  }
+  if (dependencies.transportAssignmentRepository) {
+    await registerTransportAssignmentRoutes(app, { service: new TransportAssignmentService(dependencies.transportAssignmentRepository), guards })
+  }
+  if (dependencies.reportsRepository) {
+    await registerReportsRoutes(app, { service: new ReportsService(dependencies.reportsRepository), guards })
   }
 
   return app

@@ -67,7 +67,9 @@ export class VisitorOperationsService {
     if (!Number.isInteger(extensionMinutes) || extensionMinutes <= 0) throw new ApiError(400, "VALIDATION_ERROR", "Uzatma süresi pozitif bir tam sayı dakika olmalıdır.")
     this.assertManualLifecycle(meeting.meeting, meeting.visits, actor.id, now)
     const base = Math.max(new Date(meeting.meeting.plannedEnd).getTime(), now.getTime())
-    await this.repository.updateMeetingTimes(id, new Date(meeting.meeting.plannedStart), new Date(base + extensionMinutes * 60_000))
+    // extendMeetingTimes re-validates the Meeting's ROOM / POOLED_EQUIPMENT assignments for the
+    // new range and moves plannedEnd in one transaction; a resource conflict rejects it whole.
+    await this.repository.extendMeetingTimes(id, new Date(meeting.meeting.plannedStart), new Date(base + extensionMinutes * 60_000))
     return this.getMeeting(id)
   }
 

@@ -1,11 +1,14 @@
 import type { PrismaClient } from "@prisma/client"
 
+import { ApiError } from "../lib/api-error.js"
+import { isWriteConflictError, withWriteConflictRetry } from "../lib/prisma-conflict.js"
 import type {
   CreateUnplannedInput, EmployeeActor, MeetingDto, MeetingInput, MeetingWithVisitsDto,
   PublicPreRegistrationDto, RuleAcceptanceDto, SecurityCheckInInput, SecurityCorrectionInput,
   VisitorCardDto, VisitorRuleDto, VisitDto, VisitTypeDto,
 } from "../modules/visitor-operations/types.js"
 import { parseEnum, invitationStatuses, ruleAcceptanceMethods, visitorCardStatuses, visitStatuses } from "../modules/visitor-operations/types.js"
+import type { ResourceExtensionGuard } from "./resource-assignment-repository.js"
 
 const invitationReset = { invitationStatus: "NOT_SENT", invitationSentAt: null, invitationError: null } as const
 
@@ -21,7 +24,9 @@ function isCheckInWriteConflict(error: unknown) {
   return error.code === "P2002" || error.code === "P2034"
 }
 
-const visitInclude = {
+// Exported for the Phase 4 reports repository, which projects the same flattened visitor
+// read model.
+export const visitInclude = {
   visitor: true,
   meeting: { include: { visitType: true, hostCompany: true, facility: true, hostEmployee: { include: { user: true } } } },
   ruleAcceptances: { orderBy: { acceptedAt: "desc" }, take: 1 },
@@ -41,7 +46,7 @@ function toMeeting(row: any): MeetingDto {
   }
 }
 
-function toVisit(row: any): VisitDto {
+export function toVisit(row: any): VisitDto {
   const acceptance = row.ruleAcceptances?.[0]
   const audit = row.hostCorrectionAudits?.[0]
   return {
@@ -78,6 +83,13 @@ export interface VisitorOperationsRepository {
   createMeeting(input: MeetingInput, creatorEmployeeId: string, hostEmployeeId: string | null): Promise<MeetingWithVisitsDto>
   updateMeeting(id: string, input: MeetingInput, hostEmployeeId: string | null): Promise<MeetingWithVisitsDto>
   updateMeetingTimes(id: string, plannedStart: Date, plannedEnd: Date): Promise<void>
+  /**
+   * Meeting extension: re-validates existing ROOM / POOLED_EQUIPMENT assignments for the new
+   * time range and moves plannedEnd in ONE transaction, so validation and the update cannot
+   * be split by a concurrent resource assignment. A resource conflict rejects the whole
+   * extension (plannedEnd unchanged).
+   */
+  extendMeetingTimes(id: string, plannedStart: Date, plannedEnd: Date): Promise<void>
   cancelVisit(id: string, userId: string, now: Date): Promise<void>
   cancelMeeting(id: string, userId: string, now: Date): Promise<void>
   closeMeeting(id: string, source: "MANUAL" | "VISITOR_CHECK_OUT", now: Date): Promise<void>
@@ -102,7 +114,10 @@ export interface VisitorOperationsRepository {
 }
 
 export class PrismaVisitorOperationsRepository implements VisitorOperationsRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly resourceExtensionGuard?: ResourceExtensionGuard,
+  ) {}
 
   async listVisitTypes(includeInactive: boolean) { return (await this.prisma.visitType.findMany({ where: includeInactive ? {} : { active: true }, orderBy: { name: "asc" } })).map(toVisitType) }
   async findVisitType(id: string) { const row = await this.prisma.visitType.findUnique({ where: { id } }); return row ? toVisitType(row) : null }
@@ -149,6 +164,21 @@ export class PrismaVisitorOperationsRepository implements VisitorOperationsRepos
       await tx.meeting.update({ where: { id }, data: { plannedStart, plannedEnd } })
       await tx.visit.updateMany({ where: { meetingId: id, status: "PLANNED" }, data: invitationReset })
     })
+  }
+  async extendMeetingTimes(id: string, plannedStart: Date, plannedEnd: Date) {
+    try {
+      await withWriteConflictRetry(() => this.prisma.$transaction(async (tx) => {
+        if (this.resourceExtensionGuard) await this.resourceExtensionGuard.assertExtensionSafe(tx, id, plannedEnd)
+        await tx.meeting.update({ where: { id }, data: { plannedStart, plannedEnd } })
+        await tx.visit.updateMany({ where: { meetingId: id, status: "PLANNED" }, data: invitationReset })
+      }, { isolationLevel: "Serializable" }))
+    } catch (error) {
+      if (error instanceof ApiError) throw error
+      if (isWriteConflictError(error)) {
+        throw new ApiError(409, "MEETING_EXTENSION_CONFLICT", "Toplantı uzatması sırasında kaynak durumu değişti, lütfen tekrar deneyin.")
+      }
+      throw error
+    }
   }
   async cancelVisit(id: string, userId: string, now: Date) { await this.prisma.visit.update({ where: { id }, data: { status: "CANCELLED", cancelledAt: now, cancelledByUserId: userId } }) }
   async cancelMeeting(id: string, userId: string, now: Date) { await this.prisma.visit.updateMany({ where: { meetingId: id, status: "PLANNED" }, data: { status: "CANCELLED", cancelledAt: now, cancelledByUserId: userId } }) }

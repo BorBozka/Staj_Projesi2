@@ -725,6 +725,8 @@ opaque tokens, and sends host check-in notifications as a post-transaction side 
 
 ## Backend Phase 4 — Goods, transport, resource assignments, and reporting data APIs
 
+**Status: Complete.**
+
 Implement goods movements, vehicle/driver and Meeting resource assignments, and reporting data
 endpoints while retaining the approved frontend domain semantics.
 

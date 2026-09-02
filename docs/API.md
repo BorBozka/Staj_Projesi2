@@ -206,6 +206,104 @@ create/check-in, correction/audit, and last-visitor meeting auto-close run trans
 Host notification email is attempted only after a successful planned check-in commit; a delivery
 failure is logged without rolling back the operational change.
 
+## Phase 4 goods movements
+
+`GET/POST /api/goods-movements` and `PATCH /api/goods-movements/:id` require `MANAGER` or
+`ADMIN`; `POST /api/goods-movements/:id/cancel` cancels a record without physical deletion.
+Persisted statuses are `PLANNED`, `COMPLETED`, and `CANCELLED`; `LATE` is never stored — it stays
+a presentation-only derivation from `plannedDate`/`plannedTime` vs. the current time. Create/update
+bodies match the frontend contract exactly: `direction` (`INBOUND`/`OUTBOUND`), `companyId`,
+`facilityId`, `counterpartyName`, `plannedDate` (`yyyy-MM-dd`), optional `plannedTime` (`HH:mm`),
+`goodsDescription`, optional `referenceNumber`, optional `note`. The service verifies the
+company/facility pair, and create/update/cancel apply only to editable `PLANNED` records (an
+optimistic `status = PLANNED` guard rejects a lost race). `INBOUND` keeps arrival semantics and
+`OUTBOUND` departure semantics; no separate status kinds are introduced.
+
+Security endpoints require `SECURITY`. `GET /api/security/goods-movements` returns only today's
+`PLANNED` records inside the authenticated user's company/facility authorization scope (both
+directions, as canonical records; search/sort stay on the client).
+`POST /api/security/goods-movements/:id/complete` accepts `{ companyId, facilityId, actualPlate?,
+actualDriverName? }`; the request-supplied `companyId`/`facilityId` are not trusted — they must be
+within the Security user's authorization scope and must match the movement's own company/facility.
+Completion applies only to a `PLANNED` record, writes a server-generated `actualAt`, records the
+optional actual plate/driver, and moves the status to `COMPLETED`.
+
+## Phase 4 meeting resource assignments
+
+All endpoints require `MANAGER` or `ADMIN`. Assignment rows carry an immutable snapshot
+(`resourceName`, `companyId`, `facilityId`, and equipment `totalQuantity`); projections are built
+from that snapshot, so a later rename/deactivate/delete of the catalog resource never rewrites a
+past assignment.
+
+- `GET /api/meetings/:meetingId/resource-assignments`
+- `GET /api/meetings/:meetingId/eligible-rooms` — active `ROOM` resources for the Meeting's
+  facility, each flagged available/unavailable with a conflict reason.
+- `GET /api/meetings/:meetingId/eligible-equipment` — active `POOLED_EQUIPMENT` for the facility
+  with `usedQuantity` / `remainingQuantity` over overlapping valid Meetings.
+- `POST /api/meetings/:meetingId/resource-assignments/room` `{ resourceId }` — assign or atomically
+  replace the Meeting's single room. The new room is validated and availability-checked first; the
+  existing assignment is only removed if the new one is valid.
+- `POST /api/meetings/:meetingId/resource-assignments/equipment` `{ resourceId, requestedQuantity }`
+- `PATCH /api/resource-assignments/:id` `{ requestedQuantity }` — update an equipment quantity.
+- `DELETE /api/resource-assignments/:id` — remove one assignment (`204`).
+- `PUT /api/meetings/:meetingId/resource-assignments` `{ roomResourceId: string | null, equipment:
+  [{ resourceId, requestedQuantity }] }` — full desired state; validated entirely before any
+  write, then the Meeting's whole assignment slice is replaced in one transaction.
+
+Room availability excludes only rooms already held by another active/open Meeting whose time range
+overlaps (`startA < endB && endA > startB`; a touching boundary is not a conflict). Equipment
+availability subtracts other valid overlapping Meetings' quantity use; a Meeting's own current use
+is never counted against itself on re-save, and total demand may not exceed `totalQuantity`.
+Closed (`actualMeetingEnd` set) and fully-cancelled Meetings consume no capacity. A Meeting is
+read-only for assignments once it is explicitly closed or all its visits are terminal.
+`saveMeetingAssignments` and the incremental mutations all commit under a `SERIALIZABLE`
+transaction that re-validates inside the transaction and retries a bounded number of times on a
+deadlock/write-conflict; an unresolved race returns `409 RESOURCE_ASSIGNMENT_CONFLICT` with no
+SQL Server detail.
+
+## Phase 4 meeting extension integration
+
+`POST /api/meetings/:id/extend` (host-only, unchanged auth) now re-validates the Meeting's
+existing `ROOM` and `POOLED_EQUIPMENT` assignments for the extended time range and moves
+`plannedEnd` in the **same** `SERIALIZABLE` transaction. A room conflict or equipment
+capacity violation rejects the whole extension — `plannedEnd` and the assignments are unchanged —
+and returns an explanatory `409` (`ROOM_CONFLICT` / `EQUIPMENT_CAPACITY`), or
+`409 MEETING_EXTENSION_CONFLICT` if an unresolved concurrency conflict remains.
+
+## Phase 4 transport assignments
+
+All endpoints require `MANAGER` or `ADMIN`. Canonical statuses are `ACTIVE` and `CANCELLED`.
+Create/update input: `companyId`, `facilityId`, `plannedStart`, `plannedEnd`, `purpose`,
+`vehicleResourceId`, `driverResourceId`, optional `relatedMeetingId`, optional `relatedVisitId`
+(never both). The vehicle must be an active `VEHICLE` and the driver an active `DRIVER`, each in
+the assignment's company/facility; an optional related Meeting/Visit must exist and match that
+company/facility. Each row stores a display snapshot (company/facility identity, `vehicleName`,
+`vehicleLicensePlate`, `driverName`) so historical reports survive catalog changes.
+
+- `GET /api/transport-assignments`
+- `POST /api/transport-assignments/availability` `{ companyId, facilityId, plannedStart,
+  plannedEnd, excludeAssignmentId? }` — active, scoped vehicles/drivers not already in an
+  overlapping `ACTIVE` assignment.
+- `POST /api/transport-assignments` (`201`) / `PATCH /api/transport-assignments/:id` /
+  `POST /api/transport-assignments/:id/cancel`
+
+Only `ACTIVE` assignments create conflicts; a vehicle or driver may not be double-booked for an
+overlapping range (touching ranges are allowed); on edit `excludeAssignmentId` omits the row
+being edited. A cancelled assignment cannot be edited and re-cancelling returns `409`. Create and
+update re-check availability inside a `SERIALIZABLE` transaction with bounded deadlock retry;
+an unresolved race returns `409 TRANSPORT_ASSIGNMENT_CONFLICT` without SQL Server detail.
+
+## Phase 4 reporting datasets
+
+`GET /api/reports/visits`, `GET /api/reports/fleet`, and `GET /api/reports/goods` require
+`MANAGER` or `ADMIN` (read only) and return the raw records the frontend report utilities
+consume — `{ visits }`, `{ assignments }`, `{ movements }` respectively. No KPI/chart aggregation
+or CSV/XLSX/PDF generation is done server-side. Query filters: `startDate`, `endDate`
+(`yyyy-MM-dd`), `companyId`, `facilityId` (`all`/omitted means no filter). The date range is
+inclusive local-day boundaries (`startOfDay(start) .. endOfDay(end)`) on the record's planned
+instant — `Meeting.plannedStart` for visits, `plannedStart` for fleet, `plannedDate` for goods —
+matching the frontend `reports-filters` semantics; an inverted range yields an empty dataset.
+
 ## Email delivery configuration
 
 `EMAIL_DELIVERY_MODE=log|smtp` defaults to `log`, which sends nothing and does not log email
