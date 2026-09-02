@@ -8,6 +8,7 @@ export class MockGoodsMovementService implements GoodsMovementService {
   private movements = clone(initialMockGoodsMovements)
   constructor(private readonly visitService: VisitService) {}
   async listGoodsMovements() { return clone(this.movements).sort((a, b) => `${b.plannedDate}${b.plannedTime ?? ""}`.localeCompare(`${a.plannedDate}${a.plannedTime ?? ""}`)) }
+  async listSecurityGoodsMovements() { return this.listGoodsMovements() }
   async createGoodsMovement(input: GoodsMovementInput) { const movement = await this.validate(input); this.movements = [...this.movements, movement]; return clone(movement) }
   async updateGoodsMovement(id: string, input: GoodsMovementInput) { const current = this.find(id); if (current.status !== "PLANNED") throw new Error("Bu kayıt artık düzenlenemez."); const movement = await this.validate(input, current); this.movements = this.movements.map((item) => item.id === id ? movement : item); return clone(movement) }
   async cancelGoodsMovement(id: string) { const current = this.find(id); if (current.status !== "PLANNED") throw new Error("Bu kayıt iptal edilemez."); const movement = { ...current, status: "CANCELLED" as const }; this.movements = this.movements.map((item) => item.id === id ? movement : item); return clone(movement) }

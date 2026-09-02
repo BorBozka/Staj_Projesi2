@@ -1,10 +1,14 @@
 import type { AdminUser, CreateVisitorCardInput, OperationalSettings, OrganizationEntity, OrganizationKind, OrganizationSnapshot, UpdateVisitorCardInventoryInput, VisitTypeDefinition, VisitorCardInventoryItem, VisitorRuleVersion } from "@/domain/admin"
 
 export interface SaveAdminUserOptions {
-  // The id of the currently signed-in Admin performing this save, used to enforce the
-  // self-deactivation/self-demotion guards. A real backend would derive this from the
-  // authenticated session instead of a caller-supplied value.
+  // The id of the currently signed-in Admin, used only for the page's proactive
+  // self-deactivation/self-demotion UI guards. The real backend derives the actor from the
+  // session and re-enforces these rules; the HTTP adapter never sends this field.
   actingUserId?: string
+  // Temporary password for a brand-new LOCAL user. The HTTP adapter forwards it to
+  // `POST /api/admin/users` so the backend can hash it; the mock ignores it. Not used on update
+  // (an existing user's password is changed only through `resetLocalUserPassword`).
+  temporaryPassword?: string
 }
 
 export interface AdminService {

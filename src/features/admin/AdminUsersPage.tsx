@@ -224,9 +224,9 @@ function UserDialog({ user, users, companies, onOpenChange, onSaved }: { user: A
       if (!window.confirm("Bu Admin hesabı pasif hale getirilecek. Devam etmek istiyor musunuz?")) return
     }
     try {
-      // temporaryPassword is deliberately never attached to `value` — it stays local UI state and
-      // is discarded here. A real backend would forward it to an auth/hash service instead.
-      await adminService.saveUser(value, { actingUserId: CURRENT_ADMIN_USER_ID })
+      // temporaryPassword stays out of `value` (it is not an AdminUser field); it rides in the
+      // options bag so the HTTP adapter can forward it to the backend on create only.
+      await adminService.saveUser(value, { actingUserId: CURRENT_ADMIN_USER_ID, temporaryPassword })
       setDraft(null)
       setTemporaryPassword("")
       setTemporaryPasswordConfirm("")

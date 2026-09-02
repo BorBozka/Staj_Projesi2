@@ -12,14 +12,15 @@ describe("AdminUsersPage dialog focus", () => {
 })
 
 describe("AdminUsersPage temporary password workflow", () => {
-  it("requires a temporary password and its confirmation only when creating a local user, and never forwards them to the service layer", () => {
+  it("requires a temporary password and its confirmation only when creating a local user, and forwards it through the options bag (not on the AdminUser value)", () => {
     expect(componentSource).toContain("Geçici parola")
     expect(componentSource).toContain("Geçici parolayı doğrula")
     expect(componentSource).toContain("isCreating &&")
     expect(componentSource).toContain("isTemporaryPasswordValid(temporaryPassword)")
     expect(componentSource).toContain("doPasswordsMatch(temporaryPassword, temporaryPasswordConfirm)")
-    expect(componentSource).toContain("await adminService.saveUser(value, { actingUserId: CURRENT_ADMIN_USER_ID })")
-    expect(componentSource).not.toContain("saveUser(value, { actingUserId: CURRENT_ADMIN_USER_ID, temporaryPassword")
+    // The backend needs the temp password to hash on create; it rides in the options bag so it
+    // is never a field of the AdminUser payload and is never sent on update.
+    expect(componentSource).toContain("await adminService.saveUser(value, { actingUserId: CURRENT_ADMIN_USER_ID, temporaryPassword })")
     expect(componentSource).not.toContain("saveUser({ ...value, temporaryPassword")
     expect(componentSource).not.toContain("saveUser({ ...value, password")
   })

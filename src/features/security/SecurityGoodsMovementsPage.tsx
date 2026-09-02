@@ -31,7 +31,7 @@ export function SecurityGoodsMovementsPage() {
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    void goodsMovementService.listGoodsMovements()
+    void goodsMovementService.listSecurityGoodsMovements()
       .then((next) => { if (!cancelled) setMovements(next) })
       .catch((reason) => { if (!cancelled) setError(reason instanceof Error ? reason.message : "Mal hareketleri yüklenemedi.") })
       .finally(() => { if (!cancelled) setLoading(false) })

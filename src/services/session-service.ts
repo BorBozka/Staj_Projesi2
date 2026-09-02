@@ -1,4 +1,4 @@
-import type { AuthenticationSource, ApplicationRole } from "@/domain/admin"
+import type { AuthenticationSource, ApplicationRole, AuthorizationScope } from "@/domain/admin"
 
 export interface SessionUser {
   id: string
@@ -8,6 +8,14 @@ export interface SessionUser {
   role: ApplicationRole
   roleLabel: string
   authenticationSource: AuthenticationSource
+  /**
+   * Raw assigned scope from the backend session. The server is the authorization source of
+   * truth; the frontend uses this only for scope-aware UI defaults, never as a security check.
+   * Optional so the in-memory mock session (tests/dev fixtures) need not populate it.
+   */
+  authorizationScope?: AuthorizationScope
+  /** Linked employee id, or `null` for a pure Admin account. */
+  employeeId?: string | null
 }
 
 export interface SessionService {
