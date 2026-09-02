@@ -71,7 +71,7 @@ export function MyVisitsPage() {
         </div>
       )}
 
-      <div className={"mb-[14px] grid gap-3 xl:mb-0 xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_320px] " + (isManagerView ? "xl:h-[calc(111.112dvh-27.5556px)]" : "xl:h-[calc(100dvh-76px)]") + (isEmployeeView ? " xl:[zoom:0.9] xl:h-[calc((100dvh-76px)/0.9)]" : "")}>
+      <div className={"mb-[14px] grid gap-3 xl:mb-0 xl:min-h-0 " + (isEmployeeView ? "xl:grid-cols-[minmax(0,1fr)_280px] " : "xl:grid-cols-[minmax(0,1fr)_320px] ") + (isManagerView ? "xl:h-[calc(111.112dvh-27.5556px)]" : isEmployeeView ? "xl:h-[calc(100dvh-78px)]" : "xl:h-[calc(100dvh-76px)]")}>
         <VisitTimeline
           visits={ownVisits}
           view={view}
@@ -81,8 +81,9 @@ export function MyVisitsPage() {
           onSelectedDateChange={setSelectedDate}
           onVisitOpen={setViewingVisit}
           onNewVisit={openNewVisit}
+          fitMonthToHeight={isEmployeeView}
         />
-        <UpcomingVisits visits={ownVisits} onView={setViewingVisit} currentFacilityId={referenceData?.currentEmployee.facilityId} />
+        <UpcomingVisits visits={ownVisits} onView={setViewingVisit} currentFacilityId={referenceData?.currentEmployee.facilityId} searchable={isEmployeeView} />
       </div>
 
       <VisitDetailsDialog

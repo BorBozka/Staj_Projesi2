@@ -92,6 +92,14 @@ describe("HostedMeetingEndNotifications", () => {
     expect(expanded).toContain("Toplantıyı Bitir")
   })
 
+  it("reports long overdue spans in hours instead of raw minutes", () => {
+    const props = { meeting, meetingVisits: [visit], actorEmployeeId: "host-1", onExpandedChange: vi.fn(), onChanged: vi.fn().mockResolvedValue(undefined), isExpanded: false }
+    // Meeting ends 09:00Z; 277 minutes later is 13:37Z.
+    expect(renderToStaticMarkup(<HostedMeetingNotificationRow {...props} now={new Date("2026-08-13T13:37:00.000Z")} />)).toContain("4 sa 37 dk geçti")
+    expect(renderToStaticMarkup(<HostedMeetingNotificationRow {...props} now={new Date("2026-08-13T11:00:00.000Z")} />)).toContain("2 sa geçti")
+    expect(renderToStaticMarkup(<HostedMeetingNotificationRow {...props} now={new Date("2026-08-13T09:00:00.000Z")} />)).toContain("Bitiş saati geldi")
+  })
+
   it("uses the existing invitation action labels for not-sent and failed rows", () => {
     const notSent = renderToStaticMarkup(<InvitationNotificationRow visit={invitationVisit} onAction={vi.fn()} />)
     const failed = renderToStaticMarkup(<InvitationNotificationRow visit={{ ...invitationVisit, invitationStatus: "FAILED" }} onAction={vi.fn()} />)

@@ -7,7 +7,7 @@ import { MeetingLifecycleActions } from "@/features/visits/MeetingLifecycleActio
 import { getNextExpandedMeetingId } from "@/features/visits/hosted-meeting-notifications-utils"
 import { getActionRequiredInvitationVisits, getInvitationActionLabel } from "@/features/visits/invitation-status"
 import { useVisits } from "@/features/visits/visit-context"
-import { formatTr } from "@/lib/date"
+import { formatMinutesDuration, formatTr } from "@/lib/date"
 import { getOverdueOpenHostedMeetings } from "@/lib/meeting-lifecycle"
 import { visitService } from "@/services"
 
@@ -140,7 +140,7 @@ export function HostedMeetingNotificationRow({ meeting, meetingVisits, actorEmpl
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <h3 className="truncate text-[13px] font-semibold text-slate-900">{meeting.visitTypeName}</h3>
-            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-800"><Clock3 className="size-3" />{overdueMinutes === 0 ? "Bitiş saati geldi" : `${overdueMinutes} dk geçti`}</span>
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-800"><Clock3 className="size-3" />{overdueMinutes === 0 ? "Bitiş saati geldi" : `${formatMinutesDuration(overdueMinutes)} geçti`}</span>
           </div>
           <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-600">
             <span className="inline-flex min-w-0 items-center gap-1"><Users className="size-3 shrink-0" /><span className="truncate">{visitorSummary}</span></span>

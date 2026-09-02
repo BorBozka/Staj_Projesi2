@@ -7,6 +7,7 @@ import { type FieldErrors, type FieldPath, useFieldArray, useForm } from "react-
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   InternalDialogContent,
@@ -117,6 +118,7 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
   const [savedVisits, setSavedVisits] = useState<Visit[]>(initialVisits)
   const [isSendingInvitation, setIsSendingInvitation] = useState(false)
   const [showValidationErrors, setShowValidationErrors] = useState(false)
+  const [noteEnabled, setNoteEnabled] = useState(Boolean(visit?.note))
   const form = useForm<VisitFormValues>({ resolver: zodResolver(visitFormSchema), defaultValues: defaultsFor(initialVisits), mode: "onChange" })
   const visitorFields = useFieldArray({ control: form.control, name: "visitors" })
   const companyId = form.watch("hostCompanyId")
@@ -137,8 +139,9 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
       setSavedVisits(nextInitialVisits)
       setIsSendingInvitation(false)
       setShowValidationErrors(false)
+      setNoteEnabled(Boolean(visit?.note))
     }
-  }, [form, open, visit?.meetingId])
+  }, [form, open, visit?.meetingId, visit?.note])
 
   useEffect(() => {
     const textarea = noteTextareaRef.current
@@ -245,8 +248,6 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
       ? "Gönderiliyor…"
       : pendingInvitationCount > 1
         ? `${pendingInvitationCount} Daveti Gönder`
-        : !savedMeetingId && visitorFields.fields.length > 1
-          ? `${visitorFields.fields.length} Daveti Gönder`
         : "Daveti Gönder"
 
   const fieldError = (name: FieldPath<VisitFormValues>) => {
@@ -257,8 +258,11 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <InternalDialogContent className="!max-h-[85vh] !w-[min(820px,calc(100vw-2rem))] !max-w-none flex flex-col gap-0 overflow-hidden p-0">
-        <DialogHeader className="shrink-0 border-b bg-white px-5 pb-4 pt-4 pr-12">
-          <DialogTitle className="text-lg font-semibold text-slate-900">{visit ? "Ziyareti düzenle" : "Yeni ziyaret"}</DialogTitle>
+        <DialogHeader className="shrink-0 border-b bg-white px-5 pb-3 pt-3 pr-12">
+          <DialogTitle>{visit ? "Ziyareti düzenle" : "Yeni ziyaret"}</DialogTitle>
+          <DialogDescription>
+            {visit ? "Bu ziyaretin bilgilerini güncelleyin." : "Tesise gelecek ziyaretçiler için ziyaret kaydı oluşturun."}
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={onSave} className="flex min-h-0 flex-col" noValidate>
@@ -379,31 +383,50 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
             </section>
 
             <section className="space-y-2.5 border-t border-slate-200/60 pt-3" aria-label="Ek Bilgiler">
-              <label className="flex min-h-9 cursor-pointer items-center gap-2 text-sm font-medium text-slate-700">
-                <input
-                  type="checkbox"
-                  className="size-4 rounded border-slate-300 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  {...form.register("hasAdditionalRequirements")}
-                />
-                <span>İlave gereksinim var</span>
-              </label>
-              {hasAdditionalRequirements && (
-                <FormField label="İlave gereksinim notu" error={fieldError("additionalRequirementNote")}>
-                  <Textarea rows={2} className="min-h-16 resize-y" placeholder="Erişilebilir giriş hazırlanmalı." {...form.register("additionalRequirementNote")} />
-                </FormField>
-              )}
-              <FormField label="Not / Açıklama" error={fieldError("note")}>
-                <Textarea
-                  {...noteField}
-                  ref={(element) => {
-                    noteFieldRef(element)
-                    noteTextareaRef.current = element
-                  }}
-                  rows={1}
-                  className="min-h-9 resize-none overflow-hidden"
-                  placeholder="Güvenlik veya ilgili personel için isteğe bağlı açıklama"
-                />
-              </FormField>
+              <OptionalNote
+                expanded={hasAdditionalRequirements}
+                label="İlave gereksinim var"
+                hint="İnsan kaynakları ve bilgi işleme iletilir: toplantı odası, projeksiyon, erişim izni gibi hazırlıklar."
+                checkbox={<input type="checkbox" className={checkboxClassName} {...form.register("hasAdditionalRequirements")} />}
+              >
+                {hasAdditionalRequirements && (
+                  <FormField label="İlave gereksinim notu" error={fieldError("additionalRequirementNote")}>
+                    <Textarea rows={2} className="min-h-16 resize-y" placeholder="Toplantı odasında projeksiyon hazır olmalı." {...form.register("additionalRequirementNote")} />
+                  </FormField>
+                )}
+              </OptionalNote>
+
+              <OptionalNote
+                expanded={noteEnabled}
+                label="Güvenlik notu var"
+                hint="Güvenlik görevlisi giriş anında görür: karşılama, araç, kargo gibi bilgiler."
+                checkbox={
+                  <input
+                    type="checkbox"
+                    className={checkboxClassName}
+                    checked={noteEnabled}
+                    onChange={(event) => {
+                      setNoteEnabled(event.target.checked)
+                      if (!event.target.checked) form.setValue("note", "", { shouldDirty: true })
+                    }}
+                  />
+                }
+              >
+                {noteEnabled && (
+                  <FormField label="Güvenlik notu" error={fieldError("note")}>
+                    <Textarea
+                      {...noteField}
+                      ref={(element) => {
+                        noteFieldRef(element)
+                        noteTextareaRef.current = element
+                      }}
+                      rows={2}
+                      className="min-h-16 resize-y"
+                      placeholder="Ziyaretçi yan kapıdan gelecek, kargo teslimatı var."
+                    />
+                  </FormField>
+                )}
+              </OptionalNote>
             </section>
 
             {savedVisits.length > 0 && savedMeetingId && (
@@ -445,22 +468,80 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
               >
                 {form.formState.isSubmitting ? "Kaydediliyor…" : savedMeetingId && form.formState.isDirty ? "Değişiklikleri Kaydet" : savedMeetingId ? "Kaydedildi" : "Ziyareti Kaydet"}
               </Button>
-              <Button
-                type="button"
-                className="col-span-2 sm:col-span-1"
-                onClick={() => void sendInvitation()}
-                disabled={!canSendInvitation || form.formState.isSubmitting}
-                aria-describedby={invitationHelpId}
-                aria-label={`${invitationActionLabel}. ${invitationDisabledReason}`}
-              >
-                <Send />
-                {invitationActionLabel}
-              </Button>
+              {savedMeetingId && (
+                <Button
+                  type="button"
+                  className="col-span-2 sm:col-span-1"
+                  onClick={() => void sendInvitation()}
+                  disabled={!canSendInvitation || form.formState.isSubmitting}
+                  aria-describedby={invitationHelpId}
+                  aria-label={`${invitationActionLabel}. ${invitationDisabledReason}`}
+                >
+                  <Send />
+                  {invitationActionLabel}
+                </Button>
+              )}
             </div>
           </DialogFooter>
         </form>
       </InternalDialogContent>
     </Dialog>
+  )
+}
+
+const checkboxClassName =
+  "mt-0.5 size-4 shrink-0 rounded border-slate-300 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+
+/**
+ * A checkbox that reveals an optional note, with a line naming who actually reads
+ * it. The two notes on this form go to different teams, and without that line the
+ * only difference visible to the user was the field label.
+ *
+ * Both toggles sit at the bottom of a scrolling form, so ticking one brings the
+ * revealed field into view and focuses it — otherwise the user has to scroll to
+ * reach the box they just asked for.
+ */
+function OptionalNote({
+  label,
+  hint,
+  expanded,
+  checkbox,
+  children,
+}: {
+  label: string
+  hint: string
+  expanded: boolean
+  checkbox: React.ReactNode
+  children: React.ReactNode
+}) {
+  const hintId = useId()
+  const bodyRef = useRef<HTMLDivElement | null>(null)
+  const wasExpanded = useRef(expanded)
+
+  useEffect(() => {
+    // Only react to the user opening it, never to a dialog that opens already filled in.
+    if (expanded && !wasExpanded.current) {
+      const field = bodyRef.current?.querySelector("textarea")
+      field?.focus({ preventScroll: true })
+      field?.scrollIntoView({
+        block: "nearest",
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      })
+    }
+    wasExpanded.current = expanded
+  }, [expanded])
+
+  return (
+    <div className="space-y-2">
+      <label className="flex cursor-pointer items-start gap-2">
+        {isValidElement<{ "aria-describedby"?: string }>(checkbox) ? cloneElement(checkbox, { "aria-describedby": hintId }) : checkbox}
+        <span className="min-w-0">
+          <span className="block text-sm font-medium text-slate-700">{label}</span>
+          <span id={hintId} className="mt-0.5 block text-[11px] leading-4 text-slate-500">{hint}</span>
+        </span>
+      </label>
+      <div ref={bodyRef}>{children}</div>
+    </div>
   )
 }
 

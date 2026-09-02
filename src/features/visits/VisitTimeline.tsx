@@ -12,13 +12,14 @@ import {
   startOfWeek,
 } from "date-fns"
 import { CalendarPlus, ChevronLeft, ChevronRight } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import type { Visit } from "@/domain/visits"
 import { VisitStatusBadge } from "@/features/visits/VisitStatusBadge"
 import { getTimelineRange, type TimelineRange } from "@/features/visits/timeline-range"
+import { defaultWeekDensity, resolveWeekDensity, weekRowHeight } from "@/features/visits/week-density"
 import { visitStatusAccents, visitStatusSurfaces } from "@/features/visits/visit-status-styles"
 import { formatIsoWallClockTime, formatTr, getIsoWallClockMinutes } from "@/lib/date"
 import { cn } from "@/lib/utils"
@@ -34,6 +35,8 @@ interface Props {
   onSelectedDateChange(date: Date): void
   onVisitOpen(visit: Visit): void
   onNewVisit(): void
+  /** Compress month rows so the whole month fits without vertical scrolling. */
+  fitMonthToHeight?: boolean
 }
 
 const viewLabels: Record<TimelineView, string> = {
@@ -42,7 +45,7 @@ const viewLabels: Record<TimelineView, string> = {
   month: "Ay",
 }
 
-export function VisitTimeline({ visits, view, selectedDate, currentFacilityId, onViewChange, onSelectedDateChange, onVisitOpen, onNewVisit }: Props) {
+export function VisitTimeline({ visits, view, selectedDate, currentFacilityId, onViewChange, onSelectedDateChange, onVisitOpen, onNewVisit, fitMonthToHeight = false }: Props) {
   const [now, setNow] = useState(() => new Date())
 
   useEffect(() => {
@@ -116,9 +119,10 @@ export function VisitTimeline({ visits, view, selectedDate, currentFacilityId, o
       </div>
 
       {view === "month" ? (
-        <MonthTimeline visits={visits} selectedDate={selectedDate} onVisitOpen={onVisitOpen} />
+        <MonthTimeline visits={visits} selectedDate={selectedDate} onVisitOpen={onVisitOpen} fitToHeight={fitMonthToHeight} />
       ) : (
         <LaneTimeline
+          fitToHeight={fitMonthToHeight}
           visits={visibleVisits}
           selectedDate={selectedDate}
           view={view}
@@ -138,8 +142,18 @@ export function VisitTimeline({ visits, view, selectedDate, currentFacilityId, o
   )
 }
 
-function LaneTimeline({ visits, selectedDate, view, now, timeRange, currentFacilityId, onVisitOpen }: { visits: Visit[]; selectedDate: Date; view: "day" | "week"; now: Date; timeRange: TimelineRange; currentFacilityId?: string; onVisitOpen(visit: Visit): void }) {
+function LaneTimeline({ visits, selectedDate, view, now, timeRange, currentFacilityId, fitToHeight, onVisitOpen }: { visits: Visit[]; selectedDate: Date; view: "day" | "week"; now: Date; timeRange: TimelineRange; currentFacilityId?: string; fitToHeight: boolean; onVisitOpen(visit: Visit): void }) {
   const hours = Array.from({ length: (timeRange.endMinutes - timeRange.startMinutes) / 60 + 1 }, (_, index) => timeRange.startMinutes / 60 + index)
+  const weekBodyRef = useRef<HTMLDivElement | null>(null)
+  const [weekBodyHeight, setWeekBodyHeight] = useState(0)
+
+  useEffect(() => {
+    const node = weekBodyRef.current
+    if (!fitToHeight || !node) return
+    const observer = new ResizeObserver(([entry]) => setWeekBodyHeight(entry.contentRect.height))
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [fitToHeight, view])
 
   if (view === "day") {
     const agendaVisits = layoutDayVisits(visits)
@@ -182,28 +196,44 @@ function LaneTimeline({ visits, selectedDate, view, now, timeRange, currentFacil
     start: startOfWeek(selectedDate, { weekStartsOn: 1 }),
     end: endOfWeek(selectedDate, { weekStartsOn: 1 }),
   })
-  const weekDays = days.map((day) => {
-    const dayVisits = visits.filter((visit) => isSameDay(new Date(visit.plannedStart), day))
-    return { day, dayVisits, minHeight: Math.max(56, dayVisits.length * 27 + 4) }
-  })
+  const dayBuckets = days.map((day) => ({ day, dayVisits: visits.filter((visit) => isSameDay(new Date(visit.plannedStart), day)) }))
+  const weekContainsToday = days.some((day) => isSameDay(day, now))
+  const density = fitToHeight
+    ? resolveWeekDensity(dayBuckets.map((bucket) => bucket.dayVisits.length), weekBodyHeight)
+    : defaultWeekDensity
+  const dense = density.labelFloor < 44
+  const weekDays = dayBuckets.map((bucket) => ({
+    ...bucket,
+    minHeight: weekRowHeight(density, bucket.dayVisits.length),
+  }))
 
   return (
     <div className="flex min-h-[472px] min-w-0 flex-1 flex-col xl:min-h-0">
-      <TimeHeader hours={hours} label="Gün" />
-      <div className="scrollbar-thin flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <TimeHeader hours={hours} label="Gün" nowOffset={weekContainsToday ? currentTimeOffset(now, timeRange) : null} />
+      <div ref={weekBodyRef} className="scrollbar-thin flex min-h-0 flex-1 flex-col overflow-y-auto">
         <div className="flex min-h-full flex-1 flex-col divide-y">
           {weekDays.map(({ day, dayVisits, minHeight }) => (
             <div key={day.toISOString()} className="grid flex-1 grid-cols-[112px_minmax(0,1fr)]" style={{ minHeight }}>
-              <div className={cn("flex flex-col justify-center border-r px-2.5 py-2.5", isSameDay(day, new Date()) && "bg-blue-50/60")}>
-                <p className="truncate text-[13px] font-semibold">{formatTr(day, "EEEE")}</p>
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">{formatTr(day, "d MMMM")}</p>
+              <div className={cn("flex flex-col justify-center border-r px-2.5", isSameDay(day, new Date()) && "bg-blue-50/60", dense ? "py-1" : fitToHeight ? "py-1.5" : "py-2.5")}>
+                <p className={cn("truncate font-semibold", dense ? "text-[11px] leading-[13px]" : fitToHeight ? "text-xs leading-4" : "text-[13px]")}>{formatTr(day, "EEEE")}</p>
+                <p className={cn("truncate text-muted-foreground", dense ? "text-[10px] leading-[13px]" : fitToHeight ? "text-[11px] leading-4" : "mt-0.5 text-xs")}>{formatTr(day, "d MMMM")}</p>
               </div>
               <div
                 className="relative h-full bg-[linear-gradient(to_right,hsl(var(--border))_1px,transparent_1px)] bg-[length:10%_100%]"
                 style={{ minHeight }}
               >
                 {isSameDay(day, now) && <WeekCurrentTimeIndicator now={now} timeRange={timeRange} />}
-                {dayVisits.map((visit, index) => <VisitBlock key={visit.id} visit={visit} timeRange={timeRange} top={2 + index * 27} currentFacilityId={currentFacilityId} onOpen={onVisitOpen} />)}
+                {dayVisits.map((visit, index) => (
+                  <VisitBlock
+                    key={visit.id}
+                    visit={visit}
+                    timeRange={timeRange}
+                    top={2 + index * density.pitch}
+                    height={density.pitch - 3}
+                    currentFacilityId={currentFacilityId}
+                    onOpen={onVisitOpen}
+                  />
+                ))}
               </div>
             </div>
           ))}
@@ -213,11 +243,14 @@ function LaneTimeline({ visits, selectedDate, view, now, timeRange, currentFacil
   )
 }
 
-function TimeHeader({ hours, label }: { hours: number[]; label: string }) {
+function TimeHeader({ hours, label, nowOffset }: { hours: number[]; label: string; nowOffset: number | null }) {
   return (
     <div className="grid grid-cols-[112px_minmax(0,1fr)] border-b bg-slate-50/80">
       <div className="border-r px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
-      <TimeAxis hours={hours} />
+      <div className="relative">
+        <TimeAxis hours={hours} />
+        {nowOffset !== null && <WeekCurrentTimeMarker left={nowOffset} />}
+      </div>
     </div>
   )
 }
@@ -355,7 +388,7 @@ function DayVisitCard({ visit, column, columnCount, timeRange, onOpen }: { visit
   )
 }
 
-function VisitBlock({ visit, timeRange, top = 10, currentFacilityId, onOpen }: { visit: Visit; timeRange: TimelineRange; top?: number; currentFacilityId?: string; onOpen(visit: Visit): void }) {
+function VisitBlock({ visit, timeRange, top = 10, height = 24, currentFacilityId, onOpen }: { visit: Visit; timeRange: TimelineRange; top?: number; height?: number; currentFacilityId?: string; onOpen(visit: Visit): void }) {
   const startLabel = formatIsoWallClockTime(visit.plannedStart)
   const endLabel = formatIsoWallClockTime(visit.plannedEnd)
   const startMinutes = visitStartMinutes(visit)
@@ -370,38 +403,61 @@ function VisitBlock({ visit, timeRange, top = 10, currentFacilityId, onOpen }: {
       type="button"
       onClick={() => onOpen(visit)}
       className={cn(
-        "group absolute h-6 rounded border border-l-[3px] px-1.5 py-px text-left shadow-sm transition-shadow hover:z-20 hover:shadow-md focus-visible:z-20",
+        "group absolute rounded border border-l-[3px] px-1.5 py-px text-left shadow-sm transition-shadow hover:z-20 hover:shadow-md focus-visible:z-20",
         visitStatusSurfaces[visit.status],
         visitStatusAccents[visit.status],
         visit.status === "CANCELLED" && "border-dashed",
       )}
-      style={{ left: `${left}%`, width: `${width}%`, top }}
+      style={{ left: `${left}%`, width: `${width}%`, top, height }}
       title={`${visit.visitor.firstName} ${visit.visitor.lastName} · ${startLabel}–${endLabel} · ${visit.visitTypeName}`}
     >
-      <span className="block overflow-hidden">
+      <span className="block h-full overflow-hidden">
         <span className={cn("block truncate text-[10px] font-semibold leading-[11px]", visit.status === "CANCELLED" && "line-through")}>
           {visit.visitor.firstName} {visit.visitor.lastName}
           {currentFacilityId && visit.facilityId !== currentFacilityId && <span className="text-primary"> · {visit.facilityName}</span>}
+          {height < 24 && <span className="font-normal tabular-nums opacity-80"> · {startLabel}–{endLabel}</span>}
         </span>
-        <span className="block truncate text-[10px] leading-[11px] opacity-80">{startLabel}–{endLabel}</span>
+        {height >= 24 && <span className="block truncate text-[10px] leading-[11px] opacity-80">{startLabel}–{endLabel}</span>}
       </span>
     </button>
   )
 }
 
 function WeekCurrentTimeIndicator({ now, timeRange }: { now: Date; timeRange: TimelineRange }) {
-  const currentMinutes = getIsoWallClockMinutes(now) ?? 0
-  const windowMinutes = timeRange.endMinutes - timeRange.startMinutes
-  if (currentMinutes < timeRange.startMinutes || currentMinutes > timeRange.endMinutes) return null
+  const left = currentTimeOffset(now, timeRange)
+  if (left === null) return null
 
-  const left = ((currentMinutes - timeRange.startMinutes) / windowMinutes) * 100
   return (
-    <div className="pointer-events-none absolute inset-y-0 z-10 w-px bg-rose-500/80" style={{ left: `${left}%` }} aria-hidden="true">
-      <span className="absolute left-1/2 top-1 -translate-x-1/2 rounded bg-rose-600 px-1 py-0.5 text-[9px] font-semibold leading-none text-white shadow-sm">
-        Şimdi
-      </span>
-    </div>
+    <div className="pointer-events-none absolute inset-y-0 z-30 w-px bg-rose-500/80" style={{ left: `${left}%` }} aria-hidden="true" />
   )
+}
+
+/**
+ * The "Şimdi" pill lives in the week's time ruler rather than inside a day lane,
+ * so it never collides with a lane border or a visit block. It is nudged inward at
+ * the extremes so the pill stays inside the ruler instead of bleeding past it.
+ */
+function WeekCurrentTimeMarker({ left }: { left: number }) {
+  const alignment = left < 4 ? "translate-x-0" : left > 96 ? "-translate-x-full" : "-translate-x-1/2"
+  return (
+    <span
+      className={cn(
+        "pointer-events-none absolute top-1/2 z-10 -translate-y-1/2 whitespace-nowrap rounded bg-rose-600 px-1 py-0.5 text-[9px] font-semibold leading-none text-white shadow-sm",
+        alignment,
+      )}
+      style={{ left: `${left}%` }}
+      aria-hidden="true"
+    >
+      Şimdi
+    </span>
+  )
+}
+
+/** Horizontal position of the current time inside the lane window, or null when out of range. */
+function currentTimeOffset(now: Date, timeRange: TimelineRange): number | null {
+  const currentMinutes = getIsoWallClockMinutes(now) ?? 0
+  if (currentMinutes < timeRange.startMinutes || currentMinutes > timeRange.endMinutes) return null
+  return ((currentMinutes - timeRange.startMinutes) / (timeRange.endMinutes - timeRange.startMinutes)) * 100
 }
 
 function DayCurrentTimeIndicator({ now, timeRange }: { now: Date; timeRange: TimelineRange }) {
@@ -411,8 +467,8 @@ function DayCurrentTimeIndicator({ now, timeRange }: { now: Date; timeRange: Tim
 
   const top = ((currentMinutes - timeRange.startMinutes) / windowMinutes) * 100
   return (
-    <div className="pointer-events-none absolute inset-x-0 z-10 h-px bg-rose-500/90" style={{ top: `${top}%` }} aria-hidden="true">
-      <span className="absolute left-1 top-0 -translate-y-1/2 rounded bg-rose-600 px-1 py-0.5 text-[9px] font-semibold leading-none text-white shadow-sm">
+    <div className="pointer-events-none absolute inset-x-0 z-30 h-px bg-rose-500/90" style={{ top: `${top}%` }} aria-hidden="true">
+      <span className="absolute left-1 top-0 -translate-y-1/2 whitespace-nowrap rounded bg-rose-600 px-1 py-0.5 text-[9px] font-semibold leading-none text-white shadow-sm">
         Şimdi
       </span>
     </div>
@@ -432,7 +488,7 @@ function VisitHoverTooltip({ visit }: { visit: Visit }) {
   )
 }
 
-function MonthTimeline({ visits, selectedDate, onVisitOpen }: { visits: Visit[]; selectedDate: Date; onVisitOpen(visit: Visit): void }) {
+function MonthTimeline({ visits, selectedDate, onVisitOpen, fitToHeight }: { visits: Visit[]; selectedDate: Date; onVisitOpen(visit: Visit): void; fitToHeight: boolean }) {
   const interval = {
     start: startOfWeek(startOfMonth(selectedDate), { weekStartsOn: 1 }),
     end: endOfWeek(endOfMonth(selectedDate), { weekStartsOn: 1 }),
@@ -448,7 +504,7 @@ function MonthTimeline({ visits, selectedDate, onVisitOpen }: { visits: Visit[];
             <div key={day} className="border-r px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground last:border-r-0">{day}</div>
           ))}
         </div>
-        <div className="grid flex-1 grid-cols-7" style={{ gridTemplateRows: `repeat(${weekCount}, minmax(0, 1fr))` }}>
+        <div className={cn("grid flex-1 grid-cols-7", fitToHeight && "xl:min-h-0")} style={{ gridTemplateRows: `repeat(${weekCount}, minmax(0, 1fr))` }}>
           {days.map((day) => {
             const dayVisits = visits.filter((visit) => isSameDay(new Date(visit.plannedStart), day))
             return (

@@ -15,6 +15,19 @@ describe("UserAvatar", () => {
 })
 
 describe("AccountMenu", () => {
+  it("marks the trigger as a menu with a chevron affordance in both variants", () => {
+    const chevrons = componentSource.match(/<ChevronDown/g) ?? []
+    expect(chevrons).toHaveLength(2)
+    expect(componentSource).toContain("group-data-[state=open]:rotate-180")
+    // Decorative: the button already carries the accessible name.
+    expect(componentSource).not.toContain('<ChevronDown className')
+    expect(componentSource).toContain('<ChevronDown aria-hidden="true"')
+  })
+
+  it("hides the chevron while the sidebar is collapsed to an icon rail", () => {
+    expect(componentSource).toContain("{!collapsed && <ChevronDown")
+  })
+
   it("keeps account actions shared while respecting authentication source", () => {
     expect(componentSource).toContain('profile.authenticationSource === "LOCAL"')
     expect(componentSource).toContain("Şifreyi değiştir")

@@ -59,3 +59,21 @@ export function formatIsoWallClockTime(value: Date | string): string {
   const time = getIsoWallClockTime(value)
   return time ? `${String(time.hour).padStart(2, "0")}:${String(time.minute).padStart(2, "0")}` : ""
 }
+
+/**
+ * Formats a whole number of minutes as a Turkish duration, promoting to hours and
+ * days so long spans stay readable ("4 sa 37 dk" rather than "277 dk"). Zero and
+ * negative inputs collapse to "0 dk"; callers that need a different wording for
+ * "no time elapsed" should branch before calling this.
+ */
+export function formatMinutesDuration(totalMinutes: number): string {
+  const minutes = Math.max(0, Math.floor(totalMinutes))
+  if (minutes < 60) return `${minutes} dk`
+
+  const days = Math.floor(minutes / 1440)
+  const hours = Math.floor((minutes % 1440) / 60)
+  const remainder = minutes % 60
+
+  if (days > 0) return hours > 0 ? `${days} gün ${hours} sa` : `${days} gün`
+  return remainder > 0 ? `${hours} sa ${remainder} dk` : `${hours} sa`
+}
