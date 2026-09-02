@@ -41,9 +41,6 @@ yapılandırmasını yönetebildiği modüler bir yapıya sahiptir.
 - Üretilen çıktıları işlevsel ve görsel gereksinimlere göre değerlendirdim; düzeltme ve
   iyileştirmeleri PR tabanlı bir süreçle yönlendirdim.
 
-> Ürün kararları, kapsam, kullanıcı akışları ve çıktı değerlendirmesi tarafımdan yürütülmüştür.
-> Kod üretimi AI ajanlarıyla gerçekleştirilmiştir.
-
 ## Ürün kapsamı
 
 - Ziyaret oluşturma, düzenleme, yeniden planlama ve iptal akışları
