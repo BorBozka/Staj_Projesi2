@@ -7,7 +7,7 @@ import { scopeAllows, type AccessContext } from "../../lib/authorization.js"
 import { CheckInConflictError, type VisitorOperationsRepository } from "../../repositories/visitor-operations-repository.js"
 import type {
   CreateUnplannedInput, MeetingDto, MeetingInput, PublicPreRegistrationDto, SecurityCheckInInput,
-  SecurityCorrectionInput, VisitorCardDto, VisitorRuleDto, VisitDto, VisitTypeDto,
+  SecurityCorrectionInput, VisitDto,
 } from "./types.js"
 import { normalizeCardNumber, normalizeOptional, normalizePlate, normalizeVisitTypeName, validEmail } from "./types.js"
 

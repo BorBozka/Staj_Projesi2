@@ -69,8 +69,6 @@ export function ManagerShell({ role = "MANAGER" }: { role?: Extract<ApplicationR
   const [refreshVersion, setRefreshVersion] = useState(0)
   const { reload } = useVisits()
   const { currentUser } = useAuth()
-  if (!currentUser) return null
-  const account = toAccountProfile(currentUser)
 
   useEffect(() => {
     window.sessionStorage.setItem(`${role.toLowerCase()}-navigation-collapsed`, String(collapsed))
@@ -93,6 +91,9 @@ export function ManagerShell({ role = "MANAGER" }: { role?: Extract<ApplicationR
     setCompanyId(nextCompanyId)
     setFacilityId("all")
   }, [])
+
+  if (!currentUser) return null
+  const account = toAccountProfile(currentUser)
 
   return (
     <ManagerRefreshProvider value={{ companyId, currentTime, facilityId, isRefreshing, lastUpdated, refreshVersion, refresh, selectCompany, selectFacility: setFacilityId }}>

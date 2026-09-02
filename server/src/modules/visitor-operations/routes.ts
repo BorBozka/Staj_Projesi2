@@ -8,7 +8,6 @@ import { VisitorOperationsService } from "./service.js"
 
 const id = z.string().min(1).max(36)
 const idParams = z.object({ id }).strict()
-const visitParams = z.object({ visitId: id }).strict()
 const tokenParams = z.object({ token: z.string().min(20).max(200) }).strict()
 const timestamp = z.string().datetime({ offset: true })
 const visitor = z.object({ visitId: id.optional(), firstName: z.string().max(100), lastName: z.string().max(100), email: z.string().max(320).optional(), company: z.string().max(200), phone: z.string().max(40).optional() }).strict()

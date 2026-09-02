@@ -2,7 +2,7 @@ import { ApiError } from "../../lib/api-error.js"
 import { matchesScopeFilter, resolveScopeFilter, scopeAllows, type AccessContext } from "../../lib/authorization.js"
 import { isPrismaForeignKeyError } from "../../lib/prisma-conflict.js"
 import type { ResourceRepository } from "../../repositories/resource-repository.js"
-import { normalizeLicensePlate, type FacilityResource, type ResourceInput } from "./types.js"
+import { normalizeLicensePlate, type ResourceInput } from "./types.js"
 
 function normalizeList(values: string[]) { return [...new Set(values.map((value) => value.trim()).filter(Boolean))] }
 

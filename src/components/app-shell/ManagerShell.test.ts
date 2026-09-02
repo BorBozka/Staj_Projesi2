@@ -50,6 +50,14 @@ describe("Shared account menu", () => {
     expect(componentSource).toContain("toAccountProfile(currentUser)")
     expect(componentSource).not.toContain("currentAccountProfiles")
   })
+
+  it("keeps every ManagerShell hook before the nullable-session render guard", () => {
+    const guardIndex = componentSource.indexOf("if (!currentUser) return null")
+
+    expect(guardIndex).toBeGreaterThan(componentSource.indexOf("useEffect(() => startMinuteClock"))
+    expect(guardIndex).toBeGreaterThan(componentSource.indexOf("const refresh = useCallback"))
+    expect(guardIndex).toBeGreaterThan(componentSource.indexOf("const selectCompany = useCallback"))
+  })
 })
 
 describe("Role-aware navigation", () => {

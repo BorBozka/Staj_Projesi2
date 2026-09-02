@@ -1,4 +1,4 @@
-import type { FastifyReply, FastifyRequest, preHandlerAsyncHookHandler } from "fastify"
+import type { FastifyRequest, preHandlerAsyncHookHandler } from "fastify"
 
 import { forbiddenError, unauthorizedError } from "../lib/api-error.js"
 import type { AppConfig } from "../config/env.js"
@@ -23,11 +23,11 @@ export function createAuthGuards(authService: AuthService, config: Pick<AppConfi
     if (!user) throw unauthorizedError()
     request.currentUser = user
   }
-  const requireAuthentication: preHandlerAsyncHookHandler = async (request: FastifyRequest, _reply: FastifyReply) => authenticate(request)
+  const requireAuthentication: preHandlerAsyncHookHandler = async (request: FastifyRequest) => authenticate(request)
 
   return {
     requireAuthentication,
-    requireRole: (...roles) => async (request, _reply) => {
+    requireRole: (...roles) => async (request) => {
       await authenticate(request)
       if (!request.currentUser || !roles.includes(request.currentUser.role)) throw forbiddenError()
     },

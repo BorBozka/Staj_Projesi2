@@ -32,4 +32,20 @@ test.describe("LOCAL authentication and role routing", () => {
       await expect(page.getByRole("button", { name: "Giriş Yap" })).toBeVisible()
     }
   })
+
+  test("manager and admin shells survive authenticated-to-logged-out session transitions", async ({ page }) => {
+    const runtimeErrors: string[] = []
+    page.on("pageerror", (error) => runtimeErrors.push(error.message))
+
+    await loginViaForm(page, "manager")
+    await expect(page.getByRole("navigation", { name: "Yönetici menüsü" })).toBeVisible()
+    await logout(page)
+
+    await loginViaForm(page, "admin")
+    await expect(page.getByRole("navigation", { name: "Admin menüsü" })).toBeVisible()
+    await expect(page.getByText("Sistem Yönetimi", { exact: true })).toBeVisible()
+    await logout(page)
+
+    expect(runtimeErrors.filter((message) => /hooks|rendered fewer|rendered more/i.test(message))).toEqual([])
+  })
 })

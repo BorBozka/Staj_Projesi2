@@ -7,8 +7,73 @@ import { PrismaVisitorOperationsRepository } from "./visitor-operations-reposito
 const sentAt = new Date("2026-09-02T08:00:00.000Z")
 const updatedAt = new Date("2026-09-02T09:00:00.000Z")
 
+interface FixtureVisitor {
+  id: string
+  firstName: string
+  lastName: string
+  email: string | null
+  company: string
+  phone: string | null
+}
+
+interface FixtureMeeting {
+  id: string
+  creatorEmployeeId: string
+  visitTypeId: string
+  hostEmployeeId: string | null
+  hostEmployeeName: string
+  hostCompanyId: string
+  facilityId: string
+  plannedStart: Date
+  plannedEnd: Date
+  note: string | null
+  hasAdditionalRequirements: boolean
+  additionalRequirementNote: string | null
+  actualMeetingEnd: Date | null
+  meetingEndSource: string | null
+  createdAt: Date
+  updatedAt: Date
+  visitType: { name: string }
+  hostCompany: { name: string }
+  facility: { name: string }
+  visits: FixtureVisit[]
+}
+
+interface FixtureVisit {
+  id: string
+  meetingId: string
+  visitorId: string
+  visitor: FixtureVisitor
+  meeting: FixtureMeeting
+  status: string
+  invitationStatus: string
+  invitationSentAt: Date | null
+  invitationError: string | null
+  actualCheckIn: Date | null
+  actualCheckOut: Date | null
+  visitorCardReturned: boolean | null
+  visitorCardId: string | null
+  visitorCardNumber: string | null
+  vehiclePlate: string | null
+  cancelledAt: Date | null
+  createdAt: Date
+  updatedAt: Date
+  ruleAcceptances: []
+  hostCorrectionAudits: []
+}
+
+interface FixtureCard {
+  id: string
+  cardNumber: string
+  status: string
+  currentVisitId: string | null
+  assignedVisitorName: string | null
+  createdAt: Date
+  updatedAt: Date
+}
+
 function createMeetingFixture() {
-  const meeting: any = {
+  const meeting: FixtureMeeting = {
     id: "meeting-1",
     creatorEmployeeId: "employee-1",
     visitTypeId: "type-1",
@@ -28,9 +93,9 @@ function createMeetingFixture() {
     visitType: { name: "Toplantı" },
     hostCompany: { name: "BPLAS" },
     facility: { name: "Merkez" },
-    visits: [] as any[],
+    visits: [],
   }
-  const planned = {
+  const planned: FixtureVisit = {
     id: "visit-planned",
     meetingId: meeting.id,
     visitorId: "visitor-planned",
@@ -52,7 +117,7 @@ function createMeetingFixture() {
     ruleAcceptances: [],
     hostCorrectionAudits: [],
   }
-  const terminal = {
+  const terminal: FixtureVisit = {
     ...planned,
     id: "visit-terminal",
     visitorId: "visitor-terminal",
@@ -63,8 +128,8 @@ function createMeetingFixture() {
   meeting.visits = [planned, terminal]
   const invitation = { visitId: planned.id, tokenHash: "existing-token-hash" }
 
-  const meetingUpdate = vi.fn(async ({ data }: any) => Object.assign(meeting, data))
-  const visitUpdateMany = vi.fn(async ({ where, data }: any) => {
+  const meetingUpdate = vi.fn(async ({ data }: { data: Partial<FixtureMeeting> }) => Object.assign(meeting, data))
+  const visitUpdateMany = vi.fn(async ({ where, data }: { where: { meetingId: string; status: string }; data: Partial<FixtureVisit> }) => {
     let count = 0
     for (const visit of meeting.visits) {
       if (visit.meetingId === where.meetingId && visit.status === where.status) {
@@ -77,12 +142,13 @@ function createMeetingFixture() {
   const tx = {
     meeting: { update: meetingUpdate },
     visit: {
-      findUnique: vi.fn(async ({ where }: any) => meeting.visits.find((visit: any) => visit.id === where.id) ?? null),
+      findUnique: vi.fn(async ({ where }: { where: { id: string } }) => meeting.visits.find((visit) => visit.id === where.id) ?? null),
       updateMany: visitUpdateMany,
     },
     visitor: {
-      update: vi.fn(async ({ where, data }: any) => {
-        const visit = meeting.visits.find((item: any) => item.visitorId === where.id)
+      update: vi.fn(async ({ where, data }: { where: { id: string }; data: Partial<FixtureVisitor> }) => {
+        const visit = meeting.visits.find((item) => item.visitorId === where.id)
+        if (!visit) throw new Error("Missing fixture visitor.")
         return Object.assign(visit.visitor, data)
       }),
     },
@@ -151,7 +217,7 @@ describe("PrismaVisitorOperationsRepository invitation resets", () => {
 
 describe("PrismaVisitorOperationsRepository card audit identity", () => {
   it("keeps assignment on LOST and clears it only when restored to AVAILABLE", async () => {
-    let card = {
+    let card: FixtureCard = {
       id: "card-1",
       cardNumber: "001",
       status: "NOT_RETURNED",
@@ -162,7 +228,7 @@ describe("PrismaVisitorOperationsRepository card audit identity", () => {
     }
     const prisma = {
       visitorCard: {
-        update: vi.fn(async ({ data }: any) => {
+        update: vi.fn(async ({ data }: { data: Partial<FixtureCard> }) => {
           card = { ...card, ...data }
           return card
         }),
