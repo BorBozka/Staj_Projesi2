@@ -11,6 +11,9 @@ const environmentSchema = z.object({
   SESSION_COOKIE_NAME: z.string().regex(/^[A-Za-z0-9_-]+$/, "SESSION_COOKIE_NAME yalnız güvenli cookie karakterleri içermelidir.").default("bplas_session"),
   SESSION_TTL_HOURS: z.coerce.number().int().min(1).max(24 * 30).default(8),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  // Login attempts per minute per IP. The default protects real deployments; an E2E run raises
+  // it so its many rapid seeded logins are not throttled.
+  AUTH_RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(100_000).default(10),
   DEMO_SEED_ENABLED: booleanFromEnvironment.default("false"),
   EMAIL_DELIVERY_MODE: emailDeliveryModeSchema.default("log"),
   SMTP_HOST: z.string().optional(),
@@ -33,6 +36,7 @@ export type AppConfig = {
   sessionCookieName: string
   sessionTtlHours: number
   nodeEnv: "development" | "test" | "production"
+  authRateLimitMax: number
   demoSeedEnabled: boolean
   emailDelivery: EmailDeliveryConfig
 }
@@ -91,6 +95,7 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     sessionCookieName: parsed.data.SESSION_COOKIE_NAME,
     sessionTtlHours: parsed.data.SESSION_TTL_HOURS,
     nodeEnv: parsed.data.NODE_ENV,
+    authRateLimitMax: parsed.data.AUTH_RATE_LIMIT_MAX,
     demoSeedEnabled: parsed.data.DEMO_SEED_ENABLED,
     emailDelivery,
   }

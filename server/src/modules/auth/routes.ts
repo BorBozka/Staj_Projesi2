@@ -15,7 +15,7 @@ export async function registerAuthRoutes(app: FastifyInstance, dependencies: { a
   const { authService, config } = dependencies
 
   app.post("/api/auth/login", {
-    config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
+    config: { rateLimit: { max: config.authRateLimitMax, timeWindow: "1 minute" } },
   }, async (request, reply) => {
     const parsed = loginSchema.safeParse(request.body)
     if (!parsed.success) throw validationError()

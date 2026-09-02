@@ -12,3 +12,9 @@ artifacts/
 .env
 .env.*
 !.env.example
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
