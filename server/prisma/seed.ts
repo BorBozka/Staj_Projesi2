@@ -45,6 +45,18 @@ async function seed() {
     update: {},
     create: { id: "default", overdueToleranceMinutes: 15, overdueAlertRepeatMinutes: 10, workdayEndTime: "18:15" },
   })
+  await prisma.visitorRuleVersion.upsert({
+    where: { version: 1 },
+    update: { content: "Ziyaretçiler tesis güvenlik kurallarına ve yönlendirmelerine uymayı kabul eder.", active: true },
+    create: { version: 1, content: "Ziyaretçiler tesis güvenlik kurallarına ve yönlendirmelerine uymayı kabul eder.", publishedAt: new Date(), active: true },
+  })
+  for (const cardNumber of ["001", "002", "003"]) {
+    await prisma.visitorCard.upsert({
+      where: { cardNumberNormalized: cardNumber.toLowerCase() },
+      update: { cardNumber, status: "AVAILABLE", currentVisitId: null, assignedVisitorName: null },
+      create: { cardNumber, cardNumberNormalized: cardNumber.toLowerCase(), status: "AVAILABLE" },
+    })
+  }
 
   for (const definition of getDemoSeedUsers(process.env)) {
     const passwordHash = await hashPassword(definition.password)

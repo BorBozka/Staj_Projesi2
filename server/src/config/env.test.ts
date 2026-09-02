@@ -20,6 +20,13 @@ describe("server configuration", () => {
       DEMO_SEED_ENABLED: "true",
     })).toMatchObject({ apiPort: 3001, sessionTtlHours: 8, demoSeedEnabled: true })
   })
+
+  it("defaults delivery to non-sending log mode and rejects incomplete SMTP mode at startup", () => {
+    const base = { DATABASE_URL: "sqlserver://localhost:1433;database=visitor_operations;user=sa;password=not-a-secret;encrypt=true;trustServerCertificate=true" }
+    expect(loadConfig(base).emailDelivery).toMatchObject({ mode: "log" })
+    expect(() => loadConfig({ ...base, EMAIL_DELIVERY_MODE: "smtp" })).toThrow("SMTP_HOST")
+    expect(loadConfig({ ...base, EMAIL_DELIVERY_MODE: "smtp", SMTP_HOST: "smtp.example.test", SMTP_PORT: "465", SMTP_SECURE: "true", SMTP_USER: "user", SMTP_PASSWORD: "password", MAIL_FROM_ADDRESS: "no-reply@example.test", MAIL_FROM_NAME: "Visitor" }).emailDelivery).toMatchObject({ mode: "smtp", smtp: { host: "smtp.example.test", port: 465, secure: true } })
+  })
 })
 
 describe("development demo seed definitions", () => {

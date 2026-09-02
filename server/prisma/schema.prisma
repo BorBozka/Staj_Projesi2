@@ -27,6 +27,20 @@ model Company {
   @@unique([nameNormalized], map: "Company_nameNormalized_key")
 }
 
+// Public pre-registration capability. Only a SHA-256 token hash is persisted; raw tokens exist
+// only while composing/sending an invitation email or serving an incoming public request.
+model Invitation {
+  id        String   @id @default(cuid()) @db.VarChar(36)
+  visitId   String   @unique(map: "Invitation_visitId_key") @db.VarChar(36)
+  tokenHash String   @unique(map: "Invitation_tokenHash_key") @db.VarChar(64)
+  createdAt DateTime @default(now()) @db.DateTime2
+  updatedAt DateTime @updatedAt @db.DateTime2
+
+  visit Visit @relation(fields: [visitId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([tokenHash])
+}
+
 model Facility {
   id             String   @id @default(cuid()) @db.VarChar(36)
   companyId      String   @db.VarChar(36)
@@ -271,6 +285,7 @@ model Visit {
   ruleAcceptances      VisitRuleAcceptance[]
   hostCorrectionAudits HostCorrectionAudit[]
   transportAssignments TransportAssignment[]
+  invitation           Invitation?
 
   @@index([meetingId])
   @@index([visitorId])
@@ -283,6 +298,8 @@ model VisitorCard {
   cardNumberNormalized  String            @unique(map: "VisitorCard_cardNumberNormalized_key") @db.VarChar(100)
   status                String            @default("AVAILABLE") @db.VarChar(20)
   assignedVisitorName   String?           @db.NVarChar(200)
+  // Prisma needs @unique to model the one-to-one relation. The SQL Server migration replaces
+  // its ordinary constraint with a filtered unique index so multiple NULL (unassigned) cards work.
   currentVisitId        String?           @unique(map: "VisitorCard_currentVisitId_key") @db.VarChar(36)
   createdAt             DateTime          @default(now()) @db.DateTime2
   updatedAt             DateTime          @updatedAt @db.DateTime2

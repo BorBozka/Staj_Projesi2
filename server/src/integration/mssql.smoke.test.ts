@@ -12,14 +12,24 @@ import { PrismaAuthRepository } from "../repositories/prisma-auth-repository.js"
 import { PrismaOrganizationRepository } from "../repositories/prisma-organization-repository.js"
 import { PrismaResourceRepository } from "../repositories/prisma-resource-repository.js"
 import { PrismaSettingsRepository } from "../repositories/prisma-settings-repository.js"
+import { PrismaVisitorOperationsRepository } from "../repositories/visitor-operations-repository.js"
 import { demoSeedUsers } from "../../prisma/seed-data.js"
+import type { EmailMessage, EmailSender } from "../delivery/email-sender.js"
 
 const describeMssql = process.env.RUN_MSSQL_INTEGRATION === "true" ? describe : describe.skip
 
-describeMssql.sequential("Phase 1-2 MSSQL smoke", () => {
+describeMssql.sequential("Phase 1-3 MSSQL smoke", () => {
   const prisma = new PrismaClient()
   const testStartedAt = new Date()
   const resourceIds: string[] = []
+  const visitorIds: string[] = []
+  const meetingIds: string[] = []
+  const visitIds: string[] = []
+  const cardIds: string[] = []
+  const ruleIds: string[] = []
+  const previouslyActiveRuleIds: string[] = []
+  const sentEmails: EmailMessage[] = []
+  const fakeEmailSender: EmailSender = { send: async (message) => { sentEmails.push(message) } }
   let app: FastifyInstance
   let sessionCookie = ""
   let originalSettings: {
@@ -36,9 +46,12 @@ describeMssql.sequential("Phase 1-2 MSSQL smoke", () => {
       adminRepository: new PrismaAdminRepository(prisma),
       settingsRepository: new PrismaSettingsRepository(prisma),
       resourceRepository: new PrismaResourceRepository(prisma),
+      visitorOperationsRepository: new PrismaVisitorOperationsRepository(prisma),
+      emailSender: fakeEmailSender,
       checkDatabase: async () => { await prisma.$queryRawUnsafe("SELECT 1") },
     })
     const settings = await prisma.operationalSettings.findUnique({ where: { id: "default" } })
+    previouslyActiveRuleIds.push(...(await prisma.visitorRuleVersion.findMany({ where: { active: true }, select: { id: true } })).map((item) => item.id))
     if (settings) {
       originalSettings = {
         overdueToleranceMinutes: settings.overdueToleranceMinutes,
@@ -49,6 +62,20 @@ describeMssql.sequential("Phase 1-2 MSSQL smoke", () => {
   })
 
   afterAll(async () => {
+    if (visitIds.length > 0) {
+      await prisma.$transaction([
+        prisma.hostCorrectionAudit.deleteMany({ where: { visitId: { in: visitIds } } }),
+        prisma.visitRuleAcceptance.deleteMany({ where: { visitId: { in: visitIds } } }),
+        prisma.invitation.deleteMany({ where: { visitId: { in: visitIds } } }),
+        prisma.visitorCard.updateMany({ where: { currentVisitId: { in: visitIds } }, data: { currentVisitId: null, assignedVisitorName: null, status: "AVAILABLE" } }),
+        prisma.visit.deleteMany({ where: { id: { in: visitIds } } }),
+      ])
+    }
+    if (meetingIds.length > 0) await prisma.meeting.deleteMany({ where: { id: { in: meetingIds } } })
+    if (visitorIds.length > 0) await prisma.visitor.deleteMany({ where: { id: { in: visitorIds } } })
+    if (cardIds.length > 0) await prisma.visitorCard.deleteMany({ where: { id: { in: cardIds } } })
+    if (ruleIds.length > 0) await prisma.visitorRuleVersion.deleteMany({ where: { id: { in: ruleIds } } })
+    if (previouslyActiveRuleIds.length > 0) await prisma.visitorRuleVersion.updateMany({ where: { id: { in: previouslyActiveRuleIds } }, data: { active: true } })
     if (resourceIds.length > 0) {
       await prisma.$transaction([
         prisma.driverLicenseClass.deleteMany({ where: { resourceId: { in: resourceIds } } }),
@@ -224,6 +251,64 @@ describeMssql.sequential("Phase 1-2 MSSQL smoke", () => {
     ])
     expect(licenseClasses.map(({ value }) => value)).toEqual(["D", "E"])
     expect(documents.map(({ name }) => name)).toEqual(["Psikoteknik", "SRC 4"])
+  })
+
+  it("runs the Phase 3 visitor, invitation, security, card, audit, and rule flow against MSSQL", async () => {
+    const adminHeaders = { cookie: sessionCookie }
+    const login = async (username: string, password: string) => {
+      const response = await app.inject({ method: "POST", url: "/api/auth/login", payload: { username, password } })
+      expect(response.statusCode).toBe(200)
+      const setCookie = response.headers["set-cookie"]
+      return { cookie: (Array.isArray(setCookie) ? setCookie[0] : setCookie)?.split(";", 1)[0] ?? "" }
+    }
+    const employeeHeaders = await login("calisan", "calisan")
+    const securityHeaders = await login("guvenlik", "guvenlik")
+    const suffix = Date.now().toString().slice(-8)
+
+    const rule = await app.inject({ method: "POST", url: "/api/admin/visitor-rules", headers: adminHeaders, payload: { content: `MSSQL rule ${suffix}` } })
+    expect(rule.statusCode).toBe(201); ruleIds.push(rule.json().id)
+    const card = await app.inject({ method: "POST", url: "/api/admin/visitor-cards", headers: adminHeaders, payload: { cardNumber: `MSSQL-${suffix}` } })
+    expect(card.statusCode).toBe(201); cardIds.push(card.json().id)
+    const secondCard = await app.inject({ method: "POST", url: "/api/admin/visitor-cards", headers: adminHeaders, payload: { cardNumber: `MSSQL-B-${suffix}` } })
+    expect(secondCard.statusCode).toBe(201); cardIds.push(secondCard.json().id)
+
+    const created = await app.inject({ method: "POST", url: "/api/meetings", headers: employeeHeaders, payload: { visitors: [{ firstName: "MSSQL Ada", lastName: "Yılmaz", email: `ada-${suffix}@example.test`, company: "Acme" }, { firstName: "MSSQL Deniz", lastName: "Yılmaz", email: `deniz-${suffix}@example.test`, company: "Acme" }], visitTypeId: "meeting", hostEmployeeId: "maya-kara", hostEmployeeName: "Maya Kara", hostCompanyId: "bplas", facilityId: "bplas-merkez", plannedStart: "2026-10-03T09:00:00.000Z", plannedEnd: "2026-10-03T10:00:00.000Z" } })
+    expect(created.statusCode).toBe(201)
+    const body = created.json(); meetingIds.push(body.meeting.id); visitIds.push(...body.visits.map((item: { id: string }) => item.id)); visitorIds.push(...body.visits.map((item: { visitor: { id: string } }) => item.visitor.id))
+    const [firstVisit, secondVisit] = body.visits
+
+    const invitation = await app.inject({ method: "POST", url: `/api/visits/${firstVisit.id}/invitation`, headers: employeeHeaders })
+    expect(invitation.statusCode).toBe(200); expect(invitation.json()).toMatchObject({ invitationStatus: "SENT" })
+    const url = new URL(sentEmails.at(-1)!.text.match(/https?:\/\/\S+/)![0])
+    const rawToken = url.searchParams.get("token")!
+    expect(rawToken).toBeTruthy()
+    expect(await prisma.invitation.findFirst({ where: { visitId: firstVisit.id } })).toMatchObject({ tokenHash: expect.not.stringContaining(rawToken) })
+    const publicDetails = await app.inject({ method: "GET", url: `/api/public/invitations/${rawToken}` })
+    expect(publicDetails.statusCode).toBe(200); expect(publicDetails.json()).toMatchObject({ visit: { facilityName: "Merkez Tesis" } })
+    expect((await app.inject({ method: "POST", url: `/api/public/invitations/${rawToken}/rule-acceptances` })).statusCode).toBe(200)
+
+    const checkedIn = await app.inject({ method: "POST", url: `/api/security/visits/${firstVisit.id}/check-in`, headers: securityHeaders, payload: { visitorCardId: card.json().id } })
+    expect(checkedIn.statusCode).toBe(200); expect(checkedIn.json()).toMatchObject({ status: "CHECKED_IN", visitorCardId: card.json().id })
+    const checkedOut = await app.inject({ method: "POST", url: `/api/security/visits/${firstVisit.id}/check-out`, headers: securityHeaders, payload: { cardReturned: true } })
+    expect(checkedOut.statusCode).toBe(200); expect(checkedOut.json()).toMatchObject({ status: "CHECKED_OUT", visitorCardReturned: true })
+
+    const secondInvitation = await app.inject({ method: "POST", url: `/api/visits/${secondVisit.id}/invitation`, headers: employeeHeaders })
+    const secondToken = new URL(sentEmails.at(-1)!.text.match(/https?:\/\/\S+/)![0]).searchParams.get("token")!
+    expect(secondInvitation.statusCode).toBe(200)
+    expect((await app.inject({ method: "POST", url: `/api/public/invitations/${secondToken}/rule-acceptances` })).statusCode).toBe(200)
+    expect((await app.inject({ method: "POST", url: `/api/security/visits/${secondVisit.id}/check-in`, headers: securityHeaders, payload: { visitorCardId: secondCard.json().id } })).statusCode).toBe(200)
+    expect((await app.inject({ method: "POST", url: `/api/security/visits/${secondVisit.id}/check-out`, headers: securityHeaders, payload: { cardReturned: false } })).statusCode).toBe(200)
+    expect((await app.inject({ method: "POST", url: `/api/security/visits/${secondVisit.id}/late-card-return`, headers: securityHeaders })).statusCode).toBe(200)
+
+    const unplanned = await app.inject({ method: "POST", url: "/api/security/unplanned-visits", headers: securityHeaders, payload: { firstName: "MSSQL Plansız", lastName: "Ziyaretçi", company: "Acme", hostEmployeeName: "Serbest Ev Sahibi", visitTypeId: "meeting", durationMinutes: 30, visitorCardId: card.json().id, rulesAccepted: true, companyId: "bplas", facilityId: "bplas-merkez" } })
+    expect(unplanned.statusCode).toBe(201); visitIds.push(unplanned.json().id); visitorIds.push(unplanned.json().visitor.id); meetingIds.push(unplanned.json().meeting.id)
+    const correction = await app.inject({ method: "PATCH", url: `/api/security/visits/${unplanned.json().id}/correction`, headers: securityHeaders, payload: { firstName: "MSSQL Plansız", lastName: "Ziyaretçi", company: "Acme", hostEmployeeName: "Düzeltilmiş Ev Sahibi" } })
+    expect(correction.statusCode).toBe(200)
+    expect(await prisma.hostCorrectionAudit.findFirst({ where: { visitId: unplanned.json().id } })).toMatchObject({ previousHostName: "Serbest Ev Sahibi", correctedHostName: "Düzeltilmiş Ev Sahibi" })
+
+    const nextRule = await app.inject({ method: "POST", url: "/api/admin/visitor-rules", headers: adminHeaders, payload: { content: `MSSQL rule v2 ${suffix}` } })
+    expect(nextRule.statusCode).toBe(201); ruleIds.push(nextRule.json().id)
+    expect(await prisma.visitorRuleVersion.findMany({ where: { active: true } })).toEqual([expect.objectContaining({ id: nextRule.json().id })])
   })
 
   it("logs out and rejects the revoked session during hydration", async () => {

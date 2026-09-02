@@ -15,12 +15,16 @@ import { registerSettingsRoutes } from "./modules/settings/routes.js"
 import { SettingsService } from "./modules/settings/service.js"
 import { registerResourceRoutes } from "./modules/resources/routes.js"
 import { ResourceService } from "./modules/resources/service.js"
+import { registerVisitorOperationsRoutes } from "./modules/visitor-operations/routes.js"
+import { VisitorOperationsService } from "./modules/visitor-operations/service.js"
 import { registerSecurityPlugins } from "./plugins/security.js"
+import type { EmailSender } from "./delivery/email-sender.js"
 import type { AuthRepository } from "./repositories/auth-repository.js"
 import type { OrganizationRepository } from "./repositories/organization-repository.js"
 import type { AdminRepository } from "./repositories/admin-repository.js"
 import type { SettingsRepository } from "./repositories/settings-repository.js"
 import type { ResourceRepository } from "./repositories/resource-repository.js"
+import type { VisitorOperationsRepository } from "./repositories/visitor-operations-repository.js"
 
 export interface AppDependencies {
   authRepository: AuthRepository
@@ -28,6 +32,8 @@ export interface AppDependencies {
   adminRepository?: AdminRepository
   settingsRepository?: SettingsRepository
   resourceRepository?: ResourceRepository
+  visitorOperationsRepository?: VisitorOperationsRepository
+  emailSender?: EmailSender
   checkDatabase?: () => Promise<void>
   authService?: AuthService
 }
@@ -56,6 +62,9 @@ export async function buildApp(config: AppConfig, dependencies: AppDependencies)
   if (dependencies.adminRepository) await registerAdminRoutes(app, { service: new AdminService(dependencies.adminRepository), guards })
   if (dependencies.settingsRepository) await registerSettingsRoutes(app, { service: new SettingsService(dependencies.settingsRepository), guards })
   if (dependencies.resourceRepository) await registerResourceRoutes(app, { service: new ResourceService(dependencies.resourceRepository), guards })
+  if (dependencies.visitorOperationsRepository && dependencies.emailSender) {
+    await registerVisitorOperationsRoutes(app, { service: new VisitorOperationsService(dependencies.visitorOperationsRepository, dependencies.emailSender, config.webOrigin), guards })
+  }
 
   return app
 }

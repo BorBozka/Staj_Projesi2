@@ -1,0 +1,192 @@
+import { createHash, randomBytes } from "node:crypto"
+
+import type { DeliveryLogger, EmailSender } from "../../delivery/email-sender.js"
+import { consoleDeliveryLogger } from "../../delivery/email-sender.js"
+import { ApiError } from "../../lib/api-error.js"
+import type { VisitorOperationsRepository } from "../../repositories/visitor-operations-repository.js"
+import type {
+  CreateUnplannedInput, MeetingInput, PublicPreRegistrationDto, SecurityCheckInInput,
+  SecurityCorrectionInput, VisitorCardDto, VisitorRuleDto, VisitDto, VisitTypeDto,
+} from "./types.js"
+import { normalizeCardNumber, normalizeOptional, normalizePlate, normalizeVisitTypeName, validEmail } from "./types.js"
+
+const terminal = new Set(["CHECKED_OUT", "CANCELLED", "NO_SHOW"])
+
+export class VisitorOperationsService {
+  constructor(
+    private readonly repository: VisitorOperationsRepository,
+    private readonly emailSender: EmailSender,
+    private readonly webOrigin: string,
+    private readonly logger: DeliveryLogger = consoleDeliveryLogger,
+    private readonly now: () => Date = () => new Date(),
+    private readonly createInvitationToken: () => string = () => randomBytes(32).toString("base64url"),
+  ) {}
+
+  listVisitTypes(includeInactive = false) { return this.repository.listVisitTypes(includeInactive) }
+  async createVisitType(input: { name: string; active: boolean }) { return this.saveVisitType(undefined, input) }
+  async updateVisitType(id: string, input: { name: string; active: boolean }) { await this.requireVisitType(id); return this.saveVisitType(id, input) }
+  async setVisitTypeActive(id: string, active: boolean) { const current = await this.requireVisitType(id); return this.repository.saveVisitType({ id, name: current.name, nameNormalized: normalizeVisitTypeName(current.name), active }) }
+
+  listMeetings() { return this.repository.listMeetings() }
+  listVisits() { return this.repository.listVisits() }
+  async getMeeting(id: string) { const meeting = await this.repository.findMeeting(id); if (!meeting) throw new ApiError(404, "NOT_FOUND", "Ziyaret grubu bulunamadı."); return meeting }
+  async getVisit(id: string) { return this.requireVisit(id) }
+  getReferenceData(userId: string) { return this.repository.getReferenceData(userId) }
+
+  async createMeeting(input: MeetingInput, userId: string) {
+    const actor = await this.requireActor(userId)
+    const validated = await this.validateMeetingInput(input)
+    return this.repository.createMeeting(validated.input, actor.id, validated.hostEmployeeId)
+  }
+
+  async updateMeeting(id: string, input: MeetingInput, userId: string) {
+    await this.requireActor(userId)
+    const current = await this.getMeeting(id)
+    if (current.meeting.actualMeetingEnd) throw new ApiError(409, "MEETING_CLOSED", "Kapatılmış bir toplantı düzenlenemez.")
+    const submittedIds = input.visitors.flatMap((visitor) => visitor.visitId ? [visitor.visitId] : [])
+    if (new Set(submittedIds).size !== submittedIds.length || submittedIds.some((visitId) => !current.visits.some((visit) => visit.id === visitId))) throw new ApiError(400, "VALIDATION_ERROR", "Ziyaret grubu dışındaki veya yinelenen ziyaret kayıtları gönderilemez.")
+    const validated = await this.validateMeetingInput(input, current.meeting.visitTypeId)
+    return this.repository.updateMeeting(id, validated.input, validated.hostEmployeeId)
+  }
+
+  async rescheduleVisit(id: string, input: { plannedStart: string; plannedEnd: string }, userId: string) {
+    await this.requireActor(userId)
+    const visit = await this.requireVisit(id)
+    this.requireStatus(visit, "PLANNED", "Yalnızca planlanmış ziyaret yeniden planlanabilir.")
+    this.assertTimes(input.plannedStart, input.plannedEnd)
+    if (visit.meeting.actualMeetingEnd) throw new ApiError(409, "MEETING_CLOSED", "Kapatılmış bir toplantı yeniden planlanamaz.")
+    await this.repository.updateMeetingTimes(visit.meetingId, new Date(input.plannedStart), new Date(input.plannedEnd))
+    return this.requireVisit(id)
+  }
+
+  async cancelVisit(id: string, userId: string) { const visit = await this.requireVisit(id); this.requireStatus(visit, "PLANNED", "Yalnızca planlanmış ziyaret iptal edilebilir."); await this.repository.cancelVisit(id, userId, this.now()); return this.requireVisit(id) }
+  async cancelMeeting(id: string, userId: string) { await this.getMeeting(id); await this.repository.cancelMeeting(id, userId, this.now()); return this.getMeeting(id) }
+
+  async extendMeeting(id: string, extensionMinutes: number, userId: string) {
+    const actor = await this.requireActor(userId); const meeting = await this.getMeeting(id); const now = this.now()
+    if (!Number.isInteger(extensionMinutes) || extensionMinutes <= 0) throw new ApiError(400, "VALIDATION_ERROR", "Uzatma süresi pozitif bir tam sayı dakika olmalıdır.")
+    this.assertManualLifecycle(meeting.meeting, meeting.visits, actor.id, now)
+    const base = Math.max(new Date(meeting.meeting.plannedEnd).getTime(), now.getTime())
+    await this.repository.updateMeetingTimes(id, new Date(meeting.meeting.plannedStart), new Date(base + extensionMinutes * 60_000))
+    return this.getMeeting(id)
+  }
+
+  async closeMeeting(id: string, userId: string) {
+    const actor = await this.requireActor(userId); const meeting = await this.getMeeting(id); const now = this.now()
+    this.assertManualLifecycle(meeting.meeting, meeting.visits, actor.id, now)
+    await this.repository.closeMeeting(id, "MANUAL", now)
+    return this.getMeeting(id)
+  }
+
+  async sendMeetingInvitations(id: string) {
+    const meeting = await this.getMeeting(id)
+    const delivered: VisitDto[] = []
+    for (const visit of meeting.visits) {
+      if (visit.status !== "PLANNED" || !visit.visitor.email || !["NOT_SENT", "FAILED"].includes(visit.invitationStatus)) continue
+      delivered.push(await this.sendVisitInvitation(visit.id))
+    }
+    return delivered
+  }
+
+  async sendVisitInvitation(id: string) {
+    const current = await this.requireVisit(id)
+    this.requireStatus(current, "PLANNED", "Yalnızca planlanmış ziyaretler için davet gönderilebilir.")
+    if (!current.visitor.email) throw new ApiError(409, "VISITOR_EMAIL_REQUIRED", "Ziyaretçinin davet gönderilebilecek e-posta adresi bulunmuyor.")
+    if (["SENT", "SENDING"].includes(current.invitationStatus)) return current
+
+    const rawToken = this.createInvitationToken()
+    const prepared = await this.repository.prepareInvitation(id, hashToken(rawToken))
+    if (!prepared.claimed) return prepared.visit
+    const link = `${this.webOrigin.replace(/\/$/, "")}/visitor/pre-registration?token=${encodeURIComponent(rawToken)}`
+    try {
+      await this.emailSender.send({
+        to: { address: current.visitor.email, name: `${current.visitor.firstName} ${current.visitor.lastName}` },
+        subject: "Ziyaret ön kayıt bağlantınız",
+        text: `Merhaba ${current.visitor.firstName},\n\n${current.meeting.facilityName} tesisindeki ${current.meeting.hostEmployeeName} konuğunuz için ziyaretiniz ${current.meeting.plannedStart} - ${current.meeting.plannedEnd} arasında planlandı.\n\nGüvenli ön kayıt bağlantısı: ${link}`,
+      })
+      await this.repository.finishInvitation(id, true, this.now())
+    } catch {
+      this.logger.error({ visitId: id }, "Invitation delivery başarısız oldu.")
+      await this.repository.finishInvitation(id, false, this.now())
+    }
+    return this.requireVisit(id)
+  }
+
+  async getPublicPreRegistration(rawToken: string): Promise<PublicPreRegistrationDto> {
+    const found = await this.getActivePublicInvitation(rawToken)
+    return { visitor: found.visit.visitor, visit: { plannedStart: found.visit.meeting.plannedStart, plannedEnd: found.visit.meeting.plannedEnd, visitTypeName: found.visit.meeting.visitTypeName, facilityName: found.visit.meeting.facilityName, hostEmployeeName: found.visit.meeting.hostEmployeeName, vehiclePlate: found.visit.vehiclePlate }, activeRule: found.activeRule }
+  }
+
+  async updatePublicPreRegistration(rawToken: string, input: { firstName: string; lastName: string; email?: string; company: string; phone?: string; vehiclePlate?: string }) {
+    await this.getActivePublicInvitation(rawToken)
+    const firstName = requireText(input.firstName, "Ad zorunludur."), lastName = requireText(input.lastName, "Soyad zorunludur."), company = requireText(input.company, "Ziyaretçi şirketi zorunludur.")
+    const email = normalizeOptional(input.email); if (email && !validEmail(email)) throw new ApiError(400, "VALIDATION_ERROR", "Geçerli bir e-posta adresi girin.")
+    await this.repository.updatePublicVisitor(hashToken(rawToken), { firstName, lastName, company, email, phone: normalizeOptional(input.phone), vehiclePlate: normalizePlate(input.vehiclePlate) })
+    return this.getPublicPreRegistration(rawToken)
+  }
+
+  async acceptPublicRule(rawToken: string, ipAddress?: string) { const found = await this.getActivePublicInvitation(rawToken); if (!found.activeRule) throw new ApiError(409, "NO_ACTIVE_RULE", "Aktif ziyaretçi kuralı bulunmuyor."); return this.repository.acceptPublicRule(hashToken(rawToken), ipAddress) }
+
+  listRules() { return this.repository.listRules() }
+  getActiveRule() { return this.repository.getActiveRule() }
+  async publishRule(content: string) { const normalized = requireText(content, "Kural içeriği zorunludur."); return this.repository.publishRule(normalized, this.now()) }
+
+  listCards() { return this.repository.listCards() }
+  async createCard(cardNumber: string) { const number = requireText(cardNumber, "Kart numarası zorunludur."); return this.repository.saveCard({ cardNumber: number, cardNumberNormalized: normalizeCardNumber(number) }) }
+  async updateCard(id: string, input: { cardNumber: string; active: boolean }) { const card = await this.requireCard(id); if (!['AVAILABLE', 'DISABLED'].includes(card.status)) throw new ApiError(409, "CARD_OPERATIONAL", "Kullanımdaki veya iade edilmemiş kart düzenlenemez."); const number = requireText(input.cardNumber, "Kart numarası zorunludur."); const saved = await this.repository.saveCard({ id, cardNumber: number, cardNumberNormalized: normalizeCardNumber(number) }); return saved.status === (input.active ? "AVAILABLE" : "DISABLED") ? saved : this.repository.setCardStatus(id, input.active ? "AVAILABLE" : "DISABLED") }
+  async setCardActive(id: string, active: boolean) { const card = await this.requireCard(id); if (!['AVAILABLE', 'DISABLED'].includes(card.status)) throw new ApiError(409, "CARD_OPERATIONAL", "Kullanımdaki veya iade edilmemiş kartın durumu değiştirilemez."); return this.repository.setCardStatus(id, active ? "AVAILABLE" : "DISABLED") }
+  async markCardLost(id: string) { const card = await this.requireCard(id); if (card.status !== "NOT_RETURNED") throw new ApiError(409, "INVALID_CARD_TRANSITION", "Yalnız iade edilmemiş kart kayıp işaretlenebilir."); return this.repository.setCardStatus(id, "LOST") }
+  async restoreCard(id: string) { const card = await this.requireCard(id); if (card.status !== "LOST") throw new ApiError(409, "INVALID_CARD_TRANSITION", "Yalnız kayıp kart geri alınabilir."); return this.repository.setCardStatus(id, "AVAILABLE") }
+
+  async getAvailableCards() { return (await this.repository.listCards()).filter((card) => card.status === "AVAILABLE") }
+  async checkInVisit(id: string, input: SecurityCheckInInput) {
+    const visit = await this.requireVisit(id); this.requireStatus(visit, "PLANNED", "Yalnızca planlanmış ziyaretler giriş yapabilir.")
+    const card = await this.requireCard(input.visitorCardId); if (card.status !== "AVAILABLE") throw new ApiError(409, "CARD_UNAVAILABLE", "Seçilen kart şu anda kullanılabilir değil.")
+    if (!visit.ruleAcceptance) throw new ApiError(409, "RULE_ACCEPTANCE_REQUIRED", "Ziyaretçi kuralları check-in öncesinde kabul edilmelidir.")
+    const result = await this.repository.checkIn(id, { visitorCardId: input.visitorCardId, vehiclePlate: normalizePlate(input.vehiclePlate), phone: normalizeOptional(input.phone) }, this.now())
+    if (result.hostEmail && result.hostName) this.sendHostNotification(result.visit, result.hostEmail, result.hostName)
+    return result.visit
+  }
+  async checkOutVisit(id: string, cardReturned: boolean) { const visit = await this.requireVisit(id); this.requireStatus(visit, "CHECKED_IN", "Yalnızca içerideki ziyaretçiler çıkış yapabilir."); await this.repository.checkOut(id, cardReturned, this.now()); return this.requireVisit(id) }
+  listUnreturnedIssues() { return this.repository.listUnreturnedIssues() }
+  async receiveLateCardReturn(id: string) { await this.repository.lateReturn(id, this.now()); return this.requireVisit(id) }
+  async createAndCheckInUnplanned(input: CreateUnplannedInput, userId: string) {
+    const actor = await this.requireActor(userId)
+    const clean: CreateUnplannedInput = { ...input, firstName: requireText(input.firstName, "Ad zorunludur."), lastName: requireText(input.lastName, "Soyad zorunludur."), company: requireText(input.company, "Ziyaretçi şirketi zorunludur."), hostEmployeeName: requireText(input.hostEmployeeName, "Ev sahibi zorunludur."), visitTypeId: input.visitTypeId.trim(), vehiclePlate: normalizePlate(input.vehiclePlate) }
+    if (!clean.rulesAccepted || !Number.isInteger(clean.durationMinutes) || clean.durationMinutes <= 0) throw new ApiError(400, "VALIDATION_ERROR", "Kural kabulü ve pozitif tahmini süre zorunludur.")
+    const type = await this.requireVisitType(clean.visitTypeId); if (!type.active) throw new ApiError(409, "INACTIVE_VISIT_TYPE", "Pasif ziyaret türü seçilemez.")
+    return this.repository.createUnplanned(clean, actor.id, this.now())
+  }
+  async correctVisitor(id: string, input: SecurityCorrectionInput, userId: string) {
+    const visit = await this.requireVisit(id); if (!["PLANNED", "CHECKED_IN"].includes(visit.status)) throw new ApiError(409, "VISIT_NOT_EDITABLE", "Yalnızca planlanmış veya içerideki ziyaretler düzeltilebilir.")
+    const email = input.email === undefined ? undefined : normalizeOptional(input.email); if (email && !validEmail(email)) throw new ApiError(400, "VALIDATION_ERROR", "Geçerli bir e-posta adresi girin.")
+    if (input.visitTypeId) { const type = await this.requireVisitType(input.visitTypeId); if (!type.active && type.id !== visit.meeting.visitTypeId) throw new ApiError(409, "INACTIVE_VISIT_TYPE", "Pasif ziyaret türü seçilemez.") }
+    const actor = await this.repository.findEmployeeByUserId(userId)
+    await this.repository.correctVisitor(id, { firstName: requireText(input.firstName, "Ad zorunludur."), lastName: requireText(input.lastName, "Soyad zorunludur."), company: requireText(input.company, "Ziyaretçi şirketi zorunludur."), email, phone: normalizeOptional(input.phone), visitTypeId: input.visitTypeId?.trim() || undefined, hostEmployeeName: requireText(input.hostEmployeeName, "Ev sahibi zorunludur.") }, actor, this.now())
+    return this.requireVisit(id)
+  }
+
+  private async saveVisitType(id: string | undefined, input: { name: string; active: boolean }) { const name = requireText(input.name, "Ziyaret türü adı zorunludur."); const normalized = normalizeVisitTypeName(name); const types = await this.repository.listVisitTypes(true); if (types.some((item) => item.id !== id && normalizeVisitTypeName(item.name) === normalized)) throw new ApiError(409, "DUPLICATE_NAME", "Bu ziyaret türü zaten tanımlı."); return this.repository.saveVisitType({ id, name, nameNormalized: normalized, active: input.active }) }
+  private async validateMeetingInput(input: MeetingInput, currentTypeId?: string) {
+    if (!Array.isArray(input.visitors) || input.visitors.length === 0) throw new ApiError(400, "VALIDATION_ERROR", "En az bir ziyaretçi zorunludur.")
+    this.assertTimes(input.plannedStart, input.plannedEnd)
+    const type = await this.requireVisitType(input.visitTypeId); if (!type.active && type.id !== currentTypeId) throw new ApiError(409, "INACTIVE_VISIT_TYPE", "Pasif ziyaret türü yeni ziyaret için seçilemez.")
+    const hostName = requireText(input.hostEmployeeName, "Ev sahibi zorunludur.")
+    const host = input.hostEmployeeId ? await this.repository.findEmployeeById(input.hostEmployeeId) : await this.repository.findActiveEmployeeByName(hostName, input.hostCompanyId, input.facilityId)
+    if (!host || !host.facilityIds.includes(input.facilityId) || host.companyId !== input.hostCompanyId) throw new ApiError(400, "INVALID_HOST", "Ev sahibi, şirket ve tesis kapsamıyla eşleşmelidir.")
+    const visitors = input.visitors.map((visitor) => { const email = normalizeOptional(visitor.email); if (email && !validEmail(email)) throw new ApiError(400, "VALIDATION_ERROR", "Geçerli bir e-posta adresi girin."); return { ...visitor, firstName: requireText(visitor.firstName, "Ad zorunludur."), lastName: requireText(visitor.lastName, "Soyad zorunludur."), company: requireText(visitor.company, "Ziyaretçi şirketi zorunludur."), email, phone: normalizeOptional(visitor.phone) } })
+    return { hostEmployeeId: host.id, input: { ...input, hostEmployeeName: host.fullName, visitors, note: normalizeOptional(input.note), additionalRequirementNote: input.hasAdditionalRequirements ? normalizeOptional(input.additionalRequirementNote) : undefined } }
+  }
+  private async getActivePublicInvitation(rawToken: string) { if (!rawToken || rawToken.length > 200) throw new ApiError(404, "INVITATION_NOT_FOUND", "Davet bağlantısı geçersiz veya süresi dolmuş."); const found = await this.repository.findPublicPreRegistration(hashToken(rawToken)); if (!found || found.visit.status !== "PLANNED") throw new ApiError(404, "INVITATION_NOT_FOUND", "Davet bağlantısı geçersiz veya süresi dolmuş."); return found }
+  private async requireActor(userId: string) { const actor = await this.repository.findEmployeeByUserId(userId); if (!actor) throw new ApiError(403, "EMPLOYEE_PROFILE_REQUIRED", "Bu işlem için çalışan profili gereklidir."); return actor }
+  private async requireVisitType(id: string) { const type = await this.repository.findVisitType(id); if (!type) throw new ApiError(404, "NOT_FOUND", "Ziyaret türü bulunamadı."); return type }
+  private async requireVisit(id: string) { const visit = await this.repository.findVisit(id); if (!visit) throw new ApiError(404, "NOT_FOUND", "Ziyaret bulunamadı."); return visit }
+  private async requireCard(id: string) { const card = await this.repository.findCard(id); if (!card) throw new ApiError(404, "NOT_FOUND", "Ziyaretçi kartı bulunamadı."); return card }
+  private requireStatus(visit: VisitDto, status: string, message: string) { if (visit.status !== status) throw new ApiError(409, "INVALID_VISIT_TRANSITION", message) }
+  private assertTimes(start: string, end: string) { const startAt = new Date(start), endAt = new Date(end); if (!Number.isFinite(startAt.getTime()) || !Number.isFinite(endAt.getTime()) || endAt <= startAt) throw new ApiError(400, "VALIDATION_ERROR", "Planlanan başlangıç ve bitiş zamanı geçerli ve sıralı olmalıdır.") }
+  private assertManualLifecycle(meeting: { hostEmployeeId?: string; plannedStart: string; actualMeetingEnd?: string }, visits: VisitDto[], actorId: string, now: Date) { if (meeting.hostEmployeeId !== actorId) throw new ApiError(403, "NOT_HOST", "Bu toplantının yaşam döngüsü aksiyonlarını yalnızca ev sahibi kullanabilir."); if (meeting.actualMeetingEnd) throw new ApiError(409, "MEETING_CLOSED", "Toplantı zaten kapatılmış."); if (now < new Date(meeting.plannedStart)) throw new ApiError(409, "MEETING_NOT_STARTED", "Toplantı başlamadan yaşam döngüsü aksiyonu uygulanamaz."); if (!visits.some((visit) => !terminal.has(visit.status))) throw new ApiError(409, "MEETING_TERMINAL", "Tüm ziyaretleri tamamlanmış toplantı değiştirilemez.") }
+  private sendHostNotification(visit: VisitDto, hostEmail: string, hostName: string) { void this.emailSender.send({ to: { address: hostEmail, name: hostName }, subject: "Ziyaretçi check-in bildirimi", text: `${visit.visitor.firstName} ${visit.visitor.lastName} (${visit.visitor.company}) tesise giriş yaptı. Giriş zamanı: ${visit.actualCheckIn}.` }).catch(() => this.logger.error({ visitId: visit.id }, "Host check-in bildirimi gönderilemedi.")) }
+}
+
+function requireText(value: string | undefined, message: string) { const normalized = normalizeOptional(value); if (!normalized) throw new ApiError(400, "VALIDATION_ERROR", message); return normalized }
+export function hashToken(rawToken: string) { return createHash("sha256").update(rawToken).digest("hex") }

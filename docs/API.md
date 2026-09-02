@@ -165,3 +165,51 @@ Create/update bodies are type-discriminated and match the frontend catalog contr
 The service verifies company/facility consistency, type-specific required fields, driver license
 classes, positive pool quantity, company-local vehicle plate uniqueness, and immutable resource
 type during editing.
+
+## Phase 3 visitor operations
+
+`GET /api/visit-types` lists active types by default (`includeInactive=true` keeps historical
+types resolvable). `POST`, `PATCH /:id`, and `PATCH /:id/status` require `ADMIN`; names use the
+same Turkish normalization and duplicate rule as the frontend.
+
+`GET /api/meetings`, `GET /api/meetings/:id`, `GET /api/visits`,
+`GET /api/visits/:id`, and `GET /api/visits/reference-data` serve the flattened visitor read
+model and Meeting's shared fields. Authenticated employee/manager/admin callers can create and
+edit meetings (`POST/PATCH /api/meetings`), reschedule/cancel a planned visit, cancel planned
+visits in a meeting, and use host-only `POST /api/meetings/:id/extend` or `/close`. The server
+resolves creator/actor identity from the session's User → Employee relation.
+
+`POST /api/meetings/:id/invitations` sends eligible planned visitors in bulk and
+`POST /api/visits/:id/invitation` sends/retries one. Visitors without email are skipped in bulk
+and rejected for single delivery. State transitions are `NOT_SENT|FAILED → SENDING → SENT|FAILED`;
+`SENT`/`SENDING` are never duplicated. The persisted `Invitation` row contains only a SHA-256
+hash of a cryptographically-random opaque token. The email's public URL is based on `WEB_ORIGIN`
+and contains no Visit ID or personal data.
+
+Public endpoints do not need a session: `GET/PATCH /api/public/invitations/:token` reads/updates
+the permitted visitor pre-registration data, and `POST .../:token/rule-acceptances` records the
+active immutable rule acceptance. Invalid, cancelled, and completed invitation links return the
+same generic not-found response and no internal organization/user data.
+
+Admin inventory/rule endpoints are `GET/POST /api/admin/visitor-cards`,
+`PATCH /api/admin/visitor-cards/:id`, `/status`, `/mark-lost`, `/restore`, and
+`GET/POST /api/admin/visitor-rules`. Card ownership is enforced as
+`AVAILABLE|DISABLED` (Admin), `IN_USE|NOT_RETURNED` (Security), and
+`NOT_RETURNED → LOST → AVAILABLE` for admin write-off/restore. Rule publishing atomically
+deactivates the prior version and creates the next active immutable version.
+
+Security endpoints are `GET /api/security/visitor-cards/available`,
+`GET /api/security/visitor-rules/active`, check-in/out and correction under
+`/api/security/visits/:id/*`, `GET /api/security/visitor-card-issues`, and
+`POST /api/security/unplanned-visits`. Check-in/out, card transitions, late return, unplanned
+create/check-in, correction/audit, and last-visitor meeting auto-close run transactionally.
+Host notification email is attempted only after a successful planned check-in commit; a delivery
+failure is logged without rolling back the operational change.
+
+## Email delivery configuration
+
+`EMAIL_DELIVERY_MODE=log|smtp` defaults to `log`, which sends nothing and does not log email
+bodies or raw invitation tokens. `smtp` requires `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`,
+`SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM_ADDRESS`, and `MAIL_FROM_NAME`; startup fails clearly
+when any required value is absent. The SMTP adapter is isolated behind the backend `EmailSender`
+boundary; no provider-specific logic is present in visitor services.

@@ -249,7 +249,8 @@ Potential fields:
 - arrives by vehicle,
 - plate if applicable.
 
-For a planned visitor, email is required because pre-registration is sent via email.
+For a planned visitor, email is optional. A visitor without email can be planned and processed
+normally at Security; only invitation and pre-registration delivery require an email address.
 
 Company is a required field on every visitor, not a potential/optional one, since a monthly
 manager report depends on a company value existing for every visit (see

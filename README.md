@@ -6,7 +6,7 @@
 
 ![Admin dashboard; aktif ziyaretler, durum dağılımı ve günlük operasyon görünümü](visitor-operations-dashboard.jpg)
 
-> **Güncel durum:** Proje aktif geliştirme aşamasındadır. Uygulama şu anda gerçek API'lerle değiştirilebilecek bir mock servis katmanı üzerinde çalışan frontend ürünüdür. Backend, gerçek kimlik doğrulama, e-posta, QR ve fiziksel erişim-kontrol entegrasyonları henüz bulunmamaktadır.
+> **Güncel durum:** Frontend mock servis katmanını kullanmaya devam eder. Ayrı Fastify/Prisma backend'i LOCAL kimlik doğrulama, ziyaret operasyonları, hashed invitation tokenları ve environment-based e-posta teslim altyapısını içerir; frontend HTTP adaptörleri sonraki fazdadır.
 
 ## Problem ve Ürün Yaklaşımı
 
@@ -66,6 +66,18 @@ Temel doğrulama komutları:
     pnpm typecheck
     pnpm lint
     pnpm build
+
+## Backend e-posta teslimi
+
+`server/.env.example` geliştirme için güvenli varsayılanı kullanır:
+
+    EMAIL_DELIVERY_MODE=log
+
+Bu mod e-posta göndermez; teslim denemesinin alıcı/konu metadatasını loglar ve davet tokenını
+veya ön-kayıt URL'sini loglamaz. SMTP için `EMAIL_DELIVERY_MODE=smtp` seçin ve `SMTP_HOST`,
+`SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM_ADDRESS` ile
+`MAIL_FROM_NAME` değerlerinin tamamını environment üzerinden sağlayın. Secret ve gerçek SMTP
+credential'ları commit edilmez.
 
 ## Proje Dokümantasyonu
 

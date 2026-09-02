@@ -9,6 +9,8 @@ import { PrismaOrganizationRepository } from "./repositories/prisma-organization
 import { PrismaAdminRepository } from "./repositories/prisma-admin-repository.js"
 import { PrismaSettingsRepository } from "./repositories/prisma-settings-repository.js"
 import { PrismaResourceRepository } from "./repositories/prisma-resource-repository.js"
+import { PrismaVisitorOperationsRepository } from "./repositories/visitor-operations-repository.js"
+import { createEmailSender } from "./delivery/create-email-sender.js"
 
 const config = loadConfig()
 const prisma = new PrismaClient()
@@ -18,6 +20,8 @@ const app = await buildApp(config, {
   adminRepository: new PrismaAdminRepository(prisma),
   settingsRepository: new PrismaSettingsRepository(prisma),
   resourceRepository: new PrismaResourceRepository(prisma),
+  visitorOperationsRepository: new PrismaVisitorOperationsRepository(prisma),
+  emailSender: createEmailSender(config.emailDelivery),
   checkDatabase: async () => { await prisma.$queryRawUnsafe("SELECT 1") },
 })
 

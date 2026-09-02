@@ -714,9 +714,12 @@ singleton operational settings, and resource catalog management.
 
 ## Backend Phase 3 — Visit types, meetings, visits, invitations, security, cards, and rules APIs
 
+**Status: Complete.**
+
 Implement visit types, Meeting/Visit workflows, invitations and pre-registration, Security desk
 operations, visitor-card transitions, host-correction audits, and immutable visitor-rule
-acceptance APIs.
+acceptance APIs. Invitation delivery uses the reusable log/SMTP boundary, stores only hashed
+opaque tokens, and sends host check-in notifications as a post-transaction side effect.
 
 ---
 
