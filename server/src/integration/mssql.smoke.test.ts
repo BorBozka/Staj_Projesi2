@@ -271,21 +271,33 @@ describeMssql.sequential("Phase 1-3 MSSQL smoke", () => {
     expect(card.statusCode).toBe(201); cardIds.push(card.json().id)
     const secondCard = await app.inject({ method: "POST", url: "/api/admin/visitor-cards", headers: adminHeaders, payload: { cardNumber: `MSSQL-B-${suffix}` } })
     expect(secondCard.statusCode).toBe(201); cardIds.push(secondCard.json().id)
+    const thirdCard = await app.inject({ method: "POST", url: "/api/admin/visitor-cards", headers: adminHeaders, payload: { cardNumber: `MSSQL-C-${suffix}` } })
+    expect(thirdCard.statusCode).toBe(201); cardIds.push(thirdCard.json().id)
 
-    const created = await app.inject({ method: "POST", url: "/api/meetings", headers: employeeHeaders, payload: { visitors: [{ firstName: "MSSQL Ada", lastName: "Yılmaz", email: `ada-${suffix}@example.test`, company: "Acme" }, { firstName: "MSSQL Deniz", lastName: "Yılmaz", email: `deniz-${suffix}@example.test`, company: "Acme" }], visitTypeId: "meeting", hostEmployeeId: "maya-kara", hostEmployeeName: "Maya Kara", hostCompanyId: "bplas", facilityId: "bplas-merkez", plannedStart: "2026-10-03T09:00:00.000Z", plannedEnd: "2026-10-03T10:00:00.000Z" } })
+    const created = await app.inject({ method: "POST", url: "/api/meetings", headers: employeeHeaders, payload: { visitors: [{ firstName: "MSSQL Ada", lastName: "Yılmaz", email: `ada-${suffix}@example.test`, company: "Acme" }, { firstName: "MSSQL Deniz", lastName: "Yılmaz", email: `deniz-${suffix}@example.test`, company: "Acme" }, { firstName: "MSSQL Ece", lastName: "Yılmaz", email: `ece-${suffix}@example.test`, company: "Acme" }], visitTypeId: "meeting", hostEmployeeId: "maya-kara", hostEmployeeName: "Maya Kara", hostCompanyId: "bplas", facilityId: "bplas-merkez", plannedStart: "2026-10-03T09:00:00.000Z", plannedEnd: "2026-10-03T10:00:00.000Z" } })
     expect(created.statusCode).toBe(201)
     const body = created.json(); meetingIds.push(body.meeting.id); visitIds.push(...body.visits.map((item: { id: string }) => item.id)); visitorIds.push(...body.visits.map((item: { visitor: { id: string } }) => item.visitor.id))
-    const [firstVisit, secondVisit] = body.visits
+    const [firstVisit, secondVisit, thirdVisit] = body.visits
 
     const invitation = await app.inject({ method: "POST", url: `/api/visits/${firstVisit.id}/invitation`, headers: employeeHeaders })
     expect(invitation.statusCode).toBe(200); expect(invitation.json()).toMatchObject({ invitationStatus: "SENT" })
     const url = new URL(sentEmails.at(-1)!.text.match(/https?:\/\/\S+/)![0])
     const rawToken = url.searchParams.get("token")!
     expect(rawToken).toBeTruthy()
-    expect(await prisma.invitation.findFirst({ where: { visitId: firstVisit.id } })).toMatchObject({ tokenHash: expect.not.stringContaining(rawToken) })
-    const publicDetails = await app.inject({ method: "GET", url: `/api/public/invitations/${rawToken}` })
+    const invitationBeforeReset = await prisma.invitation.findFirst({ where: { visitId: firstVisit.id } })
+    expect(invitationBeforeReset).toMatchObject({ tokenHash: expect.not.stringContaining(rawToken) })
+    const rescheduled = await app.inject({ method: "PATCH", url: `/api/visits/${firstVisit.id}/reschedule`, headers: employeeHeaders, payload: { plannedStart: "2026-10-03T11:00:00.000Z", plannedEnd: "2026-10-03T12:00:00.000Z" } })
+    expect(rescheduled.statusCode).toBe(200)
+    expect(rescheduled.json()).toMatchObject({ invitationStatus: "NOT_SENT", meeting: { plannedStart: "2026-10-03T11:00:00.000Z", plannedEnd: "2026-10-03T12:00:00.000Z" } })
+    expect(await prisma.invitation.findFirst({ where: { visitId: firstVisit.id } })).toEqual(invitationBeforeReset)
+    const resentInvitation = await app.inject({ method: "POST", url: `/api/visits/${firstVisit.id}/invitation`, headers: employeeHeaders })
+    expect(resentInvitation.statusCode).toBe(200); expect(resentInvitation.json()).toMatchObject({ invitationStatus: "SENT" })
+    const resentToken = new URL(sentEmails.at(-1)!.text.match(/https?:\/\/\S+/)![0]).searchParams.get("token")!
+    expect(resentToken).not.toBe(rawToken)
+    expect((await app.inject({ method: "GET", url: `/api/public/invitations/${rawToken}` })).statusCode).toBe(404)
+    const publicDetails = await app.inject({ method: "GET", url: `/api/public/invitations/${resentToken}` })
     expect(publicDetails.statusCode).toBe(200); expect(publicDetails.json()).toMatchObject({ visit: { facilityName: "Merkez Tesis" } })
-    expect((await app.inject({ method: "POST", url: `/api/public/invitations/${rawToken}/rule-acceptances` })).statusCode).toBe(200)
+    expect((await app.inject({ method: "POST", url: `/api/public/invitations/${resentToken}/rule-acceptances` })).statusCode).toBe(200)
 
     const checkedIn = await app.inject({ method: "POST", url: `/api/security/visits/${firstVisit.id}/check-in`, headers: securityHeaders, payload: { visitorCardId: card.json().id } })
     expect(checkedIn.statusCode).toBe(200); expect(checkedIn.json()).toMatchObject({ status: "CHECKED_IN", visitorCardId: card.json().id })
@@ -300,6 +312,23 @@ describeMssql.sequential("Phase 1-3 MSSQL smoke", () => {
     expect((await app.inject({ method: "POST", url: `/api/security/visits/${secondVisit.id}/check-out`, headers: securityHeaders, payload: { cardReturned: false } })).statusCode).toBe(200)
     expect((await app.inject({ method: "POST", url: `/api/security/visits/${secondVisit.id}/late-card-return`, headers: securityHeaders })).statusCode).toBe(200)
 
+    const thirdInvitation = await app.inject({ method: "POST", url: `/api/visits/${thirdVisit.id}/invitation`, headers: employeeHeaders })
+    const thirdToken = new URL(sentEmails.at(-1)!.text.match(/https?:\/\/\S+/)![0]).searchParams.get("token")!
+    expect(thirdInvitation.statusCode).toBe(200)
+    expect((await app.inject({ method: "POST", url: `/api/public/invitations/${thirdToken}/rule-acceptances` })).statusCode).toBe(200)
+    expect((await app.inject({ method: "POST", url: `/api/security/visits/${thirdVisit.id}/check-in`, headers: securityHeaders, payload: { visitorCardId: thirdCard.json().id } })).statusCode).toBe(200)
+    expect((await app.inject({ method: "POST", url: `/api/security/visits/${thirdVisit.id}/check-out`, headers: securityHeaders, payload: { cardReturned: false } })).statusCode).toBe(200)
+    const lostCard = await app.inject({ method: "POST", url: `/api/admin/visitor-cards/${thirdCard.json().id}/mark-lost`, headers: adminHeaders })
+    expect(lostCard.statusCode).toBe(200)
+    expect(lostCard.json()).toMatchObject({ status: "LOST", assignedVisitId: thirdVisit.id, assignedVisitorName: "MSSQL Ece Yılmaz" })
+    expect(await prisma.visitorCard.findUnique({ where: { id: thirdCard.json().id } })).toMatchObject({ status: "LOST", currentVisitId: thirdVisit.id, assignedVisitorName: "MSSQL Ece Yılmaz" })
+    const restoredCard = await app.inject({ method: "POST", url: `/api/admin/visitor-cards/${thirdCard.json().id}/restore`, headers: adminHeaders })
+    expect(restoredCard.statusCode).toBe(200)
+    expect(restoredCard.json()).toMatchObject({ status: "AVAILABLE" })
+    expect(restoredCard.json()).not.toHaveProperty("assignedVisitId")
+    expect(restoredCard.json()).not.toHaveProperty("assignedVisitorName")
+    expect(await prisma.visitorCard.findUnique({ where: { id: thirdCard.json().id } })).toMatchObject({ status: "AVAILABLE", currentVisitId: null, assignedVisitorName: null })
+
     const unplanned = await app.inject({ method: "POST", url: "/api/security/unplanned-visits", headers: securityHeaders, payload: { firstName: "MSSQL Plansız", lastName: "Ziyaretçi", company: "Acme", hostEmployeeName: "Serbest Ev Sahibi", visitTypeId: "meeting", durationMinutes: 30, visitorCardId: card.json().id, rulesAccepted: true, companyId: "bplas", facilityId: "bplas-merkez" } })
     expect(unplanned.statusCode).toBe(201); visitIds.push(unplanned.json().id); visitorIds.push(unplanned.json().visitor.id); meetingIds.push(unplanned.json().meeting.id)
     const correction = await app.inject({ method: "PATCH", url: `/api/security/visits/${unplanned.json().id}/correction`, headers: securityHeaders, payload: { firstName: "MSSQL Plansız", lastName: "Ziyaretçi", company: "Acme", hostEmployeeName: "Düzeltilmiş Ev Sahibi" } })
@@ -309,6 +338,28 @@ describeMssql.sequential("Phase 1-3 MSSQL smoke", () => {
     const nextRule = await app.inject({ method: "POST", url: "/api/admin/visitor-rules", headers: adminHeaders, payload: { content: `MSSQL rule v2 ${suffix}` } })
     expect(nextRule.statusCode).toBe(201); ruleIds.push(nextRule.json().id)
     expect(await prisma.visitorRuleVersion.findMany({ where: { active: true } })).toEqual([expect.objectContaining({ id: nextRule.json().id })])
+
+    const raceCard = await app.inject({ method: "POST", url: "/api/admin/visitor-cards", headers: adminHeaders, payload: { cardNumber: `MSSQL-RACE-${suffix}` } })
+    expect(raceCard.statusCode).toBe(201); cardIds.push(raceCard.json().id)
+    const raceMeeting = await app.inject({ method: "POST", url: "/api/meetings", headers: employeeHeaders, payload: { visitors: [{ firstName: "MSSQL Race A", lastName: "Visitor", email: `race-a-${suffix}@example.test`, company: "Acme" }, { firstName: "MSSQL Race B", lastName: "Visitor", email: `race-b-${suffix}@example.test`, company: "Acme" }], visitTypeId: "meeting", hostEmployeeId: "maya-kara", hostEmployeeName: "Maya Kara", hostCompanyId: "bplas", facilityId: "bplas-merkez", plannedStart: "2026-10-04T09:00:00.000Z", plannedEnd: "2026-10-04T10:00:00.000Z" } })
+    expect(raceMeeting.statusCode).toBe(201)
+    const raceBody = raceMeeting.json(); meetingIds.push(raceBody.meeting.id); visitIds.push(...raceBody.visits.map((item: { id: string }) => item.id)); visitorIds.push(...raceBody.visits.map((item: { visitor: { id: string } }) => item.visitor.id))
+    for (const raceVisit of raceBody.visits) {
+      expect((await app.inject({ method: "POST", url: `/api/visits/${raceVisit.id}/invitation`, headers: employeeHeaders })).statusCode).toBe(200)
+      const raceToken = new URL(sentEmails.at(-1)!.text.match(/https?:\/\/\S+/)![0]).searchParams.get("token")!
+      expect((await app.inject({ method: "POST", url: `/api/public/invitations/${raceToken}/rule-acceptances` })).statusCode).toBe(200)
+    }
+
+    const raceResponses = await Promise.all(raceBody.visits.map((raceVisit: { id: string }) => app.inject({ method: "POST", url: `/api/security/visits/${raceVisit.id}/check-in`, headers: securityHeaders, payload: { visitorCardId: raceCard.json().id } })))
+    expect(raceResponses.map((response) => response.statusCode).sort()).toEqual([200, 409])
+    const winnerResponse = raceResponses.find((response) => response.statusCode === 200)!
+    const loserResponse = raceResponses.find((response) => response.statusCode === 409)!
+    expect(["CARD_UNAVAILABLE", "CHECK_IN_CONFLICT"]).toContain(loserResponse.json().error.code)
+    expect(JSON.stringify(loserResponse.json())).not.toMatch(/P20\d\d|deadlock|transaction|SQL Server/i)
+    const raceVisits = await prisma.visit.findMany({ where: { id: { in: raceBody.visits.map((item: { id: string }) => item.id) } } })
+    expect(raceVisits.filter((visit) => visit.status === "CHECKED_IN")).toEqual([expect.objectContaining({ id: winnerResponse.json().id, visitorCardId: raceCard.json().id })])
+    expect(raceVisits.filter((visit) => visit.status === "PLANNED")).toHaveLength(1)
+    expect(await prisma.visitorCard.findUnique({ where: { id: raceCard.json().id } })).toMatchObject({ status: "IN_USE", currentVisitId: winnerResponse.json().id })
   })
 
   it("logs out and rejects the revoked session during hydration", async () => {

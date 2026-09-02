@@ -300,6 +300,10 @@ model VisitorCard {
   assignedVisitorName   String?           @db.NVarChar(200)
   // Prisma needs @unique to model the one-to-one relation. The SQL Server migration replaces
   // its ordinary constraint with a filtered unique index so multiple NULL (unassigned) cards work.
+  // Prisma cannot express a filtered index, so it never introspects VisitorCard_currentVisitId_key
+  // and every generated migration proposes an ordinary UNIQUE constraint here. Drop that statement
+  // from generated migrations: applying it fails once a second card is unassigned. The filtered
+  // index lives in 20260902104000_fix_visitor_card_current_assignment_index.
   currentVisitId        String?           @unique(map: "VisitorCard_currentVisitId_key") @db.VarChar(36)
   createdAt             DateTime          @default(now()) @db.DateTime2
   updatedAt             DateTime          @updatedAt @db.DateTime2
@@ -308,6 +312,7 @@ model VisitorCard {
   currentVisit Visit?   @relation("CurrentVisitorCard", fields: [currentVisitId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([status])
+  @@index([currentVisitId])
 }
 
 model VisitorRuleVersion {

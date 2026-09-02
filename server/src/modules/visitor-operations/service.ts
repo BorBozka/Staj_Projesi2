@@ -3,7 +3,7 @@ import { createHash, randomBytes } from "node:crypto"
 import type { DeliveryLogger, EmailSender } from "../../delivery/email-sender.js"
 import { consoleDeliveryLogger } from "../../delivery/email-sender.js"
 import { ApiError } from "../../lib/api-error.js"
-import type { VisitorOperationsRepository } from "../../repositories/visitor-operations-repository.js"
+import { CheckInConflictError, type VisitorOperationsRepository } from "../../repositories/visitor-operations-repository.js"
 import type {
   CreateUnplannedInput, MeetingInput, PublicPreRegistrationDto, SecurityCheckInInput,
   SecurityCorrectionInput, VisitorCardDto, VisitorRuleDto, VisitDto, VisitTypeDto,
@@ -143,7 +143,13 @@ export class VisitorOperationsService {
     const visit = await this.requireVisit(id); this.requireStatus(visit, "PLANNED", "Yalnızca planlanmış ziyaretler giriş yapabilir.")
     const card = await this.requireCard(input.visitorCardId); if (card.status !== "AVAILABLE") throw new ApiError(409, "CARD_UNAVAILABLE", "Seçilen kart şu anda kullanılabilir değil.")
     if (!visit.ruleAcceptance) throw new ApiError(409, "RULE_ACCEPTANCE_REQUIRED", "Ziyaretçi kuralları check-in öncesinde kabul edilmelidir.")
-    const result = await this.repository.checkIn(id, { visitorCardId: input.visitorCardId, vehiclePlate: normalizePlate(input.vehiclePlate), phone: normalizeOptional(input.phone) }, this.now())
+    let result: Awaited<ReturnType<VisitorOperationsRepository["checkIn"]>>
+    try {
+      result = await this.repository.checkIn(id, { visitorCardId: input.visitorCardId, vehiclePlate: normalizePlate(input.vehiclePlate), phone: normalizeOptional(input.phone) }, this.now())
+    } catch (error) {
+      if (error instanceof CheckInConflictError) throw new ApiError(409, "CHECK_IN_CONFLICT", "Ziyaret veya kart durumu değişti. Güncel durumu kontrol edip yeniden deneyin.")
+      throw error
+    }
     if (result.hostEmail && result.hostName) this.sendHostNotification(result.visit, result.hostEmail, result.hostName)
     return result.visit
   }

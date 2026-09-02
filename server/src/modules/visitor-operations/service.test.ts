@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 
 import type { EmailMessage, EmailSender } from "../../delivery/email-sender.js"
-import type { VisitorOperationsRepository } from "../../repositories/visitor-operations-repository.js"
+import { CheckInConflictError, type VisitorOperationsRepository } from "../../repositories/visitor-operations-repository.js"
 import { VisitorOperationsService, hashToken } from "./service.js"
 import type { MeetingDto, VisitDto } from "./types.js"
 
@@ -80,6 +80,31 @@ describe("VisitorOperationsService invitations", () => {
     await expect(service.sendVisitInvitation("sent")).resolves.toMatchObject({ invitationStatus: "SENT" })
     expect(email.messages).toHaveLength(1)
   })
+
+  it("resets a sent invitation during reschedule and allows it to be sent again", async () => {
+    const email = new FakeEmailSender()
+    let current = visit({ invitationStatus: "SENT", invitationSentAt: "2026-09-02T08:00:00.000Z" })
+    const repository = unusedRepository({
+      findEmployeeByUserId: async () => ({ id: "employee-1", userId: "user-1", fullName: "Ada", companyId: "company-1", facilityIds: ["facility-1"] }),
+      findVisit: async () => current,
+      updateMeetingTimes: async (_id: string, plannedStart: Date, plannedEnd: Date) => {
+        current = { ...current, invitationStatus: "NOT_SENT", invitationSentAt: undefined, invitationError: undefined, meeting: { ...current.meeting, plannedStart: plannedStart.toISOString(), plannedEnd: plannedEnd.toISOString() } }
+      },
+      prepareInvitation: async () => {
+        current = { ...current, invitationStatus: "SENDING" }
+        return { visit: current, claimed: true }
+      },
+      finishInvitation: async (_id: string, succeeded: boolean) => {
+        current = { ...current, invitationStatus: succeeded ? "SENT" : "FAILED", invitationSentAt: succeeded ? now.toISOString() : undefined }
+      },
+    })
+    const service = new VisitorOperationsService(repository, email, "https://web.example.test", undefined, () => now, () => "resend-token")
+
+    await expect(service.rescheduleVisit("visit-1", { plannedStart: "2026-09-04T09:00:00.000Z", plannedEnd: "2026-09-04T10:00:00.000Z" }, "user-1")).resolves.toMatchObject({ invitationStatus: "NOT_SENT" })
+    await expect(service.sendVisitInvitation("visit-1")).resolves.toMatchObject({ invitationStatus: "SENT" })
+    expect(email.messages).toHaveLength(1)
+    expect(email.messages[0].text).toContain("token=resend-token")
+  })
 })
 
 describe("VisitorOperationsService security delivery boundary", () => {
@@ -106,6 +131,22 @@ describe("VisitorOperationsService security delivery boundary", () => {
     const service = new VisitorOperationsService(repository, email, "https://web.example.test", undefined, () => now)
     await service.createAndCheckInUnplanned({ firstName: "Ada", lastName: "Yılmaz", company: "Acme", hostEmployeeName: "Serbest Ev Sahibi", visitTypeId: "type-1", durationMinutes: 30, visitorCardId: "card-1", rulesAccepted: true, companyId: "company-1", facilityId: "facility-1" }, "user-1")
     expect(email.messages).toHaveLength(0)
+  })
+
+  it("maps a concurrent check-in loser to a safe conflict", async () => {
+    const accepted = { id: "acceptance-1", ruleId: "rule-1", ruleVersion: 1, acceptedAt: now.toISOString(), method: "INVITATION_LINK" as const, contentSnapshot: "Kural" }
+    const repository = unusedRepository({
+      findVisit: async () => visit({ ruleAcceptance: accepted }),
+      findCard: async () => ({ id: "card-1", cardNumber: "001", status: "AVAILABLE", createdAt: now.toISOString(), updatedAt: now.toISOString() }),
+      checkIn: async () => { throw new CheckInConflictError() },
+    })
+    const service = new VisitorOperationsService(repository, new FakeEmailSender(), "https://web.example.test", undefined, () => now)
+
+    await expect(service.checkInVisit("visit-1", { visitorCardId: "card-1" })).rejects.toMatchObject({
+      statusCode: 409,
+      code: "CHECK_IN_CONFLICT",
+      message: "Ziyaret veya kart durumu değişti. Güncel durumu kontrol edip yeniden deneyin.",
+    })
   })
 })
 
