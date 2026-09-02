@@ -10,13 +10,13 @@ decision into `UI_SPEC.md`, and the implementation sequence into `DEVELOPMENT_PL
 ### Optional visitor phone
 
 - Phone is optional when an employee creates or edits a visit.
-- Email remains required for a planned visit because the invitation and
-  pre-registration flow depend on it.
+- Email is optional for a planned visit. Invitation and pre-registration delivery are available
+  only when an email address exists; Security processing does not require one.
 - If a phone is provided, it is stored on the visitor and shown in visit details.
 - The visitor may later correct it during pre-registration; security may correct it
   under the existing permitted-fields rule.
 
-Status: **Approved and implemented in the current frontend/mock-service scope.**
+Status: **Approved and implemented in the current full-stack scope.**
 
 ## 2. Resource Management
 
@@ -49,7 +49,7 @@ Approved direction (moved to `PRODUCT_SPEC.md` and `UI_SPEC.md`):
 - An unavailable resource does not block Meeting or Visit creation. Users with Manager
   permission see availability or shortage information and resolve it operationally.
 
-Status: **Approved and implemented in current frontend/mock-service scope.** (Meeting room and pooled equipment assignment, real-time availability/capacity checking, atomic saving, local draft UX, unsaved-change guard, and Manager visit detail tabs).
+Status: **Approved and implemented in the current full-stack scope.** (Meeting room and pooled equipment assignment, real-time availability/capacity checking, atomic saving, local draft UX, unsaved-change guard, and Manager visit detail tabs).
 
 Resolved decisions:
 
@@ -241,7 +241,7 @@ value.
 
 Approved direction (moved to `PRODUCT_SPEC.md` and `UI_SPEC.md`):
 
-- Company is a required field on `Visitor`, enforced the same way email is (blocks Save).
+- Company is a required field on `Visitor` and blocks Save. Email and phone are optional.
 - The visitor may later correct it during pre-registration.
 - Security may correct it under the existing permitted-fields rule.
 

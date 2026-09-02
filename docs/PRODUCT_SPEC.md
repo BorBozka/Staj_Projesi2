@@ -19,7 +19,7 @@ The application manages:
 - multi-company and multi-facility operations,
 - role-based dashboards,
 - reporting and exports,
-- Active Directory and local users.
+- LOCAL users with role- and scope-based authorization.
 
 This is **not** an employee HR/PDKS/access-control replacement.
 
@@ -158,26 +158,27 @@ Manages:
 
 ## 5. Authentication
 
-This frontend/mock phase implements `LOCAL` users only. The next implementation phase is a
-real backend + MSSQL + `LOCAL` authentication. Authentication source and role remain separate
-concepts so the model can be extended later.
+The implemented system authenticates `LOCAL` users through the Fastify/MSSQL backend. Passwords
+are Argon2id hashes. Successful login creates an opaque server-side session whose token is sent
+only in an HttpOnly cookie; logout revokes that session. Authentication source and role remain
+separate concepts in the data model.
 
 Active Directory integration is not in this project's implementation scope. If required, an
-organization may integrate its own Active Directory environment in a future delivery; this UI
-does not offer an AD choice or simulate AD authentication.
+organization may integrate its own Active Directory environment in a separate future delivery;
+the current API and UI neither offer an AD login choice nor implement AD provisioning.
 
-The mock session is persisted only in browser `sessionStorage`: it survives a refresh in the
-same browser session and is cleared on logout. Mock credentials stay in the in-memory service
-store and are never persisted as plain credentials.
+Authorization is derived from the authenticated session on the server. Role and company,
+facility, and security-gate scopes are enforced for reads and mutations; client-supplied actor or
+scope identifiers are not trusted as authorization proof.
 
 ### Account self-service UI
 
 All authenticated role shells expose the same account menu with the current user's avatar,
 name, role, profile-photo action, and logout action. Only `LOCAL` users see password change;
-`ACTIVE_DIRECTORY` users must not be offered a local-password flow. In the frontend/mock phase,
-profile photos may persist per immutable user ID in local storage after client-side square crop
-and compression. The account service owns profile/password operations, while logout is handled
-through the session-service boundary and redirects to `/login`.
+`ACTIVE_DIRECTORY` records must not be offered a local-password flow even though AD login is out
+of scope. Account identity comes from the backend session, LOCAL password changes use the account
+API, and the profile-photo preference remains per-browser `localStorage`. Logout goes through the
+session-service boundary, revokes the backend session, and redirects to `/login`.
 
 ---
 
@@ -316,7 +317,7 @@ Goods Delivery is a separate module.
 ## 10. Planned Visit Workflow
 
 1. Employee creates visit.
-2. Visitor receives email with secure pre-registration link.
+2. If the visitor has an email address, the visitor may receive a secure pre-registration link.
 3. Visitor may complete/correct information before arrival.
 4. Visitor reads and explicitly accepts company rules.
 5. Visitor may receive/display QR for quick visit lookup.
@@ -343,8 +344,9 @@ Visitor can use the invitation link to:
 - read rules,
 - explicitly accept rules.
 
-Company is mandatory here, the same way email is; the visitor cannot complete
-pre-registration without entering it. Phone remains optional.
+Company is mandatory here; the visitor cannot complete pre-registration without entering it.
+Email and phone remain optional visitor fields. A visitor without email cannot receive an
+invitation link but can still be planned and processed at Security.
 
 Pre-registration itself must not block arrival.
 
@@ -710,8 +712,8 @@ counterparty, planned date/time, actual time (if recorded), status (Planlandı/T
 
 ## 22A. Resource Catalog
 
-Managers maintain a frontend/mock-service catalog of facility resources independently
-from visit types.
+Managers maintain a backend-persisted catalog of facility resources through the frontend HTTP
+service boundary, independently from visit types.
 
 Supported catalog records:
 
@@ -850,7 +852,7 @@ Once a Meeting is closed (`actualMeetingEnd` is set):
   actionable Meeting hosted by the current employee reaches or passes `plannedEnd`, the
   panel includes it regardless of
   who created the Meeting. Meetings whose linked Visits are all terminal do not produce a
-  notification even when legacy/mock data has no `actualMeetingEnd`. On desktop, the panel
+  notification even when historical data has no `actualMeetingEnd`. On desktop, the panel
   is fixed at the lower-right and does not take space from the personal timeline or Upcoming
   Visits layout.
 - The notification offers +15 minutes, +30 minutes, a custom positive whole-number
@@ -1035,8 +1037,6 @@ Internal application is desktop-first.
 
 The project is developed module by module.
 
-Initial emphasis is UI.
-
-Each phase is reviewed before the next begins.
-
-Frontend mock services are later replaced by real backend APIs rather than rewriting the frontend.
+The product was delivered incrementally: production-oriented UI/domain boundaries first, then
+Fastify/Prisma/MSSQL persistence and HTTP integration. Runtime service composition now uses only
+real HTTP adapters; deterministic mock services remain solely where tests require fixtures.

@@ -7,6 +7,8 @@ dist
 *.log
 package-lock.json
 artifacts/
+/coverage/
+/screenshots/
 
 # Frontend env — keep only the checked-in example.
 .env

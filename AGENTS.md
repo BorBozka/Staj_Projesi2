@@ -4,19 +4,19 @@ This file provides guidance to Codex when working with code in this repository.
 
 ## Project
 
-A role-focused visitor management frontend (Turkish UI) for multi-company, multi-facility
-operations — visit planning/timeline, a Manager dashboard, resource/fleet/goods-movement
-planning, and reporting. Frontend-only for now: all data comes from an in-memory mock service
-layer designed to be swapped for a real API later without rewriting the UI. See `README.md` for
-a feature overview.
+A role-focused full-stack visitor management system (Turkish UI) for multi-company,
+multi-facility operations — visit planning/timeline, Security operations, Manager/Admin
+workspaces, resource/fleet/goods-movement planning, and reporting. The React frontend uses
+`Http*` adapters to the Fastify/Prisma/MSSQL backend; there is no runtime mock fallback. See
+`README.md` for a feature overview.
 
 **Authoritative docs — read before non-trivial changes:**
 - `AGENTS.md` — stack constraints, phased-development rules, business rules that must not be
   reinterpreted, and the required phase-completion report format. Read this first.
-- `PRODUCT_SPEC.md` — business behavior.
-- `UI_SPEC.md` — interface direction.
-- `TECH_STACK.md` — technology choices and dependency discipline.
-- `DEVELOPMENT_PLAN.md` — phase-by-phase status; check this to know what's actually built vs. planned.
+- `docs/PRODUCT_SPEC.md` — business behavior.
+- `docs/UI_SPEC.md` — interface direction.
+- `docs/TECH_STACK.md` — technology choices and dependency discipline.
+- `docs/DEVELOPMENT_PLAN.md` — final phase status and architectural contracts.
 
 ## Commands
 
@@ -26,9 +26,13 @@ Package manager is **pnpm** (`pnpm-lock.yaml` is canonical; there is no `package
 pnpm install              # install deps
 pnpm dev                  # Vite dev server
 pnpm build                # tsc -b && vite build
+pnpm build:api            # compile backend production sources to server/dist
+pnpm start:api            # run the compiled backend with Node.js
 pnpm typecheck             # tsc -b --pretty false (no emit)
+pnpm typecheck:api         # backend TypeScript check
 pnpm lint                  # eslint .
 pnpm test                  # vitest run (whole suite)
+pnpm test:api              # backend unit suite
 pnpm test -- <name-or-path> # vitest run, filtered (e.g. `pnpm test -- visits-report-utils`)
 ```
 
@@ -45,14 +49,12 @@ Vitest has no separate config file and no jsdom/`@testing-library` setup — see
 - `src/domain/*` — plain TypeScript types shared across the app (`visits.ts`, `resources.ts`,
   `transport-assignments.ts`, `goods-movements.ts`). No logic beyond small label/derivation
   helpers (e.g. `getGoodsMovementDisplayStatus`).
-- `src/services/*` — one interface + one `Mock*` implementation per domain (e.g.
-  `visit-service.ts` / `mock-visit-service.ts`). `src/services/index.ts` instantiates and wires
-  them (including resolving the deliberate `visitService` ↔ `resourceAssignmentService`
-  circular dependency) and exports singletons. Swapping mocks for real API clients later should
-  not require touching `src/features`.
+- `src/services/*` — domain service interfaces plus `http/Http*` production adapters.
+  `src/services/index.ts` wires only HTTP adapters; `Mock*` implementations remain as
+  deterministic unit/component test fixtures and are not a runtime fallback.
 - `src/features/<domain>/*` — UI + feature-local logic (filtering, sorting, pagination,
   export), grouped by domain: `visits`, `manager`, `resources`, `transport`, `goods`, `reports`.
-- `src/components/app-shell/*` — the two route shells (see Routing).
+- `src/components/app-shell/*` — Employee, Manager/Admin, and Security route shells (see Routing).
 - `src/components/ui/*` — shadcn/ui primitives (`style: new-york`, see `components.json`),
   adapted to the app's compact density.
 - `src/lib/*` — cross-domain utilities with no domain dependency: `sort.ts` (generic 3-state
@@ -76,12 +78,12 @@ Meeting lifecycle rules (extend/close, auto-close on last checkout) live in
 
 ### Routing and shells
 
-`src/app/App.tsx` defines two route trees under two different shells:
-- `AppShell` (`src/components/app-shell/AppShell.tsx`) — employee-facing, currently just
-  `/my-visits`.
-- `ManagerShell` (`src/components/app-shell/ManagerShell.tsx`) — `/manager/*`, holds the
+`src/app/App.tsx` defines role route trees under three shells:
+- `EmployeeShell` (`src/components/app-shell/EmployeeShell.tsx`) — `/employee/*`.
+- `ManagerShell` (`src/components/app-shell/ManagerShell.tsx`) — `/manager/*` and `/admin/*`, holds the
   collapsible sidebar, company/facility scope selector, notifications, and the per-minute clock
   (`manager-clock.ts`) driving live dashboard indicators.
+- `SecurityShell` (`src/components/app-shell/SecurityShell.tsx`) — `/security/*` operations.
 
 All route pages are lazy-loaded (`React.lazy`). `useVisits()` (`features/visits/visit-context.tsx`)
 is the shared context providing `meetings`, `visits`, `referenceData`, load/reload state to

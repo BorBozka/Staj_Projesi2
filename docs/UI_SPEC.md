@@ -259,7 +259,7 @@ On desktop, use one persistent compact `İşlem gerekenler` panel fixed to the l
 It contains every manually actionable Meeting hosted by the current employee whose planned
 end has arrived or passed. A Meeting is manually actionable only after `plannedStart`, while it is explicitly
 open, and while at least one linked Visit is non-terminal. Fully `CHECKED_OUT`, `CANCELLED`,
-or `NO_SHOW` Meetings do not appear even if legacy/mock data lacks `actualMeetingEnd`. The
+or `NO_SHOW` Meetings do not appear even if historical data lacks `actualMeetingEnd`. The
 panel also contains planned Visits created by the current employee whose invitation is
 `NOT_SENT` or `FAILED`; `SENDING` is not an actionable state. Keep invitation rows visibly
 separate from Meeting rows and route their action into the existing single-Visit invitation
@@ -283,7 +283,7 @@ Visitors:
 - At least one visitor is required.
 - Visitors can be added and removed without repeating shared meeting fields.
 - First name, last name, and email are validated separately for every visitor.
-- Visitor company is required the same way email is — left blank, it blocks Save the same way.
+- Visitor company is required and blocks Save when blank. Email and phone remain optional.
 - Phone remains optional.
 
 Shared meeting/visit information, shown once:
@@ -805,6 +805,6 @@ Manager visit details use one centered, compact dialog for both Dashboard `Sıra
 
 UI code created during early phases is retained.
 
-Mock data must be behind replaceable service boundaries.
-
-Real APIs should later replace the mock implementation without redesigning the screens.
+Runtime data must be accessed through the existing frontend service interfaces and `Http*`
+adapters. The UI must not bypass those boundaries or add a silent mock fallback. Deterministic
+mock fixtures may remain for unit/component tests.
