@@ -4,7 +4,7 @@
 atama ve yönetici raporlamasını ortak bir çalışma alanında birleştiren rol tabanlı web
 uygulaması.
 
-[Frontend preview'ı görüntüle](https://visitor-operations-platform.vercel.app)
+[Portfolio / frontend demo](https://visitor-operations-platform.vercel.app)
 
 > Bu bağlantı yalnız frontend preview'dır. Projenin public backend/MSSQL production deployment'ı
 > değildir; gerçek veri akışı için ayrı Fastify API ve SQL Server gerekir.
@@ -13,8 +13,10 @@ uygulaması.
 
 ## Güncel durum
 
-Frontend, Fastify/Prisma/MSSQL backend'ine HTTP adaptörleri üzerinden bağlıdır. Runtime'da mock
-servis veya sessiz mock fallback yoktur. Backend LOCAL kimlik doğrulama, server-side rol/kapsam
+Frontend runtime composition açıkça `VITE_APP_MODE` ile seçilir. Varsayılan `api` modu
+Fastify/Prisma/MSSQL backend'ine HTTP adaptörleri üzerinden bağlıdır; backend erişilemezse mock
+servislere sessiz fallback yapmaz. `demo` modu yalnız frontend içinde çalışan portfolio
+preview'ıdır. Backend LOCAL kimlik doğrulama, server-side rol/kapsam
 yetkilendirmesi, hashed opaque session ve invitation tokenları ile environment tabanlı log/SMTP
 e-posta teslim sınırını içerir. Active Directory entegrasyonu uygulama kapsamında değildir.
 
@@ -124,6 +126,10 @@ Gereksinimler: desteklenen bir Node.js sürümü, pnpm ve erişilebilir Microsof
 
 ### Environment özeti
 
+- `VITE_APP_MODE=api`, gerçek Fastify/MSSQL uygulamasını kullanır ve varsayılandır.
+  `VITE_APP_MODE=demo`, frontend-only portfolio preview için mevcut mock servislerini kullanır.
+  Public Vercel deployment `demo` olarak yapılandırılır; başka bir değer açık configuration
+  hatası üretir.
 - Kök `VITE_API_BASE_URL`, `/api` dahil backend taban adresidir. Tanımlanmazsa frontend
   `http://localhost:3001/api` kullanır.
 - `WEB_ORIGIN`, backend CORS ve public invitation URL üretimi için tek frontend origin'idir.
