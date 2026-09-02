@@ -25,6 +25,8 @@ describe("auth and account HTTP routes", () => {
       authenticationSource: "LOCAL",
       active: true,
       passwordHash: await hashPassword("calisan"),
+      authorizationScope: { companyIds: ["bplas"], facilityIds: [], securityGateIds: [] },
+      employeeId: "maya-kara",
     }])
     const authService = new AuthService(repository, { sessionTtlHours: 8, createToken: () => "raw-session-token" })
     const app = await buildApp(config, { authRepository: repository, authService })
@@ -32,7 +34,15 @@ describe("auth and account HTTP routes", () => {
 
     const login = await app.inject({ method: "POST", url: "/api/auth/login", payload: { username: "calisan", password: "calisan" } })
     expect(login.statusCode).toBe(200)
-    expect(login.json()).toMatchObject({ user: { id: "user-1", initials: "MK", role: "EMPLOYEE" } })
+    expect(login.json()).toMatchObject({
+      user: {
+        id: "user-1",
+        initials: "MK",
+        role: "EMPLOYEE",
+        employeeId: "maya-kara",
+        authorizationScope: { companyIds: ["bplas"], facilityIds: [], securityGateIds: [] },
+      },
+    })
     const setCookie = login.headers["set-cookie"] as string
     expect(setCookie).toContain("HttpOnly")
     expect(setCookie).toContain("SameSite=Lax")

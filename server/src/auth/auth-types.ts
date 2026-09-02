@@ -1,5 +1,10 @@
+import type { AuthorizationScope } from "../lib/scope.js"
+
 export const applicationRoles = ["MANAGER", "ADMIN", "SECURITY", "EMPLOYEE"] as const
 export type ApplicationRole = (typeof applicationRoles)[number]
+
+/** Assigned scope with every dimension empty — a user with no explicit scope sees nothing. */
+export const EMPTY_AUTHORIZATION_SCOPE: AuthorizationScope = { companyIds: [], facilityIds: [], securityGateIds: [] }
 
 export const authenticationSources = ["ACTIVE_DIRECTORY", "LOCAL"] as const
 export type AuthenticationSource = (typeof authenticationSources)[number]
@@ -20,6 +25,10 @@ export interface AuthUserRecord {
   authenticationSource: AuthenticationSource
   active: boolean
   passwordHash: string | null
+  /** Company/facility/security-gate ids this user's access is confined to (raw assigned scope). */
+  authorizationScope: AuthorizationScope
+  /** Linked Employee id when the user has a staff profile; `null` for pure Admin accounts. */
+  employeeId: string | null
 }
 
 export interface SessionRecord {
@@ -44,6 +53,10 @@ export interface SessionUser {
   role: ApplicationRole
   roleLabel: string
   authenticationSource: AuthenticationSource
+  /** Raw assigned scope. Route/service authorization derives the effective scope from this. */
+  authorizationScope: AuthorizationScope
+  /** Linked Employee id, or `null`. Actor identity for meeting/visit ownership checks. */
+  employeeId: string | null
 }
 
 export const roleLabels: Record<ApplicationRole, string> = {
@@ -63,5 +76,7 @@ export function toSessionUser(user: AuthUserRecord): SessionUser {
     role: user.role,
     roleLabel: roleLabels[user.role],
     authenticationSource: user.authenticationSource,
+    authorizationScope: user.authorizationScope,
+    employeeId: user.employeeId,
   }
 }

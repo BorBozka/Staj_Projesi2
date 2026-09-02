@@ -16,6 +16,8 @@ async function createUser(overrides: Partial<AuthUserRecord> = {}): Promise<Auth
     authenticationSource: "LOCAL",
     active: true,
     passwordHash: await hashPassword("calisan"),
+    authorizationScope: { companyIds: ["bplas"], facilityIds: [], securityGateIds: [] },
+    employeeId: "maya-kara",
     ...overrides,
   }
 }

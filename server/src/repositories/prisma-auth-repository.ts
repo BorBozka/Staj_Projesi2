@@ -11,6 +11,10 @@ const userSelect = {
   authenticationSource: true,
   active: true,
   passwordHash: true,
+  companyScopes: { select: { companyId: true } },
+  facilityScopes: { select: { facilityId: true } },
+  securityGateScopes: { select: { securityGateId: true } },
+  employeeProfile: { select: { id: true } },
 } as const
 
 function toUserRecord(user: {
@@ -21,14 +25,28 @@ function toUserRecord(user: {
   authenticationSource: string
   active: boolean
   passwordHash: string | null
+  companyScopes: { companyId: string }[]
+  facilityScopes: { facilityId: string }[]
+  securityGateScopes: { securityGateId: string }[]
+  employeeProfile: { id: string } | null
 }): AuthUserRecord {
   const role = parseApplicationRole(user.role)
   const authenticationSource = parseAuthenticationSource(user.authenticationSource)
   if (!role || !authenticationSource) throw new Error("Unsupported persisted user role or authentication source.")
   return {
-    ...user,
+    id: user.id,
+    username: user.username,
+    fullName: user.fullName,
     role,
     authenticationSource,
+    active: user.active,
+    passwordHash: user.passwordHash,
+    authorizationScope: {
+      companyIds: user.companyScopes.map((scope) => scope.companyId),
+      facilityIds: user.facilityScopes.map((scope) => scope.facilityId),
+      securityGateIds: user.securityGateScopes.map((scope) => scope.securityGateId),
+    },
+    employeeId: user.employeeProfile?.id ?? null,
   }
 }
 
