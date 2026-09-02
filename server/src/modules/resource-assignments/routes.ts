@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify"
 import { z } from "zod"
 
 import type { AuthGuards } from "../../auth/auth-guards.js"
+import { toAccessContext } from "../../lib/authorization.js"
 import { validationError } from "../../lib/api-error.js"
 import { ResourceAssignmentService } from "./service.js"
 
@@ -26,23 +27,23 @@ export async function registerResourceAssignmentRoutes(app: FastifyInstance, dep
   const service = dependencies.service
 
   app.get("/api/meetings/:meetingId/resource-assignments", { preHandler: guard }, async (request) =>
-    service.listAssignmentsForMeeting(parsed(meetingParams.safeParse(request.params)).meetingId))
+    service.listAssignmentsForMeeting(parsed(meetingParams.safeParse(request.params)).meetingId, toAccessContext(request.currentUser!)))
   app.get("/api/meetings/:meetingId/eligible-rooms", { preHandler: guard }, async (request) =>
-    service.getEligibleRooms(parsed(meetingParams.safeParse(request.params)).meetingId))
+    service.getEligibleRooms(parsed(meetingParams.safeParse(request.params)).meetingId, toAccessContext(request.currentUser!)))
   app.get("/api/meetings/:meetingId/eligible-equipment", { preHandler: guard }, async (request) =>
-    service.getEligibleEquipment(parsed(meetingParams.safeParse(request.params)).meetingId))
+    service.getEligibleEquipment(parsed(meetingParams.safeParse(request.params)).meetingId, toAccessContext(request.currentUser!)))
 
   app.post("/api/meetings/:meetingId/resource-assignments/room", { preHandler: guard }, async (request, reply) =>
-    reply.status(201).send(await service.assignRoom(parsed(meetingParams.safeParse(request.params)).meetingId, parsed(roomBody.safeParse(request.body)))))
+    reply.status(201).send(await service.assignRoom(parsed(meetingParams.safeParse(request.params)).meetingId, parsed(roomBody.safeParse(request.body)), toAccessContext(request.currentUser!))))
   app.post("/api/meetings/:meetingId/resource-assignments/equipment", { preHandler: guard }, async (request, reply) =>
-    reply.status(201).send(await service.assignEquipment(parsed(meetingParams.safeParse(request.params)).meetingId, parsed(equipmentBody.safeParse(request.body)))))
+    reply.status(201).send(await service.assignEquipment(parsed(meetingParams.safeParse(request.params)).meetingId, parsed(equipmentBody.safeParse(request.body)), toAccessContext(request.currentUser!))))
   app.put("/api/meetings/:meetingId/resource-assignments", { preHandler: guard }, async (request) =>
-    service.saveMeetingAssignments(parsed(meetingParams.safeParse(request.params)).meetingId, parsed(desiredBody.safeParse(request.body))))
+    service.saveMeetingAssignments(parsed(meetingParams.safeParse(request.params)).meetingId, parsed(desiredBody.safeParse(request.body)), toAccessContext(request.currentUser!)))
 
   app.patch("/api/resource-assignments/:id", { preHandler: guard }, async (request) =>
-    service.updateEquipmentAssignment(parsed(assignmentParams.safeParse(request.params)).id, parsed(quantityBody.safeParse(request.body)).requestedQuantity))
+    service.updateEquipmentAssignment(parsed(assignmentParams.safeParse(request.params)).id, parsed(quantityBody.safeParse(request.body)).requestedQuantity, toAccessContext(request.currentUser!)))
   app.delete("/api/resource-assignments/:id", { preHandler: guard }, async (request, reply) => {
-    await service.removeAssignment(parsed(assignmentParams.safeParse(request.params)).id)
+    await service.removeAssignment(parsed(assignmentParams.safeParse(request.params)).id, toAccessContext(request.currentUser!))
     return reply.status(204).send()
   })
 }

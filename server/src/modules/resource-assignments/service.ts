@@ -1,4 +1,5 @@
 import { ApiError } from "../../lib/api-error.js"
+import { scopeAllows, type AccessContext } from "../../lib/authorization.js"
 import {
   assignmentViewToNew,
   type AssignmentMeetingContext,
@@ -28,12 +29,13 @@ import type {
 export class ResourceAssignmentService {
   constructor(private readonly repository: ResourceAssignmentRepository) {}
 
-  listAssignmentsForMeeting(meetingId: string) {
+  async listAssignmentsForMeeting(meetingId: string, ctx?: AccessContext) {
+    if (ctx) await this.loadContext(meetingId, ctx)
     return this.repository.listAssignmentsForMeeting(meetingId)
   }
 
-  async getEligibleRooms(meetingId: string): Promise<RoomAvailabilityInfo[]> {
-    const context = await this.loadContext(meetingId)
+  async getEligibleRooms(meetingId: string, ctx?: AccessContext): Promise<RoomAvailabilityInfo[]> {
+    const context = await this.loadContext(meetingId, ctx)
     return context.eligibleRooms.map((room) => {
       const conflict = findRoomConflict(room.id, context.meeting, context.others)
       return conflict
@@ -42,16 +44,16 @@ export class ResourceAssignmentService {
     })
   }
 
-  async getEligibleEquipment(meetingId: string): Promise<EquipmentAvailabilityInfo[]> {
-    const context = await this.loadContext(meetingId)
+  async getEligibleEquipment(meetingId: string, ctx?: AccessContext): Promise<EquipmentAvailabilityInfo[]> {
+    const context = await this.loadContext(meetingId, ctx)
     return context.eligibleEquipment.map((equipment) => {
       const usedQuantity = computeUsedEquipmentQuantity(equipment.id, context.meeting, context.others)
       return { resource: equipment, usedQuantity, remainingQuantity: equipment.totalQuantity - usedQuantity }
     })
   }
 
-  async assignRoom(meetingId: string, input: AssignRoomInput): Promise<RoomAssignmentView> {
-    const context = await this.loadContext(meetingId)
+  async assignRoom(meetingId: string, input: AssignRoomInput, ctx?: AccessContext): Promise<RoomAssignmentView> {
+    const context = await this.loadContext(meetingId, ctx)
     assertMeetingResourcesMutable(context.meeting)
     const room = await this.requireRoom(input.resourceId, context.meeting.facilityId)
     const next = [roomToNew(room), ...equipmentAssignments(context)]
@@ -59,9 +61,9 @@ export class ResourceAssignmentService {
     return views.find((view): view is RoomAssignmentView => view.resourceType === "ROOM")!
   }
 
-  async assignEquipment(meetingId: string, input: AssignEquipmentInput): Promise<EquipmentAssignmentView> {
+  async assignEquipment(meetingId: string, input: AssignEquipmentInput, ctx?: AccessContext): Promise<EquipmentAssignmentView> {
     assertPositiveQuantity(input.requestedQuantity)
-    const context = await this.loadContext(meetingId)
+    const context = await this.loadContext(meetingId, ctx)
     assertMeetingResourcesMutable(context.meeting)
     if (context.currentAssignments.some((view) => view.resourceType === "POOLED_EQUIPMENT" && view.resourceId === input.resourceId)) {
       throw new ApiError(409, "EQUIPMENT_ALREADY_ASSIGNED", "Bu ekipman zaten atandı. Miktarını güncellemek için düzenleyin.")
@@ -77,14 +79,14 @@ export class ResourceAssignmentService {
       view.resourceType === "POOLED_EQUIPMENT" && view.resourceId === input.resourceId)!
   }
 
-  async updateEquipmentAssignment(assignmentId: string, requestedQuantity: number): Promise<EquipmentAssignmentView> {
+  async updateEquipmentAssignment(assignmentId: string, requestedQuantity: number, ctx?: AccessContext): Promise<EquipmentAssignmentView> {
     assertPositiveQuantity(requestedQuantity)
     const current = await this.repository.findAssignment(assignmentId)
     if (!current) throw new ApiError(404, "NOT_FOUND", "Atama bulunamadı.")
     if (current.resourceType !== "POOLED_EQUIPMENT") {
       throw new ApiError(400, "VALIDATION_ERROR", "Bu atama bir ekipman havuzu ataması değil.")
     }
-    const context = await this.loadContext(current.meetingId)
+    const context = await this.loadContext(current.meetingId, ctx)
     assertMeetingResourcesMutable(context.meeting)
     const next = context.currentAssignments.map(assignmentViewToNew).map((assignment) =>
       assignment.resourceType === "POOLED_EQUIPMENT" && assignment.resourceId === current.resourceId
@@ -96,10 +98,10 @@ export class ResourceAssignmentService {
       view.resourceType === "POOLED_EQUIPMENT" && view.resourceId === current.resourceId)!
   }
 
-  async removeAssignment(assignmentId: string): Promise<void> {
+  async removeAssignment(assignmentId: string, ctx?: AccessContext): Promise<void> {
     const current = await this.repository.findAssignment(assignmentId)
     if (!current) throw new ApiError(404, "NOT_FOUND", "Atama bulunamadı.")
-    const context = await this.loadContext(current.meetingId)
+    const context = await this.loadContext(current.meetingId, ctx)
     assertMeetingResourcesMutable(context.meeting)
     const next = context.currentAssignments
       .filter((view) => view.id !== assignmentId)
@@ -107,8 +109,8 @@ export class ResourceAssignmentService {
     await this.commit(current.meetingId, context, next)
   }
 
-  async saveMeetingAssignments(meetingId: string, desired: DesiredResourceState): Promise<ResourceAssignmentView[]> {
-    const context = await this.loadContext(meetingId)
+  async saveMeetingAssignments(meetingId: string, desired: DesiredResourceState, ctx?: AccessContext): Promise<ResourceAssignmentView[]> {
+    const context = await this.loadContext(meetingId, ctx)
     assertMeetingResourcesMutable(context.meeting)
 
     const next: NewAssignment[] = []
@@ -137,9 +139,13 @@ export class ResourceAssignmentService {
     })
   }
 
-  private async loadContext(meetingId: string): Promise<AssignmentMeetingContext> {
+  private async loadContext(meetingId: string, ctx?: AccessContext): Promise<AssignmentMeetingContext> {
     const context = await this.repository.loadMeetingContext(meetingId)
     if (!context) throw new ApiError(404, "NOT_FOUND", "Toplantı bulunamadı.")
+    // An out-of-scope meeting is reported as 404, never as a cross-scope leak.
+    if (ctx && !scopeAllows(ctx, { companyId: context.meeting.hostCompanyId, facilityId: context.meeting.facilityId })) {
+      throw new ApiError(404, "NOT_FOUND", "Toplantı bulunamadı.")
+    }
     return context
   }
 

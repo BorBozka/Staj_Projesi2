@@ -7,10 +7,18 @@ import { GOODS_MOVEMENT_INCLUDE, toGoodsMovementDto } from "./goods-movement-rep
 import { TRANSPORT_ASSIGNMENT_INCLUDE, toTransportAssignmentDto } from "./transport-assignment-repository.js"
 import { toVisit, visitInclude } from "./visitor-operations-repository.js"
 
+/**
+ * `companyIds`/`facilityIds` (when present) are the authorization-scoped id sets a report is
+ * confined to — an empty array therefore matches nothing. They take precedence over the single
+ * `companyId`/`facilityId`, which stay for direct (unscoped) unit-test use.
+ */
+
 /** Date-range on a genuine instant column (Meeting.plannedStart, TransportAssignment.plannedStart). */
 export interface InstantRangeFilter {
   companyId?: string
   facilityId?: string
+  companyIds?: string[]
+  facilityIds?: string[]
   from?: Date
   to?: Date
 }
@@ -19,8 +27,22 @@ export interface InstantRangeFilter {
 export interface DateRangeFilter {
   companyId?: string
   facilityId?: string
+  companyIds?: string[]
+  facilityIds?: string[]
   startDate?: string
   endDate?: string
+}
+
+function companyWhere(filter: { companyId?: string; companyIds?: string[] }, field: string) {
+  if (filter.companyIds) return { [field]: { in: filter.companyIds } }
+  if (filter.companyId) return { [field]: filter.companyId }
+  return {}
+}
+
+function facilityWhere(filter: { facilityId?: string; facilityIds?: string[] }) {
+  if (filter.facilityIds) return { facilityId: { in: filter.facilityIds } }
+  if (filter.facilityId) return { facilityId: filter.facilityId }
+  return {}
 }
 
 export interface ReportsRepository {
@@ -42,8 +64,8 @@ export class PrismaReportsRepository implements ReportsRepository {
     const rows = await this.prisma.visit.findMany({
       where: {
         meeting: {
-          ...(filter.companyId ? { hostCompanyId: filter.companyId } : {}),
-          ...(filter.facilityId ? { facilityId: filter.facilityId } : {}),
+          ...companyWhere(filter, "hostCompanyId"),
+          ...facilityWhere(filter),
           ...(Object.keys(range).length > 0 ? { plannedStart: range } : {}),
         },
       },
@@ -57,8 +79,8 @@ export class PrismaReportsRepository implements ReportsRepository {
     const range = instantRange(filter)
     const rows = await this.prisma.transportAssignment.findMany({
       where: {
-        ...(filter.companyId ? { companyId: filter.companyId } : {}),
-        ...(filter.facilityId ? { facilityId: filter.facilityId } : {}),
+        ...companyWhere(filter, "companyId"),
+        ...facilityWhere(filter),
         ...(Object.keys(range).length > 0 ? { plannedStart: range } : {}),
       },
       include: TRANSPORT_ASSIGNMENT_INCLUDE,
@@ -74,8 +96,8 @@ export class PrismaReportsRepository implements ReportsRepository {
     }
     const rows = await this.prisma.goodsMovement.findMany({
       where: {
-        ...(filter.companyId ? { companyId: filter.companyId } : {}),
-        ...(filter.facilityId ? { facilityId: filter.facilityId } : {}),
+        ...companyWhere(filter, "companyId"),
+        ...facilityWhere(filter),
         ...(Object.keys(range).length > 0 ? { plannedDate: range } : {}),
       },
       include: GOODS_MOVEMENT_INCLUDE,

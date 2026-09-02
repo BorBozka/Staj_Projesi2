@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify"
 import { z } from "zod"
 
 import type { AuthGuards } from "../../auth/auth-guards.js"
+import { toAccessContext } from "../../lib/authorization.js"
 import { validationError } from "../../lib/api-error.js"
 import { TransportAssignmentService } from "./service.js"
 
@@ -36,13 +37,13 @@ export async function registerTransportAssignmentRoutes(app: FastifyInstance, de
   const guard = dependencies.guards.requireRole("MANAGER", "ADMIN")
   const service = dependencies.service
 
-  app.get("/api/transport-assignments", { preHandler: guard }, async () => service.listAssignments())
+  app.get("/api/transport-assignments", { preHandler: guard }, async (request) => service.listAssignments(toAccessContext(request.currentUser!)))
   app.post("/api/transport-assignments/availability", { preHandler: guard }, async (request) =>
-    service.getAvailability(parsed(availabilityBody.safeParse(request.body))))
+    service.getAvailability(parsed(availabilityBody.safeParse(request.body)), toAccessContext(request.currentUser!)))
   app.post("/api/transport-assignments", { preHandler: guard }, async (request, reply) =>
-    reply.status(201).send(await service.createAssignment(parsed(assignmentBody.safeParse(request.body)))))
+    reply.status(201).send(await service.createAssignment(parsed(assignmentBody.safeParse(request.body)), toAccessContext(request.currentUser!))))
   app.patch("/api/transport-assignments/:id", { preHandler: guard }, async (request) =>
-    service.updateAssignment(parsed(idParams.safeParse(request.params)).id, parsed(assignmentBody.safeParse(request.body))))
+    service.updateAssignment(parsed(idParams.safeParse(request.params)).id, parsed(assignmentBody.safeParse(request.body)), toAccessContext(request.currentUser!)))
   app.post("/api/transport-assignments/:id/cancel", { preHandler: guard }, async (request) =>
-    service.cancelAssignment(parsed(idParams.safeParse(request.params)).id))
+    service.cancelAssignment(parsed(idParams.safeParse(request.params)).id, toAccessContext(request.currentUser!)))
 }

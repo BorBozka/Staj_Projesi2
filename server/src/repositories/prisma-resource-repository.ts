@@ -42,6 +42,7 @@ export class PrismaResourceRepository implements ResourceRepository {
   async find(id: string) { const row = await this.prisma.resource.findUnique({ where: { id }, include }); return row ? toResource(row) : null }
   async save(input: ResourceInput, id?: string, active = true) { const row = id ? await this.prisma.resource.update({ where: { id }, data: updateData(input), include }) : await this.prisma.resource.create({ data: createData(input, active), include }); return toResource(row) }
   async setActive(id: string, active: boolean) { return toResource(await this.prisma.resource.update({ where: { id }, data: { active }, include })) }
+  async delete(id: string) { await this.prisma.$transaction([this.prisma.driverLicenseClass.deleteMany({ where: { resourceId: id } }), this.prisma.driverDocument.deleteMany({ where: { resourceId: id } }), this.prisma.resource.delete({ where: { id } })]) }
   async companyAndFacilityExist(companyId: string, facilityId: string) { return Boolean(await this.prisma.facility.findFirst({ where: { id: facilityId, companyId }, select: { id: true } })) }
   async findVehicleByCompanyAndPlate(companyId: string, licensePlate: string, excludeId?: string) { const row = await this.prisma.resource.findFirst({ where: { type: "VEHICLE", companyId, licensePlate, ...(excludeId ? { id: { not: excludeId } } : {}) }, include }); return row ? toResource(row) : null }
 }

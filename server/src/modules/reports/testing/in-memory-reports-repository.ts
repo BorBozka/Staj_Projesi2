@@ -22,6 +22,16 @@ function withinInstant(value: string, filter: InstantRangeFilter): boolean {
   return true
 }
 
+function companyMatch(filter: { companyId?: string; companyIds?: string[] }, companyId: string): boolean {
+  if (filter.companyIds) return filter.companyIds.includes(companyId)
+  return !filter.companyId || filter.companyId === companyId
+}
+
+function facilityMatch(filter: { facilityId?: string; facilityIds?: string[] }, facilityId: string): boolean {
+  if (filter.facilityIds) return filter.facilityIds.includes(facilityId)
+  return !filter.facilityId || filter.facilityId === facilityId
+}
+
 export class InMemoryReportsRepository implements ReportsRepository {
   private readonly visits: VisitDto[]
   private readonly assignments: PlannedTransportAssignmentDto[]
@@ -35,22 +45,22 @@ export class InMemoryReportsRepository implements ReportsRepository {
 
   async listVisits(filter: InstantRangeFilter) {
     return clone(this.visits.filter((visit) =>
-      (!filter.companyId || visit.meeting.hostCompanyId === filter.companyId)
-      && (!filter.facilityId || visit.meeting.facilityId === filter.facilityId)
+      companyMatch(filter, visit.meeting.hostCompanyId)
+      && facilityMatch(filter, visit.meeting.facilityId)
       && withinInstant(visit.meeting.plannedStart, filter)))
   }
 
   async listFleet(filter: InstantRangeFilter) {
     return clone(this.assignments.filter((assignment) =>
-      (!filter.companyId || assignment.companyId === filter.companyId)
-      && (!filter.facilityId || assignment.facilityId === filter.facilityId)
+      companyMatch(filter, assignment.companyId)
+      && facilityMatch(filter, assignment.facilityId)
       && withinInstant(assignment.plannedStart, filter)))
   }
 
   async listGoods(filter: DateRangeFilter) {
     return clone(this.movements.filter((movement) =>
-      (!filter.companyId || movement.companyId === filter.companyId)
-      && (!filter.facilityId || movement.facilityId === filter.facilityId)
+      companyMatch(filter, movement.companyId)
+      && facilityMatch(filter, movement.facilityId)
       && (!filter.startDate || movement.plannedDate >= filter.startDate)
       && (!filter.endDate || movement.plannedDate <= filter.endDate)))
   }

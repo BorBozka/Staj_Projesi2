@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify"
 import { z } from "zod"
 import type { AuthGuards } from "../../auth/auth-guards.js"
+import { toAccessContext } from "../../lib/authorization.js"
 import { validationError } from "../../lib/api-error.js"
 import { resourceTypes } from "./types.js"
 import { ResourceService } from "./service.js"
@@ -11,9 +12,10 @@ const querySchema = z.object({ includeInactive: z.enum(["true", "false"]).option
 
 export async function registerResourceRoutes(app: FastifyInstance, dependencies: { service: ResourceService; guards: AuthGuards }) {
   const guard = dependencies.guards.requireRole("ADMIN", "MANAGER")
-  app.get("/api/resources", { preHandler: guard }, async (request) => { const parsed = querySchema.safeParse(request.query); if (!parsed.success) throw validationError(); return dependencies.service.list(parsed.data) })
-  app.get("/api/resources/:id", { preHandler: guard }, async (request) => { const parsed = idSchema.safeParse(request.params); if (!parsed.success) throw validationError(); return dependencies.service.get(parsed.data.id) })
-  app.post("/api/resources", { preHandler: guard }, async (request, reply) => { const parsed = resourceBody.safeParse(request.body); if (!parsed.success) throw validationError(); return reply.status(201).send(await dependencies.service.create(parsed.data)) })
-  app.patch("/api/resources/:id", { preHandler: guard }, async (request) => { const params = idSchema.safeParse(request.params); const body = resourceBody.safeParse(request.body); if (!params.success || !body.success) throw validationError(); return dependencies.service.update(params.data.id, body.data) })
-  app.patch("/api/resources/:id/status", { preHandler: guard }, async (request) => { const params = idSchema.safeParse(request.params); const body = z.object({ active: z.boolean() }).strict().safeParse(request.body); if (!params.success || !body.success) throw validationError(); return dependencies.service.setActive(params.data.id, body.data.active) })
+  app.get("/api/resources", { preHandler: guard }, async (request) => { const parsed = querySchema.safeParse(request.query); if (!parsed.success) throw validationError(); return dependencies.service.list(parsed.data, toAccessContext(request.currentUser!)) })
+  app.get("/api/resources/:id", { preHandler: guard }, async (request) => { const parsed = idSchema.safeParse(request.params); if (!parsed.success) throw validationError(); return dependencies.service.get(parsed.data.id, toAccessContext(request.currentUser!)) })
+  app.post("/api/resources", { preHandler: guard }, async (request, reply) => { const parsed = resourceBody.safeParse(request.body); if (!parsed.success) throw validationError(); return reply.status(201).send(await dependencies.service.create(parsed.data, toAccessContext(request.currentUser!))) })
+  app.patch("/api/resources/:id", { preHandler: guard }, async (request) => { const params = idSchema.safeParse(request.params); const body = resourceBody.safeParse(request.body); if (!params.success || !body.success) throw validationError(); return dependencies.service.update(params.data.id, body.data, toAccessContext(request.currentUser!)) })
+  app.patch("/api/resources/:id/status", { preHandler: guard }, async (request) => { const params = idSchema.safeParse(request.params); const body = z.object({ active: z.boolean() }).strict().safeParse(request.body); if (!params.success || !body.success) throw validationError(); return dependencies.service.setActive(params.data.id, body.data.active, toAccessContext(request.currentUser!)) })
+  app.delete("/api/resources/:id", { preHandler: guard }, async (request, reply) => { const params = idSchema.safeParse(request.params); if (!params.success) throw validationError(); await dependencies.service.remove(params.data.id, toAccessContext(request.currentUser!)); return reply.status(204).send() })
 }

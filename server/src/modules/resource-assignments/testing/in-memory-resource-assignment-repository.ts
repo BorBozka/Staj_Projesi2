@@ -13,6 +13,7 @@ const TERMINAL = new Set(["CHECKED_OUT", "CANCELLED", "NO_SHOW"])
 
 export interface FixtureMeeting {
   id: string
+  hostCompanyId?: string
   facilityId: string
   plannedStart: string
   plannedEnd: string
@@ -80,6 +81,7 @@ export class InMemoryResourceAssignmentRepository implements ResourceAssignmentR
     return {
       meeting: {
         id: meeting.id,
+        hostCompanyId: meeting.hostCompanyId ?? "company-1",
         facilityId: meeting.facilityId,
         plannedStart: meeting.plannedStart,
         plannedEnd: meeting.plannedEnd,

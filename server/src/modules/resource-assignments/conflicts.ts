@@ -13,6 +13,7 @@ export interface TimeWindow {
 
 export interface MeetingContext extends TimeWindow {
   id: string
+  hostCompanyId: string
   facilityId: string
   actualMeetingEnd: string | null
   /** Precomputed: the Meeting has visits and every one is CHECKED_OUT / CANCELLED / NO_SHOW. */

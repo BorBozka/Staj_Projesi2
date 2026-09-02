@@ -19,6 +19,7 @@ export class InMemoryResourceRepository implements ResourceRepository {
     return clone(resource)
   }
   async setActive(id: string, active: boolean) { const old = await this.find(id); if (!old) throw new Error("Resource not found"); const updated = { ...old, isActive: active }; this.resources = this.resources.map((candidate) => candidate.id === id ? updated : candidate); return updated }
+  async delete(id: string) { this.resources = this.resources.filter((candidate) => candidate.id !== id) }
   async companyAndFacilityExist(companyId: string, facilityId: string) { return this.validScopes.some((scope) => scope.companyId === companyId && scope.facilityId === facilityId) }
   async findVehicleByCompanyAndPlate(companyId: string, licensePlate: string, excludeId?: string) { const resource = this.resources.find((candidate) => candidate.id !== excludeId && candidate.type === "VEHICLE" && candidate.companyId === companyId && candidate.licensePlate === licensePlate); return resource ? clone(resource) : null }
 }

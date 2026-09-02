@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify"
 import { z } from "zod"
 
 import type { AuthGuards } from "../../auth/auth-guards.js"
+import { toAccessContext } from "../../lib/authorization.js"
 import { validationError } from "../../lib/api-error.js"
 import { ReportsService } from "./service.js"
 
@@ -21,7 +22,7 @@ export async function registerReportsRoutes(app: FastifyInstance, dependencies: 
   const guard = dependencies.guards.requireRole("MANAGER", "ADMIN")
   const service = dependencies.service
 
-  app.get("/api/reports/visits", { preHandler: guard }, async (request) => service.getVisitsReport(parsed(querySchema.safeParse(request.query))))
-  app.get("/api/reports/fleet", { preHandler: guard }, async (request) => service.getFleetReport(parsed(querySchema.safeParse(request.query))))
-  app.get("/api/reports/goods", { preHandler: guard }, async (request) => service.getGoodsReport(parsed(querySchema.safeParse(request.query))))
+  app.get("/api/reports/visits", { preHandler: guard }, async (request) => service.getVisitsReport(parsed(querySchema.safeParse(request.query)), toAccessContext(request.currentUser!)))
+  app.get("/api/reports/fleet", { preHandler: guard }, async (request) => service.getFleetReport(parsed(querySchema.safeParse(request.query)), toAccessContext(request.currentUser!)))
+  app.get("/api/reports/goods", { preHandler: guard }, async (request) => service.getGoodsReport(parsed(querySchema.safeParse(request.query)), toAccessContext(request.currentUser!)))
 }

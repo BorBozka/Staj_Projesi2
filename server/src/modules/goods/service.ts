@@ -1,4 +1,5 @@
 import { ApiError } from "../../lib/api-error.js"
+import { matchesScopeFilter, resolveScopeFilter, scopeAllows, type AccessContext } from "../../lib/authorization.js"
 import { isValidCalendarDate } from "../../lib/calendar-date.js"
 import { isWithinAuthorizationScope, type AuthorizationScope } from "../../lib/scope.js"
 import type { GoodsMovementRepository, PersistGoodsMovementInput } from "../../repositories/goods-movement-repository.js"
@@ -18,24 +19,43 @@ export class GoodsMovementService {
     private readonly now: () => Date = () => new Date(),
   ) {}
 
-  list() {
-    return this.repository.list()
+  /**
+   * Manager/Admin planning list. `ctx` is omitted only by unit tests; every route passes it and
+   * the result is confined to the caller's authorization scope.
+   */
+  async list(ctx?: AccessContext) {
+    const movements = await this.repository.list()
+    if (!ctx) return movements
+    const filter = resolveScopeFilter(ctx, {})
+    return movements.filter((movement) => matchesScopeFilter(filter, movement))
   }
 
-  async create(input: GoodsMovementInput) {
+  async create(input: GoodsMovementInput, ctx?: AccessContext) {
+    if (ctx && !scopeAllows(ctx, { companyId: input.companyId, facilityId: input.facilityId })) {
+      throw new ApiError(403, "OUT_OF_SCOPE", "Bu şirket/tesis yetki kapsamınız dışında.")
+    }
     return this.repository.create(await this.validate(input))
   }
 
-  async update(id: string, input: GoodsMovementInput) {
+  async update(id: string, input: GoodsMovementInput, ctx?: AccessContext) {
     const current = await this.require(id)
+    if (ctx && !scopeAllows(ctx, { companyId: current.companyId, facilityId: current.facilityId })) {
+      throw new ApiError(404, "NOT_FOUND", "Mal hareketi bulunamadı.")
+    }
+    if (ctx && !scopeAllows(ctx, { companyId: input.companyId, facilityId: input.facilityId })) {
+      throw new ApiError(403, "OUT_OF_SCOPE", "Bu şirket/tesis yetki kapsamınız dışında.")
+    }
     if (current.status !== "PLANNED") throw new ApiError(409, STATE_CONFLICT, "Bu kayıt artık düzenlenemez.")
     const result = await this.repository.update(id, await this.validate(input))
     if (!result) throw new ApiError(409, STATE_CONFLICT, "Bu kayıt artık düzenlenemez.")
     return result
   }
 
-  async cancel(id: string) {
+  async cancel(id: string, ctx?: AccessContext) {
     const current = await this.require(id)
+    if (ctx && !scopeAllows(ctx, { companyId: current.companyId, facilityId: current.facilityId })) {
+      throw new ApiError(404, "NOT_FOUND", "Mal hareketi bulunamadı.")
+    }
     if (current.status !== "PLANNED") throw new ApiError(409, STATE_CONFLICT, "Bu kayıt iptal edilemez.")
     const result = await this.repository.cancel(id)
     if (!result) throw new ApiError(409, STATE_CONFLICT, "Bu kayıt iptal edilemez.")

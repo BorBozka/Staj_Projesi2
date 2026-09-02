@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify"
 import { z } from "zod"
 
 import type { AuthGuards } from "../../auth/auth-guards.js"
+import { toAccessContext } from "../../lib/authorization.js"
 import { validationError } from "../../lib/api-error.js"
 import { GoodsMovementService } from "./service.js"
 import { goodsMovementDirections } from "./types.js"
@@ -35,13 +36,13 @@ export async function registerGoodsMovementRoutes(app: FastifyInstance, dependen
   const securityGuard = dependencies.guards.requireRole("SECURITY")
   const service = dependencies.service
 
-  app.get("/api/goods-movements", { preHandler: planningGuard }, async () => service.list())
+  app.get("/api/goods-movements", { preHandler: planningGuard }, async (request) => service.list(toAccessContext(request.currentUser!)))
   app.post("/api/goods-movements", { preHandler: planningGuard }, async (request, reply) =>
-    reply.status(201).send(await service.create(parsed(movementBody.safeParse(request.body)))))
+    reply.status(201).send(await service.create(parsed(movementBody.safeParse(request.body)), toAccessContext(request.currentUser!))))
   app.patch("/api/goods-movements/:id", { preHandler: planningGuard }, async (request) =>
-    service.update(parsed(idParams.safeParse(request.params)).id, parsed(movementBody.safeParse(request.body))))
+    service.update(parsed(idParams.safeParse(request.params)).id, parsed(movementBody.safeParse(request.body)), toAccessContext(request.currentUser!)))
   app.post("/api/goods-movements/:id/cancel", { preHandler: planningGuard }, async (request) =>
-    service.cancel(parsed(idParams.safeParse(request.params)).id))
+    service.cancel(parsed(idParams.safeParse(request.params)).id, toAccessContext(request.currentUser!)))
 
   app.get("/api/security/goods-movements", { preHandler: securityGuard }, async (request) =>
     service.listSecurityOperational(request.currentUser!.id))

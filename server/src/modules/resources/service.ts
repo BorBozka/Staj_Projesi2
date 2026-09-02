@@ -1,4 +1,6 @@
 import { ApiError } from "../../lib/api-error.js"
+import { matchesScopeFilter, resolveScopeFilter, scopeAllows, type AccessContext } from "../../lib/authorization.js"
+import { isPrismaForeignKeyError } from "../../lib/prisma-conflict.js"
 import type { ResourceRepository } from "../../repositories/resource-repository.js"
 import { normalizeLicensePlate, type FacilityResource, type ResourceInput } from "./types.js"
 
@@ -6,11 +8,59 @@ function normalizeList(values: string[]) { return [...new Set(values.map((value)
 
 export class ResourceService {
   constructor(private readonly repository: ResourceRepository) {}
-  list(filters: { includeInactive: boolean; companyId?: string; facilityId?: string; type?: string }) { return this.repository.list(filters) }
-  async get(id: string) { const resource = await this.repository.find(id); if (!resource) throw new ApiError(404, "NOT_FOUND", "Kaynak bulunamadı."); return resource }
-  async create(input: ResourceInput) { const validated = await this.validateInput(input); return this.repository.save(validated) }
-  async update(id: string, input: ResourceInput) { const current = await this.get(id); if (current.type !== input.type) throw new ApiError(409, "RESOURCE_TYPE_IMMUTABLE", "Kaynak türü düzenleme sırasında değiştirilemez."); const validated = await this.validateInput(input, id); return this.repository.save(validated, id, current.isActive) }
-  async setActive(id: string, active: boolean) { await this.get(id); return this.repository.setActive(id, active) }
+
+  async list(filters: { includeInactive: boolean; companyId?: string; facilityId?: string; type?: string }, ctx?: AccessContext) {
+    const resources = await this.repository.list(filters)
+    if (!ctx) return resources
+    const scope = resolveScopeFilter(ctx, {})
+    return resources.filter((resource) => matchesScopeFilter(scope, resource))
+  }
+
+  async get(id: string, ctx?: AccessContext) {
+    const resource = await this.repository.find(id)
+    if (!resource) throw new ApiError(404, "NOT_FOUND", "Kaynak bulunamadı.")
+    if (ctx && !scopeAllows(ctx, { companyId: resource.companyId, facilityId: resource.facilityId })) {
+      throw new ApiError(404, "NOT_FOUND", "Kaynak bulunamadı.")
+    }
+    return resource
+  }
+
+  async create(input: ResourceInput, ctx?: AccessContext) {
+    if (ctx && !scopeAllows(ctx, { companyId: input.companyId, facilityId: input.facilityId })) {
+      throw new ApiError(403, "OUT_OF_SCOPE", "Bu şirket/tesis yetki kapsamınız dışında.")
+    }
+    const validated = await this.validateInput(input)
+    return this.repository.save(validated)
+  }
+
+  async update(id: string, input: ResourceInput, ctx?: AccessContext) {
+    const current = await this.get(id, ctx)
+    if (ctx && !scopeAllows(ctx, { companyId: input.companyId, facilityId: input.facilityId })) {
+      throw new ApiError(403, "OUT_OF_SCOPE", "Bu şirket/tesis yetki kapsamınız dışında.")
+    }
+    if (current.type !== input.type) throw new ApiError(409, "RESOURCE_TYPE_IMMUTABLE", "Kaynak türü düzenleme sırasında değiştirilemez.")
+    const validated = await this.validateInput(input, id)
+    return this.repository.save(validated, id, current.isActive)
+  }
+
+  async setActive(id: string, active: boolean, ctx?: AccessContext) { await this.get(id, ctx); return this.repository.setActive(id, active) }
+
+  /**
+   * Hard delete. Its `DriverLicenseClass` / `DriverDocument` sub-rows go with it; a resource
+   * still referenced by an (immutable, historical) assignment cannot be deleted and must be
+   * deactivated instead.
+   */
+  async remove(id: string, ctx?: AccessContext) {
+    await this.get(id, ctx)
+    try {
+      await this.repository.delete(id)
+    } catch (error) {
+      if (isPrismaForeignKeyError(error)) {
+        throw new ApiError(409, "RESOURCE_IN_USE", "Bu kaynağın atama geçmişi olduğu için silinemez; pasife alın.")
+      }
+      throw error
+    }
+  }
 
   private async validateInput(input: ResourceInput, excludeId?: string): Promise<ResourceInput> {
     if (!await this.repository.companyAndFacilityExist(input.companyId, input.facilityId)) throw new ApiError(400, "INVALID_SCOPE", "Şirket ve tesis eşleşmesi geçersiz.")

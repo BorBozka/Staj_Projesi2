@@ -188,6 +188,7 @@ export class PrismaResourceAssignmentRepository implements ResourceAssignmentRep
     return {
       meeting: {
         id: meeting.id,
+        hostCompanyId: meeting.hostCompanyId,
         facilityId: meeting.facilityId,
         plannedStart: meeting.plannedStart.toISOString(),
         plannedEnd: meeting.plannedEnd.toISOString(),

@@ -1,4 +1,5 @@
 import { ApiError } from "../../lib/api-error.js"
+import { resolveScopeFilter, type AccessContext } from "../../lib/authorization.js"
 import { isValidCalendarDate } from "../../lib/calendar-date.js"
 import type { DateRangeFilter, InstantRangeFilter, ReportsRepository } from "../../repositories/reports-repository.js"
 import type { FleetReportDataset, GoodsReportDataset, ReportsQuery, VisitsReportDataset } from "./types.js"
@@ -12,19 +13,29 @@ import type { FleetReportDataset, GoodsReportDataset, ReportsQuery, VisitsReport
 export class ReportsService {
   constructor(private readonly repository: ReportsRepository) {}
 
-  async getVisitsReport(query: ReportsQuery): Promise<VisitsReportDataset> {
+  async getVisitsReport(query: ReportsQuery, ctx?: AccessContext): Promise<VisitsReportDataset> {
     if (this.rangeInverted(query)) return { visits: [] }
-    return { visits: await this.repository.listVisits(this.instantFilter(query)) }
+    return { visits: await this.repository.listVisits(this.instantFilter(query, ctx)) }
   }
 
-  async getFleetReport(query: ReportsQuery): Promise<FleetReportDataset> {
+  async getFleetReport(query: ReportsQuery, ctx?: AccessContext): Promise<FleetReportDataset> {
     if (this.rangeInverted(query)) return { assignments: [] }
-    return { assignments: await this.repository.listFleet(this.instantFilter(query)) }
+    return { assignments: await this.repository.listFleet(this.instantFilter(query, ctx)) }
   }
 
-  async getGoodsReport(query: ReportsQuery): Promise<GoodsReportDataset> {
+  async getGoodsReport(query: ReportsQuery, ctx?: AccessContext): Promise<GoodsReportDataset> {
     if (this.rangeInverted(query)) return { movements: [] }
-    return { movements: await this.repository.listGoods(this.dateFilter(query)) }
+    return { movements: await this.repository.listGoods(this.dateFilter(query, ctx)) }
+  }
+
+  /**
+   * `companyId=all` / `facilityId=all` (or omitted) never means "everything": with a `ctx` it is
+   * resolved to the caller's assigned scope, and a concrete out-of-scope id yields an empty set.
+   */
+  private scopeIds(query: ReportsQuery, ctx: AccessContext | undefined) {
+    if (!ctx) return {}
+    const resolved = resolveScopeFilter(ctx, { companyId: query.companyId, facilityId: query.facilityId })
+    return { companyIds: resolved.companyIds, ...(resolved.facilityIds ? { facilityIds: resolved.facilityIds } : {}) }
   }
 
   private rangeInverted(query: ReportsQuery): boolean {
@@ -45,21 +56,23 @@ export class ReportsService {
     return !value || value === "all" ? undefined : value
   }
 
-  private instantFilter(query: ReportsQuery): InstantRangeFilter {
+  private instantFilter(query: ReportsQuery, ctx?: AccessContext): InstantRangeFilter {
     const start = this.parseDate(query.startDate)
     const end = this.parseDate(query.endDate)
     return {
       companyId: this.normalizeId(query.companyId),
       facilityId: this.normalizeId(query.facilityId),
+      ...this.scopeIds(query, ctx),
       from: start ? startOfLocalDay(start) : undefined,
       to: end ? endOfLocalDay(end) : undefined,
     }
   }
 
-  private dateFilter(query: ReportsQuery): DateRangeFilter {
+  private dateFilter(query: ReportsQuery, ctx?: AccessContext): DateRangeFilter {
     return {
       companyId: this.normalizeId(query.companyId),
       facilityId: this.normalizeId(query.facilityId),
+      ...this.scopeIds(query, ctx),
       startDate: this.parseDate(query.startDate),
       endDate: this.parseDate(query.endDate),
     }

@@ -1,4 +1,5 @@
 import { ApiError } from "../../lib/api-error.js"
+import { matchesScopeFilter, resolveScopeFilter, scopeAllows, type AccessContext } from "../../lib/authorization.js"
 import type {
   PersistTransportAssignmentInput,
   TransportAssignmentRepository,
@@ -15,11 +16,18 @@ const NOT_EDITABLE = "TRANSPORT_ASSIGNMENT_NOT_EDITABLE"
 export class TransportAssignmentService {
   constructor(private readonly repository: TransportAssignmentRepository) {}
 
-  listAssignments() {
-    return this.repository.list()
+  /** `ctx` omitted only by unit tests; every route passes it and confines the list to scope. */
+  async listAssignments(ctx?: AccessContext) {
+    const assignments = await this.repository.list()
+    if (!ctx) return assignments
+    const filter = resolveScopeFilter(ctx, {})
+    return assignments.filter((assignment) => matchesScopeFilter(filter, assignment))
   }
 
-  async getAvailability(input: TransportAvailabilityInput): Promise<TransportAvailability> {
+  async getAvailability(input: TransportAvailabilityInput, ctx?: AccessContext): Promise<TransportAvailability> {
+    if (ctx && !scopeAllows(ctx, { companyId: input.companyId, facilityId: input.facilityId })) {
+      throw new ApiError(403, "OUT_OF_SCOPE", "Bu şirket/tesis yetki kapsamınız dışında.")
+    }
     await this.assertScopeAndTime(input)
     const [{ vehicles, drivers }, overlapping] = await Promise.all([
       this.repository.listActiveResources(input.companyId, input.facilityId),
@@ -33,20 +41,32 @@ export class TransportAssignmentService {
     }
   }
 
-  async createAssignment(input: CreatePlannedTransportAssignmentInput) {
+  async createAssignment(input: CreatePlannedTransportAssignmentInput, ctx?: AccessContext) {
+    if (ctx && !scopeAllows(ctx, { companyId: input.companyId, facilityId: input.facilityId })) {
+      throw new ApiError(403, "OUT_OF_SCOPE", "Bu şirket/tesis yetki kapsamınız dışında.")
+    }
     return this.repository.create(await this.validate(input))
   }
 
-  async updateAssignment(id: string, input: CreatePlannedTransportAssignmentInput) {
+  async updateAssignment(id: string, input: CreatePlannedTransportAssignmentInput, ctx?: AccessContext) {
     const current = await this.repository.find(id)
     if (!current) throw new ApiError(404, "NOT_FOUND", "Planlı atama bulunamadı.")
+    if (ctx && !scopeAllows(ctx, { companyId: current.companyId, facilityId: current.facilityId })) {
+      throw new ApiError(404, "NOT_FOUND", "Planlı atama bulunamadı.")
+    }
+    if (ctx && !scopeAllows(ctx, { companyId: input.companyId, facilityId: input.facilityId })) {
+      throw new ApiError(403, "OUT_OF_SCOPE", "Bu şirket/tesis yetki kapsamınız dışında.")
+    }
     if (current.status === "CANCELLED") throw new ApiError(409, NOT_EDITABLE, "İptal edilen atama düzenlenemez.")
     return this.repository.update(id, await this.validate(input, id))
   }
 
-  async cancelAssignment(id: string) {
+  async cancelAssignment(id: string, ctx?: AccessContext) {
     const current = await this.repository.find(id)
     if (!current) throw new ApiError(404, "NOT_FOUND", "Planlı atama bulunamadı.")
+    if (ctx && !scopeAllows(ctx, { companyId: current.companyId, facilityId: current.facilityId })) {
+      throw new ApiError(404, "NOT_FOUND", "Planlı atama bulunamadı.")
+    }
     if (current.status === "CANCELLED") throw new ApiError(409, NOT_EDITABLE, "Atama zaten iptal edildi.")
     const result = await this.repository.cancel(id)
     if (!result) throw new ApiError(409, NOT_EDITABLE, "Atama zaten iptal edildi.")

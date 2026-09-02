@@ -3,14 +3,40 @@ import { createHash, randomBytes } from "node:crypto"
 import type { DeliveryLogger, EmailSender } from "../../delivery/email-sender.js"
 import { consoleDeliveryLogger } from "../../delivery/email-sender.js"
 import { ApiError } from "../../lib/api-error.js"
+import { scopeAllows, type AccessContext } from "../../lib/authorization.js"
 import { CheckInConflictError, type VisitorOperationsRepository } from "../../repositories/visitor-operations-repository.js"
 import type {
-  CreateUnplannedInput, MeetingInput, PublicPreRegistrationDto, SecurityCheckInInput,
+  CreateUnplannedInput, MeetingDto, MeetingInput, PublicPreRegistrationDto, SecurityCheckInInput,
   SecurityCorrectionInput, VisitorCardDto, VisitorRuleDto, VisitDto, VisitTypeDto,
 } from "./types.js"
 import { normalizeCardNumber, normalizeOptional, normalizePlate, normalizeVisitTypeName, validEmail } from "./types.js"
 
 const terminal = new Set(["CHECKED_OUT", "CANCELLED", "NO_SHOW"])
+const securityOperationalStatuses = new Set(["PLANNED", "CHECKED_IN"])
+
+const notFound = () => new ApiError(404, "NOT_FOUND", "Ziyaret bulunamadı.")
+const mutationForbidden = () =>
+  new ApiError(403, "VISIT_MUTATION_FORBIDDEN", "Bu ziyaret grubu üzerinde değişiklik yapma yetkiniz yok.")
+
+/** Is a meeting visible to this caller (scope + role-specific ownership)? */
+function isMeetingVisible(ctx: AccessContext, meeting: Pick<MeetingDto, "hostCompanyId" | "facilityId" | "creatorEmployeeId" | "hostEmployeeId">): boolean {
+  if (!scopeAllows(ctx, { companyId: meeting.hostCompanyId, facilityId: meeting.facilityId })) return false
+  if (ctx.role === "MANAGER" || ctx.role === "ADMIN" || ctx.role === "SECURITY") return true
+  // EMPLOYEE: only meetings they created or host.
+  return meeting.creatorEmployeeId === ctx.employeeId || (meeting.hostEmployeeId ?? "") === ctx.employeeId
+}
+
+/**
+ * Guards a meeting/visit mutation. An out-of-scope target is reported as 404 (no cross-scope
+ * leak); an in-scope target owned by another user is 403. ADMIN may mutate any in-scope meeting;
+ * EMPLOYEE and MANAGER may mutate only ones they created.
+ */
+function assertMeetingMutable(ctx: AccessContext, meeting: Pick<MeetingDto, "hostCompanyId" | "facilityId" | "creatorEmployeeId">): void {
+  if (!scopeAllows(ctx, { companyId: meeting.hostCompanyId, facilityId: meeting.facilityId })) throw notFound()
+  if (ctx.role === "ADMIN") return
+  if ((ctx.role === "EMPLOYEE" || ctx.role === "MANAGER") && meeting.creatorEmployeeId === ctx.employeeId) return
+  throw mutationForbidden()
+}
 
 export class VisitorOperationsService {
   constructor(
@@ -27,21 +53,57 @@ export class VisitorOperationsService {
   async updateVisitType(id: string, input: { name: string; active: boolean }) { await this.requireVisitType(id); return this.saveVisitType(id, input) }
   async setVisitTypeActive(id: string, active: boolean) { const current = await this.requireVisitType(id); return this.repository.saveVisitType({ id, name: current.name, nameNormalized: normalizeVisitTypeName(current.name), active }) }
 
-  listMeetings() { return this.repository.listMeetings() }
-  listVisits() { return this.repository.listVisits() }
-  async getMeeting(id: string) { const meeting = await this.repository.findMeeting(id); if (!meeting) throw new ApiError(404, "NOT_FOUND", "Ziyaret grubu bulunamadı."); return meeting }
-  async getVisit(id: string) { return this.requireVisit(id) }
-  getReferenceData(userId: string) { return this.repository.getReferenceData(userId) }
+  async listMeetings(ctx: AccessContext) {
+    const meetings = await this.repository.listMeetings()
+    if (ctx.role === "SECURITY") {
+      const operationalMeetingIds = new Set(
+        (await this.repository.listVisits())
+          .filter((visit) => securityOperationalStatuses.has(visit.status) && isMeetingVisible(ctx, visit.meeting))
+          .map((visit) => visit.meetingId),
+      )
+      return meetings.filter((meeting) => operationalMeetingIds.has(meeting.id))
+    }
+    return meetings.filter((meeting) => isMeetingVisible(ctx, meeting))
+  }
 
-  async createMeeting(input: MeetingInput, userId: string) {
-    const actor = await this.requireActor(userId)
+  async listVisits(ctx: AccessContext) {
+    return (await this.repository.listVisits()).filter((visit) => {
+      if (!isMeetingVisible(ctx, visit.meeting)) return false
+      return ctx.role === "SECURITY" ? securityOperationalStatuses.has(visit.status) : true
+    })
+  }
+
+  async getMeeting(id: string) { const meeting = await this.repository.findMeeting(id); if (!meeting) throw new ApiError(404, "NOT_FOUND", "Ziyaret grubu bulunamadı."); return meeting }
+
+  /** Detail read that hides a meeting outside the caller's scope/ownership behind the same 404. */
+  async getVisibleMeeting(id: string, ctx: AccessContext) {
+    const meeting = await this.getMeeting(id)
+    if (!isMeetingVisible(ctx, meeting.meeting)) throw new ApiError(404, "NOT_FOUND", "Ziyaret grubu bulunamadı.")
+    return meeting
+  }
+
+  async getVisibleVisit(id: string, ctx: AccessContext) {
+    const visit = await this.requireVisit(id)
+    if (!isMeetingVisible(ctx, visit.meeting)) throw notFound()
+    return visit
+  }
+
+  async getReferenceData(ctx: AccessContext) {
+    return scopeReferenceData(ctx, await this.repository.getReferenceData(ctx.userId))
+  }
+
+  async createMeeting(input: MeetingInput, ctx: AccessContext) {
+    const actor = await this.requireActor(ctx.userId)
+    if (!scopeAllows(ctx, { companyId: input.hostCompanyId, facilityId: input.facilityId })) throw mutationForbidden()
     const validated = await this.validateMeetingInput(input)
     return this.repository.createMeeting(validated.input, actor.id, validated.hostEmployeeId)
   }
 
-  async updateMeeting(id: string, input: MeetingInput, userId: string) {
-    await this.requireActor(userId)
+  async updateMeeting(id: string, input: MeetingInput, ctx: AccessContext) {
+    await this.requireActor(ctx.userId)
     const current = await this.getMeeting(id)
+    assertMeetingMutable(ctx, current.meeting)
+    if (!scopeAllows(ctx, { companyId: input.hostCompanyId, facilityId: input.facilityId })) throw mutationForbidden()
     if (current.meeting.actualMeetingEnd) throw new ApiError(409, "MEETING_CLOSED", "Kapatılmış bir toplantı düzenlenemez.")
     const submittedIds = input.visitors.flatMap((visitor) => visitor.visitId ? [visitor.visitId] : [])
     if (new Set(submittedIds).size !== submittedIds.length || submittedIds.some((visitId) => !current.visits.some((visit) => visit.id === visitId))) throw new ApiError(400, "VALIDATION_ERROR", "Ziyaret grubu dışındaki veya yinelenen ziyaret kayıtları gönderilemez.")
@@ -49,9 +111,10 @@ export class VisitorOperationsService {
     return this.repository.updateMeeting(id, validated.input, validated.hostEmployeeId)
   }
 
-  async rescheduleVisit(id: string, input: { plannedStart: string; plannedEnd: string }, userId: string) {
-    await this.requireActor(userId)
+  async rescheduleVisit(id: string, input: { plannedStart: string; plannedEnd: string }, ctx: AccessContext) {
+    await this.requireActor(ctx.userId)
     const visit = await this.requireVisit(id)
+    assertMeetingMutable(ctx, visit.meeting)
     this.requireStatus(visit, "PLANNED", "Yalnızca planlanmış ziyaret yeniden planlanabilir.")
     this.assertTimes(input.plannedStart, input.plannedEnd)
     if (visit.meeting.actualMeetingEnd) throw new ApiError(409, "MEETING_CLOSED", "Kapatılmış bir toplantı yeniden planlanamaz.")
@@ -59,11 +122,13 @@ export class VisitorOperationsService {
     return this.requireVisit(id)
   }
 
-  async cancelVisit(id: string, userId: string) { const visit = await this.requireVisit(id); this.requireStatus(visit, "PLANNED", "Yalnızca planlanmış ziyaret iptal edilebilir."); await this.repository.cancelVisit(id, userId, this.now()); return this.requireVisit(id) }
-  async cancelMeeting(id: string, userId: string) { await this.getMeeting(id); await this.repository.cancelMeeting(id, userId, this.now()); return this.getMeeting(id) }
+  async cancelVisit(id: string, ctx: AccessContext) { const visit = await this.requireVisit(id); assertMeetingMutable(ctx, visit.meeting); this.requireStatus(visit, "PLANNED", "Yalnızca planlanmış ziyaret iptal edilebilir."); await this.repository.cancelVisit(id, ctx.userId, this.now()); return this.requireVisit(id) }
+  async cancelMeeting(id: string, ctx: AccessContext) { const meeting = await this.getMeeting(id); assertMeetingMutable(ctx, meeting.meeting); await this.repository.cancelMeeting(id, ctx.userId, this.now()); return this.getMeeting(id) }
 
-  async extendMeeting(id: string, extensionMinutes: number, userId: string) {
-    const actor = await this.requireActor(userId); const meeting = await this.getMeeting(id); const now = this.now()
+  async extendMeeting(id: string, extensionMinutes: number, ctx: AccessContext) {
+    const actor = await this.requireActor(ctx.userId); const meeting = await this.getMeeting(id); const now = this.now()
+    // Lifecycle is host-identity gated (assertManualLifecycle); scope only hides an out-of-reach meeting.
+    if (!scopeAllows(ctx, { companyId: meeting.meeting.hostCompanyId, facilityId: meeting.meeting.facilityId })) throw new ApiError(404, "NOT_FOUND", "Ziyaret grubu bulunamadı.")
     if (!Number.isInteger(extensionMinutes) || extensionMinutes <= 0) throw new ApiError(400, "VALIDATION_ERROR", "Uzatma süresi pozitif bir tam sayı dakika olmalıdır.")
     this.assertManualLifecycle(meeting.meeting, meeting.visits, actor.id, now)
     const base = Math.max(new Date(meeting.meeting.plannedEnd).getTime(), now.getTime())
@@ -73,24 +138,32 @@ export class VisitorOperationsService {
     return this.getMeeting(id)
   }
 
-  async closeMeeting(id: string, userId: string) {
-    const actor = await this.requireActor(userId); const meeting = await this.getMeeting(id); const now = this.now()
+  async closeMeeting(id: string, ctx: AccessContext) {
+    const actor = await this.requireActor(ctx.userId); const meeting = await this.getMeeting(id); const now = this.now()
+    if (!scopeAllows(ctx, { companyId: meeting.meeting.hostCompanyId, facilityId: meeting.meeting.facilityId })) throw new ApiError(404, "NOT_FOUND", "Ziyaret grubu bulunamadı.")
     this.assertManualLifecycle(meeting.meeting, meeting.visits, actor.id, now)
     await this.repository.closeMeeting(id, "MANUAL", now)
     return this.getMeeting(id)
   }
 
-  async sendMeetingInvitations(id: string) {
+  async sendMeetingInvitations(id: string, ctx: AccessContext) {
     const meeting = await this.getMeeting(id)
+    assertMeetingMutable(ctx, meeting.meeting)
     const delivered: VisitDto[] = []
     for (const visit of meeting.visits) {
       if (visit.status !== "PLANNED" || !visit.visitor.email || !["NOT_SENT", "FAILED"].includes(visit.invitationStatus)) continue
-      delivered.push(await this.sendVisitInvitation(visit.id))
+      delivered.push(await this.deliverInvitation(visit.id))
     }
     return delivered
   }
 
-  async sendVisitInvitation(id: string) {
+  async sendVisitInvitation(id: string, ctx: AccessContext) {
+    const current = await this.requireVisit(id)
+    assertMeetingMutable(ctx, current.meeting)
+    return this.deliverInvitation(id)
+  }
+
+  private async deliverInvitation(id: string) {
     const current = await this.requireVisit(id)
     this.requireStatus(current, "PLANNED", "Yalnızca planlanmış ziyaretler için davet gönderilebilir.")
     if (!current.visitor.email) throw new ApiError(409, "VISITOR_EMAIL_REQUIRED", "Ziyaretçinin davet gönderilebilecek e-posta adresi bulunmuyor.")
@@ -141,8 +214,14 @@ export class VisitorOperationsService {
   async restoreCard(id: string) { const card = await this.requireCard(id); if (card.status !== "LOST") throw new ApiError(409, "INVALID_CARD_TRANSITION", "Yalnız kayıp kart geri alınabilir."); return this.repository.setCardStatus(id, "AVAILABLE") }
 
   async getAvailableCards() { return (await this.repository.listCards()).filter((card) => card.status === "AVAILABLE") }
-  async checkInVisit(id: string, input: SecurityCheckInInput) {
-    const visit = await this.requireVisit(id); this.requireStatus(visit, "PLANNED", "Yalnızca planlanmış ziyaretler giriş yapabilir.")
+
+  /** Security operations are confined to the gate user's company/facility scope. */
+  private assertOperationalScope(ctx: AccessContext, meeting: Pick<MeetingDto, "hostCompanyId" | "facilityId">): void {
+    if (!scopeAllows(ctx, { companyId: meeting.hostCompanyId, facilityId: meeting.facilityId })) throw notFound()
+  }
+
+  async checkInVisit(id: string, input: SecurityCheckInInput, ctx: AccessContext) {
+    const visit = await this.requireVisit(id); this.assertOperationalScope(ctx, visit.meeting); this.requireStatus(visit, "PLANNED", "Yalnızca planlanmış ziyaretler giriş yapabilir.")
     const card = await this.requireCard(input.visitorCardId); if (card.status !== "AVAILABLE") throw new ApiError(409, "CARD_UNAVAILABLE", "Seçilen kart şu anda kullanılabilir değil.")
     if (!visit.ruleAcceptance) throw new ApiError(409, "RULE_ACCEPTANCE_REQUIRED", "Ziyaretçi kuralları check-in öncesinde kabul edilmelidir.")
     let result: Awaited<ReturnType<VisitorOperationsRepository["checkIn"]>>
@@ -155,21 +234,24 @@ export class VisitorOperationsService {
     if (result.hostEmail && result.hostName) this.sendHostNotification(result.visit, result.hostEmail, result.hostName)
     return result.visit
   }
-  async checkOutVisit(id: string, cardReturned: boolean) { const visit = await this.requireVisit(id); this.requireStatus(visit, "CHECKED_IN", "Yalnızca içerideki ziyaretçiler çıkış yapabilir."); await this.repository.checkOut(id, cardReturned, this.now()); return this.requireVisit(id) }
+  async checkOutVisit(id: string, cardReturned: boolean, ctx: AccessContext) { const visit = await this.requireVisit(id); this.assertOperationalScope(ctx, visit.meeting); this.requireStatus(visit, "CHECKED_IN", "Yalnızca içerideki ziyaretçiler çıkış yapabilir."); await this.repository.checkOut(id, cardReturned, this.now()); return this.requireVisit(id) }
   listUnreturnedIssues() { return this.repository.listUnreturnedIssues() }
-  async receiveLateCardReturn(id: string) { await this.repository.lateReturn(id, this.now()); return this.requireVisit(id) }
-  async createAndCheckInUnplanned(input: CreateUnplannedInput, userId: string) {
-    const actor = await this.requireActor(userId)
+  async receiveLateCardReturn(id: string, ctx: AccessContext) { const visit = await this.requireVisit(id); this.assertOperationalScope(ctx, visit.meeting); await this.repository.lateReturn(id, this.now()); return this.requireVisit(id) }
+  async createAndCheckInUnplanned(input: CreateUnplannedInput, ctx: AccessContext) {
+    const actor = await this.requireActor(ctx.userId)
+    // The company/facility come from the client's scope context and are NOT trusted: they must
+    // sit inside the Security user's authorization scope.
+    if (!scopeAllows(ctx, { companyId: input.companyId, facilityId: input.facilityId })) throw new ApiError(403, "OUT_OF_SCOPE", "Bu şirket/tesis yetki kapsamınız dışında.")
     const clean: CreateUnplannedInput = { ...input, firstName: requireText(input.firstName, "Ad zorunludur."), lastName: requireText(input.lastName, "Soyad zorunludur."), company: requireText(input.company, "Ziyaretçi şirketi zorunludur."), hostEmployeeName: requireText(input.hostEmployeeName, "Ev sahibi zorunludur."), visitTypeId: input.visitTypeId.trim(), vehiclePlate: normalizePlate(input.vehiclePlate) }
     if (!clean.rulesAccepted || !Number.isInteger(clean.durationMinutes) || clean.durationMinutes <= 0) throw new ApiError(400, "VALIDATION_ERROR", "Kural kabulü ve pozitif tahmini süre zorunludur.")
     const type = await this.requireVisitType(clean.visitTypeId); if (!type.active) throw new ApiError(409, "INACTIVE_VISIT_TYPE", "Pasif ziyaret türü seçilemez.")
     return this.repository.createUnplanned(clean, actor.id, this.now())
   }
-  async correctVisitor(id: string, input: SecurityCorrectionInput, userId: string) {
-    const visit = await this.requireVisit(id); if (!["PLANNED", "CHECKED_IN"].includes(visit.status)) throw new ApiError(409, "VISIT_NOT_EDITABLE", "Yalnızca planlanmış veya içerideki ziyaretler düzeltilebilir.")
+  async correctVisitor(id: string, input: SecurityCorrectionInput, ctx: AccessContext) {
+    const visit = await this.requireVisit(id); this.assertOperationalScope(ctx, visit.meeting); if (!["PLANNED", "CHECKED_IN"].includes(visit.status)) throw new ApiError(409, "VISIT_NOT_EDITABLE", "Yalnızca planlanmış veya içerideki ziyaretler düzeltilebilir.")
     const email = input.email === undefined ? undefined : normalizeOptional(input.email); if (email && !validEmail(email)) throw new ApiError(400, "VALIDATION_ERROR", "Geçerli bir e-posta adresi girin.")
     if (input.visitTypeId) { const type = await this.requireVisitType(input.visitTypeId); if (!type.active && type.id !== visit.meeting.visitTypeId) throw new ApiError(409, "INACTIVE_VISIT_TYPE", "Pasif ziyaret türü seçilemez.") }
-    const actor = await this.repository.findEmployeeByUserId(userId)
+    const actor = await this.repository.findEmployeeByUserId(ctx.userId)
     await this.repository.correctVisitor(id, { firstName: requireText(input.firstName, "Ad zorunludur."), lastName: requireText(input.lastName, "Soyad zorunludur."), company: requireText(input.company, "Ziyaretçi şirketi zorunludur."), email, phone: normalizeOptional(input.phone), visitTypeId: input.visitTypeId?.trim() || undefined, hostEmployeeName: requireText(input.hostEmployeeName, "Ev sahibi zorunludur.") }, actor, this.now())
     return this.requireVisit(id)
   }
@@ -198,3 +280,29 @@ export class VisitorOperationsService {
 
 function requireText(value: string | undefined, message: string) { const normalized = normalizeOptional(value); if (!normalized) throw new ApiError(400, "VALIDATION_ERROR", message); return normalized }
 export function hashToken(rawToken: string) { return createHash("sha256").update(rawToken).digest("hex") }
+
+interface ReferenceData {
+  companies: { id: string; name: string }[]
+  facilities: { id: string; companyId: string; name: string }[]
+  employees: { id: string; companyId: string; facilityIds: string[]; name: string; departmentId: string; department: string }[]
+  visitTypes: unknown
+  currentEmployee: unknown
+}
+
+/**
+ * Narrows the shared reference data (company/facility/employee option lists) to the caller's
+ * authorization scope. Visit types stay global; `currentEmployee` is passed through unchanged.
+ */
+function scopeReferenceData(ctx: AccessContext, raw: unknown): ReferenceData {
+  const data = raw as ReferenceData
+  const companyIds = new Set(ctx.scope.companyIds)
+  const facilityIds = ctx.scope.facilityIds
+  const facilityAllowed = (facilityId: string) => facilityIds.length === 0 || facilityIds.includes(facilityId)
+  return {
+    companies: data.companies.filter((company) => companyIds.has(company.id)),
+    facilities: data.facilities.filter((facility) => companyIds.has(facility.companyId) && facilityAllowed(facility.id)),
+    employees: data.employees.filter((employee) => companyIds.has(employee.companyId)),
+    visitTypes: data.visitTypes,
+    currentEmployee: data.currentEmployee,
+  }
+}
