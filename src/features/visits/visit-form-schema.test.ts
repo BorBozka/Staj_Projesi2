@@ -12,6 +12,7 @@ const validVisitor = {
 const validValues = {
   visitors: [validVisitor],
   visitTypeId: "meeting",
+  hostEmployeeId: "maya-kara",
   hostEmployeeName: "Maya Kara",
   hostCompanyId: "bplas",
   facilityId: "bplas-merkez",
@@ -44,6 +45,21 @@ describe("visitFormSchema", () => {
         "visitors.1.visitorCompany",
       ]))
     }
+  })
+
+  it("cannot be submitted without a personnel record picked from the list", () => {
+    expect(visitFormSchema.safeParse({ ...validValues, hostEmployeeId: "", hostEmployeeName: "" }).success).toBe(false)
+    // A typed name with no matching id (what free text would produce) is still rejected.
+    expect(visitFormSchema.safeParse({ ...validValues, hostEmployeeId: "", hostEmployeeName: "Yanlış Yazım" }).success).toBe(false)
+    const result = visitFormSchema.safeParse({ ...validValues, hostEmployeeId: "" })
+    if (!result.success) expect(result.error.issues.some((issue) => issue.path.includes("hostEmployeeId"))).toBe(true)
+  })
+
+  it("maps the selected personnel id through to the meeting input", () => {
+    expect(toMeetingInput(visitFormSchema.parse(validValues))).toMatchObject({
+      hostEmployeeId: "maya-kara",
+      hostEmployeeName: "Maya Kara",
+    })
   })
 
   it("rejects an end time that is not after the start time", () => {

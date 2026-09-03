@@ -10,7 +10,7 @@ describe("MyVisitsPage workspace density", () => {
     // 52px header + 12px shell top padding + 14px page gutter.
     expect(pageSource).toContain('isEmployeeView ? "xl:h-[calc(100dvh-78px)]" : "xl:h-[calc(100dvh-76px)]"')
     expect(pageSource).toContain('isManagerView ? "xl:h-[calc(111.112dvh-27.5556px)]"')
-    expect(pageSource).toContain('isEmployeeView ? "xl:grid-cols-[minmax(0,1fr)_280px] " : "xl:grid-cols-[minmax(0,1fr)_320px] "')
+    expect(pageSource).toContain('isEmployeeView ? "xl:grid-cols-[minmax(0,1fr)_256px] " : "xl:grid-cols-[minmax(0,1fr)_320px] "')
     expect(pageSource).not.toContain("zoom:0.9")
   })
 

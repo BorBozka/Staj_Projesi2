@@ -21,6 +21,7 @@ import { MockSecurityService } from "@/services/mock-security-service"
 import { MockSessionService } from "@/services/mock-session-service"
 import { MockTransportAssignmentService } from "@/services/mock-transport-assignment-service"
 import { MockVisitService } from "@/services/mock-visit-service"
+import { toDemoVisitCurrentEmployee } from "@/services/mock-visit-data"
 import { MockVisitTypeStore } from "@/services/mock-visit-type-store"
 import { MockVisitorCardStore } from "@/services/mock-visitor-card-store"
 import { MockVisitorRuleStore } from "@/services/mock-visitor-rule-store"
@@ -68,7 +69,17 @@ function createDemoServices(): RuntimeServices {
   const visitTypeStore = new MockVisitTypeStore()
   const visitorCardStore = new MockVisitorCardStore()
   const visitorRuleStore = new MockVisitorRuleStore()
-  const visitService = new MockVisitService(undefined, organizationStore, visitTypeStore)
+  // Session is created first so Visit reference data reflects the signed-in demo user, matching
+  // how the API path resolves identity server-side.
+  const authenticationStore = new MockAuthenticationStore()
+  const accountService = new MockAccountService(authenticationStore)
+  const sessionService = new MockSessionService(authenticationStore)
+  const visitService = new MockVisitService(
+    undefined,
+    organizationStore,
+    visitTypeStore,
+    () => toDemoVisitCurrentEmployee(sessionService.peekSession()),
+  )
   const resourceCatalogService = new MockResourceCatalogService(organizationStore)
   const resourceAssignmentService = new MockResourceAssignmentService(
     visitService,
@@ -91,10 +102,6 @@ function createDemoServices(): RuntimeServices {
     visitService,
     visitorRuleStore,
   )
-  const authenticationStore = new MockAuthenticationStore()
-  const accountService = new MockAccountService(authenticationStore)
-  const sessionService = new MockSessionService(authenticationStore)
-
   // Break the lifecycle dependency cycle using the same composition as the pre-Phase 5 runtime.
   visitService.setResourceAssignmentService(resourceAssignmentService)
 

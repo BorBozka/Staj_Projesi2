@@ -196,6 +196,9 @@ export interface VisitorInput {
 export interface MeetingInput {
   visitors: VisitorInput[]
   visitTypeId: string
+  // Selected from the employee roster in the form. The server still receives
+  // hostEmployeeName (and canonicalizes it), but the id is what identifies the host.
+  hostEmployeeId?: string
   hostEmployeeName: string
   hostCompanyId: string
   facilityId: string

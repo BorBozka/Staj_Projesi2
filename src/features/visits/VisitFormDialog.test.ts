@@ -6,11 +6,16 @@ const dialogSource = readFileSync(resolve(process.cwd(), "src/features/visits/Vi
 const timelineSource = readFileSync(resolve(process.cwd(), "src/features/visits/VisitTimeline.tsx"), "utf8")
 
 describe("VisitFormDialog invitation action", () => {
-  it("only offers the send button once the visit exists", () => {
-    expect(dialogSource).toContain("{savedMeetingId && (")
+  it("only offers the send button once the visit exists and has pending invitations", () => {
+    expect(dialogSource).toContain("{savedMeetingId && hasPendingInvitation && (")
     // Two competing primary actions before the first save made the correct one ambiguous.
-    const beforeFooter = dialogSource.indexOf("{savedMeetingId && (")
+    const beforeFooter = dialogSource.indexOf("{savedMeetingId && hasPendingInvitation && (")
     expect(dialogSource.indexOf("Daveti Gönder")).toBeLessThan(beforeFooter)
+  })
+
+  it("hides the send invitation button when there are no pending invitations", () => {
+    expect(dialogSource).toContain("{savedMeetingId && hasPendingInvitation && (")
+    expect(dialogSource).not.toContain("{savedMeetingId && (\n")
   })
 
   it("keeps the explanation of why sending is not possible yet", () => {
@@ -86,5 +91,23 @@ describe("VisitTimeline current-time indicator", () => {
 
   it("hides the week marker when the shown week is not the current one", () => {
     expect(timelineSource).toContain("nowOffset={weekContainsToday ? currentTimeOffset(now, timeRange) : null}")
+  })
+})
+
+describe("VisitFormDialog save button", () => {
+  it("labels the save button as Ziyareti Kaydet", () => {
+    expect(dialogSource).toContain('"Ziyareti Kaydet"')
+  })
+
+  it("keeps the save button disabled until all required fields are valid", () => {
+    expect(dialogSource).toContain("!form.formState.isValid")
+  })
+})
+
+describe("VisitTimeline status indicators info panel", () => {
+  it("places the status indicators in a dropdown info panel next to the navigation controls", () => {
+    expect(timelineSource).toContain('aria-label="Durum göstergeleri"')
+    expect(timelineSource).toContain("<Info")
+    expect(timelineSource).not.toContain("border-t bg-slate-50/70 px-3 py-1.5")
   })
 })

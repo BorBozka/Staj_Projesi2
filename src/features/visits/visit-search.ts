@@ -1,12 +1,5 @@
 import type { Visit } from "@/domain/visits"
-
-/**
- * Turkish-aware lowercase. Plain `toLowerCase()` maps "I" to "i" instead of "ı",
- * so searching "ISTANBUL" would miss "İstanbul" and vice versa.
- */
-function fold(value: string) {
-  return value.toLocaleLowerCase("tr-TR")
-}
+import { foldTr as fold } from "@/lib/turkish"
 
 /** Fields a visit can be found by. Kept narrow on purpose: notes are excluded so
  * a free-text note cannot flood results with weak matches. */

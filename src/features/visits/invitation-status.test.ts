@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import type { Visit, VisitStatus } from "@/domain/visits"
-import { getActionRequiredInvitationVisits, getPendingInvitationVisits } from "@/features/visits/invitation-status"
+import { formatInvitationSentAt, getActionRequiredInvitationVisits, getPendingInvitationVisits } from "@/features/visits/invitation-status"
 
 function makeVisit(id: string, status: VisitStatus, overrides: Partial<Visit> = {}): Visit {
   return {
@@ -41,5 +41,11 @@ describe("getActionRequiredInvitationVisits", () => {
     const noEmail = makeVisit("no-email", "PLANNED", { creatorEmployeeId: "creator-1", visitor: { id: "v1", firstName: "A", lastName: "B", email: undefined, company: "C" } })
     const withEmail = makeVisit("with-email", "PLANNED", { creatorEmployeeId: "creator-1" })
     expect(getActionRequiredInvitationVisits([noEmail, withEmail], "creator-1").map((visit) => visit.id)).toEqual(["with-email"])
+  })
+})
+
+describe("formatInvitationSentAt", () => {
+  it("uses the long Turkish month format the details dialog shows dates in", () => {
+    expect(formatInvitationSentAt(new Date(2026, 8, 1, 9, 15).toISOString())).toBe("1 Eylül 2026 · 09:15")
   })
 })

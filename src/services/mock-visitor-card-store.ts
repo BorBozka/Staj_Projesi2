@@ -17,6 +17,7 @@ export const defaultVisitorCards: VisitorCardInventoryItem[] = [
   { id: "card-13", cardNumber: "013", status: "IN_USE", assignedVisitId: "v-security-inside-5", assignedVisitorName: "İrem Yazgan" },
   { id: "card-14", cardNumber: "014", status: "IN_USE", assignedVisitId: "v-security-inside-6", assignedVisitorName: "Kaan Balcı" },
   { id: "card-15", cardNumber: "015", status: "IN_USE", assignedVisitId: "v-security-inside-7", assignedVisitorName: "Nalan Kurt" },
+  { id: "card-16", cardNumber: "016", status: "IN_USE", assignedVisitId: "v-maya-overdue", assignedVisitorName: "Gökçe Yalçın" },
 ]
 
 /**

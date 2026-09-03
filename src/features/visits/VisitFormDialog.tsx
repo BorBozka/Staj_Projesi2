@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label"
 import { Select } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { hasVisitorEmail, type InvitationStatus, type Visit } from "@/domain/visits"
+import { HostEmployeeCombobox } from "@/features/visits/HostEmployeeCombobox"
 import { getInvitationActionLabel } from "@/features/visits/invitation-status"
 import { useVisits } from "@/features/visits/visit-context"
 import { toMeetingInput, visitFormSchema, type VisitFormValues } from "@/features/visits/visit-form-schema"
@@ -62,6 +63,7 @@ function defaultsFor(visits: Visit[] = []): VisitFormValues {
         }))
       : [blankVisitor()],
     visitTypeId: visit?.visitTypeId ?? "",
+    hostEmployeeId: visit?.hostEmployeeId ?? "",
     hostEmployeeName: visit?.hostEmployeeName ?? "",
     hostCompanyId: visit?.hostCompanyId ?? "",
     facilityId: visit?.facilityId ?? "",
@@ -122,8 +124,18 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
   const form = useForm<VisitFormValues>({ resolver: zodResolver(visitFormSchema), defaultValues: defaultsFor(initialVisits), mode: "onChange" })
   const visitorFields = useFieldArray({ control: form.control, name: "visitors" })
   const companyId = form.watch("hostCompanyId")
+  const facilityId = form.watch("facilityId")
+  const hostEmployeeId = form.watch("hostEmployeeId")
   const hasAdditionalRequirements = form.watch("hasAdditionalRequirements")
   const note = form.watch("note")
+  const hostEmployeeField = form.register("hostEmployeeId")
+
+  // The scoped roster changes with company/facility, so a previously picked host
+  // no longer belongs once either changes.
+  const clearHostEmployee = () => {
+    form.setValue("hostEmployeeId", "", { shouldDirty: true, shouldValidate: true })
+    form.setValue("hostEmployeeName", "", { shouldDirty: true, shouldValidate: true })
+  }
   const invitationHelpId = useId()
   const noteTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const formContentRef = useRef<HTMLDivElement | null>(null)
@@ -351,6 +363,7 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
                     {...form.register("hostCompanyId", {
                       onChange: () => {
                         form.setValue("facilityId", "", { shouldDirty: true, shouldValidate: true })
+                        clearHostEmployee()
                         scrollToNextFields()
                       },
                     })}
@@ -360,13 +373,27 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
                   </Select>
                 </FormField>
                 <FormField label="Tesis" required error={fieldError("facilityId")}>
-                  <Select {...form.register("facilityId")} disabled={!companyId}>
+                  <Select {...form.register("facilityId", { onChange: clearHostEmployee })} disabled={!companyId}>
                     <option value="" disabled hidden>Tesis seçin</option>
                     {facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}
                   </Select>
                 </FormField>
-                <FormField label="İlgili Personel" required error={fieldError("hostEmployeeName")}>
-                  <Input placeholder="Ad Soyad" {...form.register("hostEmployeeName")} />
+                <FormField label="İlgili Personel" required error={fieldError("hostEmployeeId")}>
+                  <HostEmployeeCombobox
+                    ref={hostEmployeeField.ref}
+                    name={hostEmployeeField.name}
+                    employees={referenceData?.employees ?? []}
+                    companyId={companyId}
+                    facilityId={facilityId}
+                    value={hostEmployeeId}
+                    selectedName={visit?.hostEmployeeName}
+                    disabled={!companyId || !facilityId}
+                    invalid={showValidationErrors && Boolean(form.getFieldState("hostEmployeeId").error)}
+                    onChange={(employeeId, employeeName) => {
+                      form.setValue("hostEmployeeId", employeeId, { shouldDirty: true, shouldValidate: true })
+                      form.setValue("hostEmployeeName", employeeName, { shouldDirty: true, shouldValidate: true })
+                    }}
+                  />
                 </FormField>
                 <FormField label="Tarih" required error={fieldError("visitDate")}>
                   <Input type="date" {...form.register("visitDate")} />
@@ -430,20 +457,25 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
             </section>
 
             {savedVisits.length > 0 && savedMeetingId && (
-              <ul className="grid gap-1.5 border-y border-slate-200 py-2.5 text-xs" aria-label="Ziyaretçi davet durumları">
-                {savedVisits.map((item) => (
-                  <li key={item.id} className="flex items-center justify-between gap-3">
-                    <span className="truncate font-medium text-slate-700">{item.visitor.firstName} {item.visitor.lastName}</span>
-                    {hasVisitorEmail(item.visitor)
-                      ? (
-                        <span className={item.invitationStatus === "FAILED" ? "font-semibold text-red-700" : item.invitationStatus === "SENT" ? "font-semibold text-emerald-700" : "font-medium text-amber-700"}>
-                          {invitationStatusLabels[item.invitationStatus]}
-                        </span>
-                      )
-                      : <span className="font-medium text-slate-500">E-posta yok</span>}
-                  </li>
-                ))}
-              </ul>
+              <section className="space-y-2.5" aria-labelledby="invitation-status-heading">
+                <div className="flex items-baseline gap-2 border-b border-slate-200/70 pb-1.5">
+                  <h3 id="invitation-status-heading" className="text-sm font-semibold text-slate-900">Davet Durumu</h3>
+                </div>
+                <ul className="grid gap-1.5 border-b border-slate-200 pb-2.5 text-xs" aria-label="Ziyaretçi davet durumları">
+                  {savedVisits.map((item) => (
+                    <li key={item.id} className="flex items-center justify-between gap-3">
+                      <span className="truncate font-medium text-slate-700">{item.visitor.firstName} {item.visitor.lastName}</span>
+                      {hasVisitorEmail(item.visitor)
+                        ? (
+                          <span className={item.invitationStatus === "FAILED" ? "font-semibold text-red-700" : item.invitationStatus === "SENT" ? "font-semibold text-emerald-700" : "font-medium text-amber-700"}>
+                            {invitationStatusLabels[item.invitationStatus]}
+                          </span>
+                        )
+                        : <span className="font-medium text-slate-500">E-posta yok</span>}
+                    </li>
+                  ))}
+                </ul>
+              </section>
             )}
 
             {submitError && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700" role="alert">{submitError}</p>}
@@ -463,12 +495,16 @@ export function VisitFormDialog({ open, onOpenChange, visit, invitationScope = "
               </Button>
               <Button
                 type="submit"
-                variant={!savedMeetingId || form.formState.isDirty ? "default" : "outline"}
-                disabled={form.formState.isSubmitting || isSendingInvitation || (Boolean(savedMeetingId) && !form.formState.isDirty)}
+                disabled={
+                  form.formState.isSubmitting ||
+                  isSendingInvitation ||
+                  !form.formState.isValid ||
+                  (Boolean(savedMeetingId) && !form.formState.isDirty)
+                }
               >
-                {form.formState.isSubmitting ? "Kaydediliyor…" : savedMeetingId && form.formState.isDirty ? "Değişiklikleri Kaydet" : savedMeetingId ? "Kaydedildi" : "Ziyareti Kaydet"}
+                {form.formState.isSubmitting ? "Kaydediliyor…" : "Ziyareti Kaydet"}
               </Button>
-              {savedMeetingId && (
+              {savedMeetingId && hasPendingInvitation && (
                 <Button
                   type="button"
                   className="col-span-2 sm:col-span-1"

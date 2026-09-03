@@ -1,10 +1,11 @@
 import { CalendarClock, Pencil, XCircle } from "lucide-react"
-import type { ReactNode } from "react"
+import { useState, type ReactNode } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogFooter, DialogHeader, DialogTitle, InternalDialogContent } from "@/components/ui/dialog"
 import type { InvitationStatus, Visit } from "@/domain/visits"
 import { VisitStatusBadge } from "@/features/visits/VisitStatusBadge"
+import { formatInvitationSentAt } from "@/features/visits/invitation-status"
 import { getVisibleAdditionalRequirementNote, type VisitViewerRole } from "@/features/visits/visit-visibility"
 import { formatTr } from "@/lib/date"
 import { cn } from "@/lib/utils"
@@ -32,12 +33,14 @@ interface Props {
   onCancel(visit: Visit): void
   readOnly?: boolean
   viewerRole?: VisitViewerRole
+  showHostEmployee?: boolean
 }
 
-export function VisitDetailsDialog({ visit, open, onOpenChange, onEdit, onReschedule, onCancel, readOnly = false, viewerRole = "SECURITY" }: Props) {
+export function VisitDetailsDialog({ visit, open, onOpenChange, onEdit, onReschedule, onCancel, readOnly = false, viewerRole = "SECURITY", showHostEmployee = true }: Props) {
   if (!visit) return null
   const additionalRequirementNote = getVisibleAdditionalRequirementNote(visit, viewerRole)
-  const plannedSummary = `${formatTr(new Date(visit.plannedStart), "d MMM yyyy")} · ${formatTr(new Date(visit.plannedStart), "HH:mm")}–${formatTr(new Date(visit.plannedEnd), "HH:mm")}`
+  const plannedDateLine = formatTr(new Date(visit.plannedStart), "d MMMM yyyy")
+  const plannedTimeLine = `Başlangıç ${formatTr(new Date(visit.plannedStart), "HH:mm")} · Çıkış ${formatTr(new Date(visit.plannedEnd), "HH:mm")}`
 
   const openAction = (action: (selectedVisit: Visit) => void) => {
     onOpenChange(false)
@@ -52,21 +55,31 @@ export function VisitDetailsDialog({ visit, open, onOpenChange, onEdit, onResche
             <DialogTitle className="min-w-0 truncate text-lg font-semibold text-slate-900">{visit.visitor.firstName} {visit.visitor.lastName}</DialogTitle>
             <VisitStatusBadge status={visit.status} />
           </div>
-          <p className="mt-1 text-xs text-slate-600">{visit.visitTypeName} · {plannedSummary}</p>
         </DialogHeader>
 
         <div className="px-5 py-4">
           <div className="grid gap-0 min-[560px]:grid-cols-2 min-[560px]:divide-x min-[560px]:divide-slate-200">
             <DetailSection title="Ziyaretçi">
-              <Field label="E-posta" value={visit.visitor.email ?? <span className="font-normal text-slate-500">E-posta yok</span>} valueClassName="sm:whitespace-nowrap" />
+              <Field label="E-posta" truncateValue={false} value={visit.visitor.email ? <VisitorEmail email={visit.visitor.email} /> : <span className="font-normal text-slate-500">E-posta yok</span>} />
               <Field label="Ziyaretçi Şirketi" value={visit.visitor.company} />
+              <Field label="Ziyaret Türü" value={visit.visitTypeName} />
               {visit.visitor.phone && <Field label="Telefon" value={visit.visitor.phone} />}
               <Field label="Davet" labelClassName="whitespace-nowrap" value={<InvitationStatus visit={{ ...visit, invitationSentAt: visit.invitationStatus === "SENT" ? visit.invitationSentAt : undefined, invitationError: visit.invitationStatus === "FAILED" ? visit.invitationError : undefined }} />} />
             </DetailSection>
             <DetailSection title="Ziyaret" className="mt-5 border-t border-slate-100 pt-5 min-[560px]:mt-0 min-[560px]:border-t-0 min-[560px]:pl-5 min-[560px]:pt-0">
-              <Field label="İlgili personel" value={visit.hostEmployeeName} />
+              {showHostEmployee && <Field label="İlgili personel" value={visit.hostEmployeeName} />}
               <Field label="Şirket" value={visit.hostCompanyName} />
               <Field label="Tesis" value={visit.facilityName} />
+              <Field
+                label="Planlanan"
+                truncateValue={false}
+                value={
+                  <div className="space-y-1">
+                    <span className="block truncate" title={plannedDateLine}>{plannedDateLine}</span>
+                    <span className="block text-xs font-normal text-slate-500">{plannedTimeLine}</span>
+                  </div>
+                }
+              />
               {visit.actualCheckIn && <Field label="Gerçek giriş" value={formatTr(new Date(visit.actualCheckIn), "d MMM yyyy · HH:mm")} />}
               {visit.actualCheckOut && <Field label="Gerçek çıkış" value={formatTr(new Date(visit.actualCheckOut), "d MMM yyyy · HH:mm")} />}
             </DetailSection>
@@ -96,12 +109,19 @@ function DetailSection({ title, children, className }: { title: string; children
   return <section aria-label={title} className={className}><h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">{title}</h3><dl className="space-y-2.5">{children}</dl></section>
 }
 
-function Field({ label, value, labelClassName, valueClassName }: { label: string; value: ReactNode; labelClassName?: string; valueClassName?: string }) {
-  return <div className="grid grid-cols-[82px_minmax(0,1fr)] gap-2 text-[13px]"><dt className={cn("text-slate-500", labelClassName)}>{label}</dt><dd className={cn("min-w-0 break-words font-medium text-slate-900", valueClassName)}>{value}</dd></div>
+function Field({ label, value, labelClassName, valueClassName, truncateValue = true }: { label: string; value: ReactNode; labelClassName?: string; valueClassName?: string; truncateValue?: boolean }) {
+  const valueTitle = typeof value === "string" ? value : undefined
+  return <div className="grid grid-cols-[112px_minmax(0,1fr)] gap-2 text-[13px]"><dt className={cn("whitespace-nowrap text-slate-500", labelClassName)}>{label}</dt><dd className={cn("min-w-0 font-medium text-slate-900", truncateValue && "truncate", valueClassName)} title={valueTitle}>{value}</dd></div>
+}
+
+function VisitorEmail({ email }: { email: string }) {
+  const [revealed, setRevealed] = useState(false)
+  if (revealed) return <span className="block break-all">{email}</span>
+  return <button type="button" onClick={() => setRevealed(true)} title={email} className="block max-w-full truncate text-left font-medium text-slate-900 hover:underline">{email}</button>
 }
 
 function InvitationStatus({ visit }: { visit: Visit }) {
-  return <div className="space-y-1.5"><span className={cn("inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold", invitationSurfaces[visit.invitationStatus])}>{invitationLabels[visit.invitationStatus]}</span>{visit.invitationSentAt && <p className="text-xs font-normal text-slate-600">Gönderim: {formatTr(new Date(visit.invitationSentAt), "d MMM yyyy · HH:mm")}</p>}{visit.invitationError && <p className="min-w-0 break-words text-xs font-normal leading-5 text-red-700">{visit.invitationError}</p>}</div>
+  return <div className="space-y-1.5"><span className="flex flex-wrap items-center gap-x-2 gap-y-1"><span className={cn("inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold", invitationSurfaces[visit.invitationStatus])}>{invitationLabels[visit.invitationStatus]}</span>{visit.invitationSentAt && <span className="text-xs font-normal text-slate-500">{formatInvitationSentAt(visit.invitationSentAt)}</span>}</span>{visit.invitationError && <p className="min-w-0 break-words text-xs font-normal leading-5 text-red-700">{visit.invitationError}</p>}</div>
 }
 
 function NoteSection({ title, value }: { title: string; value: string }) {

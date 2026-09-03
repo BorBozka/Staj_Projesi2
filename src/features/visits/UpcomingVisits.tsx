@@ -1,11 +1,11 @@
-import { CalendarDays, MapPin, Search, X } from "lucide-react"
+import { Clock3, MapPin, Search, X } from "lucide-react"
 import { useEffect, useState } from "react"
 
 import type { Visit } from "@/domain/visits"
-import { VisitStatusBadge } from "@/features/visits/VisitStatusBadge"
-import { getUpcomingVisits } from "@/features/visits/upcoming-visits"
+import { formatUpcomingVisitTypeLine, getNonCancelledUpcomingVisits, getUpcomingVisitDayGroups, getUpcomingVisitRelativeTime, getUpcomingVisits } from "@/features/visits/upcoming-visits"
 import { searchVisits } from "@/features/visits/visit-search"
 import { formatTr } from "@/lib/date"
+import { shouldShowDifferentFacility } from "@/lib/facility-visibility"
 
 interface Props {
   visits: Visit[]
@@ -25,17 +25,18 @@ export function UpcomingVisits({ visits, onView, currentFacilityId, searchable =
   }, [])
 
   const isSearching = searchable && query.trim().length > 0
-  const listed = isSearching ? searchVisits(visits, query, now) : getUpcomingVisits(visits, now)
+  const visibleVisits = getNonCancelledUpcomingVisits(visits)
+  const listed = isSearching ? searchVisits(visibleVisits, query, now) : getUpcomingVisits(visibleVisits, now)
+  const dayGroups = getUpcomingVisitDayGroups(listed, now)
 
   return (
     <section className="flex h-full flex-col overflow-hidden rounded-lg border bg-card shadow-panel xl:min-h-0" aria-labelledby="upcoming-title">
-      <div className="shrink-0 flex items-center justify-between border-b px-3 py-2.5">
-        <h2 id="upcoming-title" className="text-sm font-semibold">{isSearching ? "Arama Sonuçları" : "Yaklaşan Ziyaretler"}</h2>
-        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{listed.length}</span>
-      </div>
-
-      {searchable && (
-        <div className="shrink-0 border-b px-3 py-2">
+      <div className="shrink-0 space-y-2 border-b px-3 py-2.5">
+        <div className="flex items-center justify-between">
+          <h2 id="upcoming-title" className="text-sm font-semibold">{isSearching ? "Arama Sonuçları" : "Yaklaşan Ziyaretler"}</h2>
+          <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{listed.length}</span>
+        </div>
+        {searchable && (
           <div className="relative">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" aria-hidden="true" />
             <input
@@ -57,39 +58,46 @@ export function UpcomingVisits({ visits, onView, currentFacilityId, searchable =
               </button>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {listed.length === 0 ? (
         <p className="px-4 py-8 text-center text-[13px] text-muted-foreground">
           {isSearching ? `"${query.trim()}" için ziyaret bulunamadı.` : "Yaklaşan ziyaret bulunmuyor."}
         </p>
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
-          {listed.map((visit) => (
-            <button
-              key={visit.id}
-              type="button"
-              onClick={() => onView(visit)}
-              className="group block w-full border-b border-slate-200 px-3 py-2.5 text-left transition-colors hover:bg-blue-50 hover:shadow-[inset_3px_0_0_hsl(var(--primary))] focus-visible:relative focus-visible:z-10 focus-visible:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
-              aria-label={`${visit.visitor.firstName} ${visit.visitor.lastName} ziyaret detaylarını aç`}
-            >
-              <div className="flex items-start gap-3">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="truncate text-[13px] font-semibold transition-colors group-hover:text-primary group-focus-visible:text-primary">{visit.visitor.firstName} {visit.visitor.lastName}</span>
-                    <VisitStatusBadge status={visit.status} compact />
-                  </div>
-                  <p className="mt-1 truncate text-xs text-muted-foreground">{visit.visitTypeName}</p>
-                </div>
-              </div>
-              <div className="mt-1.5 space-y-1 text-xs leading-[18px] text-slate-600">
-                <div className="flex items-start gap-1.5"><CalendarDays className="mt-0.5 size-3.5 shrink-0 text-slate-400" /><span>{formatTr(new Date(visit.plannedStart), "d MMMM EEEE · HH:mm")}–{formatTr(new Date(visit.plannedEnd), "HH:mm")}</span></div>
-                {currentFacilityId && visit.facilityId !== currentFacilityId && (
-                  <div className="flex min-w-0 items-start gap-1.5 text-slate-700"><MapPin className="mt-0.5 size-3.5 shrink-0 text-primary" /><span><span className="font-medium">Farklı tesis:</span> {visit.facilityName}</span></div>
-                )}
-              </div>
-            </button>
+        <div className="relative isolate min-h-0 flex-1 overflow-y-auto scrollbar-thin">
+          {dayGroups.map((group) => (
+            <section key={group.visits[0].id} aria-label={group.label}>
+              <h3 className="sticky top-0 z-20 bg-slate-100 px-3 py-1.5 text-[10px] font-semibold text-slate-500">{group.label}</h3>
+              {group.visits.map((visit) => {
+                const timeRange = `${formatTr(new Date(visit.plannedStart), "HH:mm")}–${formatTr(new Date(visit.plannedEnd), "HH:mm")}`
+                const relativeTime = getUpcomingVisitRelativeTime(visit.plannedStart, now)
+                const scheduleLabel = relativeTime ? `${relativeTime} · ${timeRange}` : timeRange
+                const typeLine = formatUpcomingVisitTypeLine(visit.visitTypeName, visit.visitor.company)
+
+                return (
+                  <button
+                    key={visit.id}
+                    type="button"
+                    onClick={() => onView(visit)}
+                    className="group block w-full border-b border-slate-200 px-3 py-2.5 text-left transition-colors hover:bg-blue-50 hover:shadow-[inset_3px_0_0_hsl(var(--primary))] focus-visible:relative focus-visible:z-10 focus-visible:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+                    aria-label={`${visit.visitor.firstName} ${visit.visitor.lastName} ziyaret detaylarını aç`}
+                  >
+                    <div className="min-w-0">
+                      <span className="block min-w-0 truncate text-[13px] font-semibold transition-colors group-hover:text-primary group-focus-visible:text-primary" title={`${visit.visitor.firstName} ${visit.visitor.lastName}`}>{visit.visitor.firstName} {visit.visitor.lastName}</span>
+                      <p className="mt-0.5 min-w-0 truncate text-xs text-slate-400" title={typeLine}>{typeLine}</p>
+                    </div>
+                      <div className="mt-1.5 space-y-1 text-xs leading-[18px] text-slate-600">
+                      <div className="flex min-w-0 items-start gap-1.5"><Clock3 className="mt-0.5 size-3.5 shrink-0 text-slate-400" /><span className="min-w-0 truncate" title={scheduleLabel}>{scheduleLabel}</span></div>
+                      {shouldShowDifferentFacility(visit.facilityId, currentFacilityId) && (
+                        <div className="flex min-w-0 items-start gap-1.5 text-slate-700"><MapPin className="mt-0.5 size-3.5 shrink-0 text-slate-400" /><span className="min-w-0 truncate" title={visit.facilityName}><span className="font-medium">Farklı tesis:</span> {visit.facilityName}</span></div>
+                      )}
+                    </div>
+                  </button>
+                )
+              })}
+            </section>
           ))}
         </div>
       )}

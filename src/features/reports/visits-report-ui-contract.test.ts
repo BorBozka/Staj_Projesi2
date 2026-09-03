@@ -96,7 +96,7 @@ describe("Visits report UI contracts", () => {
   })
 
   it("keeps a separator beneath every upcoming visit row, including the last one", () => {
-    expect(upcomingSource).toContain('className="min-h-0 flex-1 overflow-y-auto scrollbar-thin"')
+    expect(upcomingSource).toContain('className="relative isolate min-h-0 flex-1 overflow-y-auto scrollbar-thin"')
     expect(upcomingSource).toContain('className="group block w-full border-b border-slate-200')
   })
 

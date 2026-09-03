@@ -46,7 +46,7 @@ export function CancelVisitDialog({ visit, open, onOpenChange, onSaved }: Props)
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{showScopeSelection ? "İptal kapsamını seçin" : "Planlanan ziyaret iptal edilsin mi?"}</DialogTitle>
+          <DialogTitle>{showScopeSelection ? "İptal kapsamını seçin" : "Ziyaret iptal edilsin mi?"}</DialogTitle>
           <DialogDescription>
             {visit
               ? showScopeSelection
@@ -55,20 +55,20 @@ export function CancelVisitDialog({ visit, open, onOpenChange, onSaved }: Props)
               : "Bu ziyaret iptal edilecek."}
           </DialogDescription>
         </DialogHeader>
-        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-800">
-          Kayıt silinmeyecek; ziyaret geçmişinizde iptal edilmiş durumuyla kalacaktır.
+        <div className="rounded-md border bg-slate-50 px-3 py-2.5 text-xs leading-5 text-slate-600">
+          Kayıt silinmez; ziyaret geçmişinizde iptal edilmiş olarak kalır.
           {protectedMeetingVisits.length > 0 && ` İçeride veya çıkış yapmış ${protectedMeetingVisits.length} ziyaret kaydı toplu iptalden etkilenmez.`}
         </div>
         {error && <p className="text-xs text-destructive">{error}</p>}
-        <DialogFooter className="sm:flex-col sm:items-stretch">
-          <Button variant="outline" className="w-full" onClick={() => onOpenChange(false)}>Vazgeç</Button>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Vazgeç</Button>
           {showScopeSelection && (
-            <Button variant="outline" className="w-full border-red-200 text-destructive hover:bg-red-50 hover:text-destructive" onClick={() => void cancel("VISIT")} disabled={isSubmitting}>
+            <Button type="button" variant="outline" className="border-red-200 text-destructive hover:bg-red-50 hover:text-destructive" onClick={() => void cancel("VISIT")} disabled={isSubmitting}>
               {visitorName} · 1 Ziyareti İptal Et
             </Button>
           )}
-          <Button className="w-full" variant="destructive" onClick={() => void cancel(showScopeSelection ? "MEETING" : "VISIT")} disabled={isSubmitting}>
-            {isSubmitting ? "İptal ediliyor…" : showScopeSelection ? `${cancellableMeetingVisits.length} Ziyareti Birlikte İptal Et` : `${visitorName} Ziyaretini İptal Et`}
+          <Button type="button" variant="destructive" onClick={() => void cancel(showScopeSelection ? "MEETING" : "VISIT")} disabled={isSubmitting}>
+            {isSubmitting ? "İptal ediliyor…" : showScopeSelection ? `${cancellableMeetingVisits.length} Ziyareti Birlikte İptal Et` : "Ziyareti İptal Et"}
           </Button>
         </DialogFooter>
       </DialogContent>

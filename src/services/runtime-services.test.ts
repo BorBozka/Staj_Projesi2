@@ -93,6 +93,27 @@ describe("runtime service composition", () => {
     await expect(sessionService.getCurrentSession()).resolves.toEqual(loggedIn)
   })
 
+  it("derives Visit reference-data identity from the signed-in demo user", async () => {
+    const values = new Map<string, string>()
+    vi.stubGlobal("window", {
+      sessionStorage: {
+        getItem: (key: string) => values.get(key) ?? null,
+        setItem: (key: string, value: string) => values.set(key, value),
+        removeItem: (key: string) => values.delete(key),
+      },
+    })
+    const { sessionService, visitService } = createRuntimeServices("demo")
+    await sessionService.login("calisan", "calisan")
+
+    const reference = await visitService.getReferenceData()
+    expect(reference.currentEmployee).toEqual({ employeeId: "maya-kara", companyId: "bplas", facilityId: "bplas-merkez", role: "EMPLOYEE" })
+
+    const visits = await visitService.listVisits()
+    const foreignVisit = visits.find((visit) => visit.id === "v-invitation-failed")
+    expect(foreignVisit?.creatorEmployeeId).toBe("eda-karaca")
+    expect(foreignVisit?.creatorEmployeeId).not.toBe(reference.currentEmployee.employeeId)
+  })
+
   it("shares demo data across dependent services", async () => {
     const services = createRuntimeServices("demo")
     const meetings = await services.visitService.listMeetings()

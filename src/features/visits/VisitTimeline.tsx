@@ -11,7 +11,7 @@ import {
   startOfMonth,
   startOfWeek,
 } from "date-fns"
-import { CalendarPlus, ChevronLeft, ChevronRight } from "lucide-react"
+import { CalendarPlus, ChevronLeft, ChevronRight, Info } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 
 import { Button } from "@/components/ui/button"
@@ -82,14 +82,13 @@ export function VisitTimeline({ visits, view, selectedDate, currentFacilityId, o
   return (
     <section className="flex h-full flex-col overflow-hidden rounded-lg border bg-card shadow-panel xl:min-h-0" aria-label="Ziyaret Takvimi">
       <div className="shrink-0 flex flex-col gap-1.5 border-b px-3 py-2 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold">Ziyaret Takvimi</h2>
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-              {visibleVisits.length} ziyaret
-            </span>
-          </div>
-          <p className="mt-0.5 text-[13px] text-muted-foreground">{title}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-sm font-semibold">Ziyaret Takvimi</h2>
+          <span className="text-xs text-muted-foreground">·</span>
+          <span className="text-xs text-muted-foreground">{title}</span>
+          <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+            {visibleVisits.length} ziyaret
+          </span>
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5">
@@ -115,6 +114,23 @@ export function VisitTimeline({ visits, view, selectedDate, currentFacilityId, o
             <Button variant="outline" size="icon-sm" className="rounded-r-none" onClick={() => move(-1)} aria-label={`Önceki ${viewLabels[view].toLocaleLowerCase("tr-TR")}`}><ChevronLeft /></Button>
             <Button variant="outline" size="icon-sm" className="-ml-px rounded-l-none" onClick={() => move(1)} aria-label={`Sonraki ${viewLabels[view].toLocaleLowerCase("tr-TR")}`}><ChevronRight /></Button>
           </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon-sm" aria-label="Durum göstergeleri" title="Durum göstergeleri">
+                <Info className="size-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48 p-2">
+              <p className="px-1.5 py-1 text-[11px] font-semibold tracking-wider text-slate-500 uppercase">Durum Göstergeleri</p>
+              <div className="flex flex-col gap-1.5 p-1">
+                {(["PLANNED", "CHECKED_IN", "CHECKED_OUT", "CANCELLED", "NO_SHOW"] as const).map((status) => (
+                  <div key={status} className="flex items-center">
+                    <VisitStatusBadge status={status} />
+                  </div>
+                ))}
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -132,12 +148,6 @@ export function VisitTimeline({ visits, view, selectedDate, currentFacilityId, o
           onVisitOpen={onVisitOpen}
         />
       )}
-
-      <div className="shrink-0 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 border-t bg-slate-50/70 px-3 py-1.5">
-        {(["PLANNED", "CHECKED_IN", "CHECKED_OUT", "CANCELLED", "NO_SHOW"] as const).map((status) => (
-          <VisitStatusBadge key={status} status={status} compact />
-        ))}
-      </div>
     </section>
   )
 }

@@ -17,6 +17,8 @@ interface FocusedShellProps {
   headerCenter?: ReactNode
   /** Header height in pixels; defaults to the compact shared-shell height. */
   headerHeight?: number
+  /** Optional content-area layout overrides for a role-specific shell. */
+  contentClassName?: string
   children: ReactNode
 }
 
@@ -26,7 +28,7 @@ interface FocusedShellProps {
  * a profile slot plus a scroll-contained main area. Presentation only — role-specific
  * routing and business logic live in the wrapping shell.
  */
-export function FocusedShell({ title, account, headerNavigation, headerCenter, headerHeight = FOCUSED_SHELL_HEADER_HEIGHT, children }: FocusedShellProps) {
+export function FocusedShell({ title, account, headerNavigation, headerCenter, headerHeight = FOCUSED_SHELL_HEADER_HEIGHT, contentClassName, children }: FocusedShellProps) {
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-slate-50">
       <header
@@ -45,7 +47,7 @@ export function FocusedShell({ title, account, headerNavigation, headerCenter, h
       </header>
 
       <main className="min-h-0 flex-1 overflow-hidden">
-        <div className="mx-auto h-full w-full max-w-[1600px] px-3 py-3 md:px-5 lg:px-6">{children}</div>
+        <div className={`mx-auto h-full w-full max-w-[1600px] px-3 py-3 md:px-5 lg:px-6 ${contentClassName ?? ""}`}>{children}</div>
       </main>
     </div>
   )

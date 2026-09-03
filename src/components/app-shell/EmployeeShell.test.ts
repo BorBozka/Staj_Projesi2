@@ -17,6 +17,7 @@ describe("EmployeeShell", () => {
     expect(shellSource).toContain("FocusedShell")
     expect(shellSource).toContain("useAuth")
     expect(shellSource).toContain("toAccountProfile(currentUser)")
+    expect(shellSource).toContain('contentClassName="lg:pr-3"')
   })
 
   it("has no sidebar, drawer or navigation for its single workspace", () => {

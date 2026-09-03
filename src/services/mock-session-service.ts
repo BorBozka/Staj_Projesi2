@@ -51,6 +51,15 @@ export class MockSessionService implements SessionService {
   }
 
   async getCurrentSession() {
+    return this.peekSession()
+  }
+
+  /**
+   * Synchronous read of the persisted browser session. Lets the demo composition resolve the
+   * signed-in identity for other mock services (e.g. Visit reference data) without threading an
+   * async call through their synchronous code paths.
+   */
+  peekSession(): SessionUser | null {
     const serialized = this.storage?.getItem(sessionStorageKey)
     if (!serialized) return null
     try {

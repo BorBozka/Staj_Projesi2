@@ -18,6 +18,9 @@ export const visitFormSchema = z
   .object({
     visitors: z.array(visitorSchema).min(1, "En az bir ziyaretçi ekleyin."),
     visitTypeId: z.string().min(1, "Ziyaret türü zorunludur."),
+    // Only a personnel record picked from the list is accepted; a mistyped name
+    // cannot be saved because the id is what the form actually submits.
+    hostEmployeeId: z.string().min(1, "İlgili personel zorunludur."),
     hostEmployeeName: z.string().trim().min(1, "İlgili personel zorunludur."),
     hostCompanyId: z.string().min(1, "Ziyaret edilecek şirket zorunludur."),
     facilityId: z.string().min(1, "Tesis zorunludur."),
@@ -58,6 +61,7 @@ export function toMeetingInput(values: VisitFormValues) {
       phone: visitor.visitorPhone?.trim() ? normalizeVisitorPhone(visitor.visitorPhone) : undefined,
     })),
     visitTypeId: values.visitTypeId,
+    hostEmployeeId: values.hostEmployeeId,
     hostEmployeeName: values.hostEmployeeName,
     hostCompanyId: values.hostCompanyId,
     facilityId: values.facilityId,

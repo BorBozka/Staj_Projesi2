@@ -4,6 +4,38 @@ import type { InvitationStatus, Meeting, VisitRecord, VisitReferenceData, VisitS
 import { initialMockOrganizationSnapshot } from "@/services/mock-organization-store"
 import { initialMockVisitTypes } from "@/services/mock-visit-type-store"
 import { scenarioAt, scenarioCreatedAt, scenarioMoment } from "@/services/mock-scenario"
+import type { SessionUser } from "@/services/session-service"
+
+type VisitCurrentEmployee = VisitReferenceData["currentEmployee"]
+
+/**
+ * Deterministic identity for unit/component fixtures only. The demo runtime never uses this:
+ * `createDemoServices()` passes a resolver that derives `currentEmployee` from the signed-in
+ * browser session (see {@link toDemoVisitCurrentEmployee}).
+ */
+export const demoFixtureCurrentEmployee: VisitCurrentEmployee = {
+  employeeId: "eda-karaca",
+  companyId: "bplas",
+  facilityId: "bplas-merkez",
+  role: "MANAGER",
+}
+
+/**
+ * Projects a signed-in demo session onto the Visit reference-data `currentEmployee` shape so the
+ * demo path mirrors the API path (where the backend resolves identity from the session). Throws
+ * rather than falling back to a fixed identity when no user is signed in.
+ */
+export function toDemoVisitCurrentEmployee(session: SessionUser | null): VisitCurrentEmployee {
+  if (!session) {
+    throw new Error("Demo ziyaret referans verisi oturum açmış bir kullanıcı gerektirir; sabit bir kimliğe geri düşülmez.")
+  }
+  return {
+    employeeId: session.employeeId ?? "",
+    companyId: session.authorizationScope?.companyIds[0] ?? "",
+    facilityId: session.authorizationScope?.facilityIds[0] ?? "",
+    role: session.role === "EMPLOYEE" ? "EMPLOYEE" : "MANAGER",
+  }
+}
 
 const employeeDefinitions = [
   { id: "eda-karaca", companyId: "bplas", facilityIds: ["bplas-merkez", "bplas-arge", "otomotiv-uretim", "anadolu-lojistik-merkez"], name: "Eda Karaca", departmentId: "department-bplas-yonetim" },
@@ -19,7 +51,11 @@ const employeeDefinitions = [
 export function createMockVisitReferenceData(
   organization: OrganizationSnapshot,
   visitTypes: VisitTypeDefinition[] = initialMockVisitTypes,
+  currentEmployee?: VisitCurrentEmployee,
 ): VisitReferenceData {
+  if (!currentEmployee) {
+    throw new Error('createMockVisitReferenceData: currentEmployee kimliği zorunludur; sabit "eda-karaca" değerine geri düşülmez.')
+  }
   const companies = organization.companies.filter((company) => company.active).map(({ id, name }) => ({ id, name }))
   const facilities = organization.facilities
     .filter((facility) => facility.active && organization.companies.some((company) => company.id === facility.parentId && company.active))
@@ -33,13 +69,13 @@ export function createMockVisitReferenceData(
     facilities,
     employees,
     visitTypes,
-    currentEmployee: { employeeId: "eda-karaca", companyId: "bplas", facilityId: "bplas-merkez", role: "MANAGER" },
+    currentEmployee,
   }
 }
 
 // Legacy tests and pure UI utilities can use the initial projection. Runtime services never
 // read this constant; they request a fresh projection from MockOrganizationStore.
-export const mockVisitReferenceData = createMockVisitReferenceData(initialMockOrganizationSnapshot, initialMockVisitTypes)
+export const mockVisitReferenceData = createMockVisitReferenceData(initialMockOrganizationSnapshot, initialMockVisitTypes, demoFixtureCurrentEmployee)
 
 interface SeedVisit {
   id: string
@@ -152,6 +188,16 @@ const operationalSeeds: SeedVisit[] = [
   { id: "v-unplanned-desk", firstName: "Kuzey", lastName: "Mert", company: "Bora Elektrik Taahhüt", plannedStart: scenarioMoment(-125), plannedEnd: scenarioMoment(-35), actualCheckIn: scenarioMoment(-118), actualCheckOut: scenarioMoment(-42), visitorCardReturned: true, status: "CHECKED_OUT", typeId: "technical-service", employeeId: "emre-yilmaz", companyId: "bplas", facilityId: "bplas-arge", invitationStatus: "NOT_SENT", note: "Güvenlik masasında kaydedilen plansız klima bakım ziyareti." },
   { id: "v-invitation-failed", firstName: "Mina", lastName: "Koşal", company: "Nokta Finans Danışmanlık", dayOffset: 1, startHour: 10, durationMinutes: 60, status: "PLANNED", typeId: "meeting", employeeId: "eda-karaca", companyId: "bplas", facilityId: "bplas-merkez", invitationStatus: "FAILED" },
   { id: "v-lifecycle-active", firstName: "Levent", lastName: "Yaman", company: "Yalın Süreç Akademi", plannedStart: scenarioMoment(-30), plannedEnd: scenarioMoment(75), actualCheckIn: scenarioMoment(-25), visitorCardId: "card-8", visitorCardNumber: "008", status: "CHECKED_IN", typeId: "meeting", employeeId: "eda-karaca", creatorEmployeeId: "maya-kara", companyId: "bplas", facilityId: "bplas-merkez", note: "Operasyon verimliliği çalışma oturumu" },
+  { id: "v-maya-soon", firstName: "Aylin", lastName: "Koca", company: "Kıyı Kalıp Teknolojileri", plannedStart: scenarioMoment(85), plannedEnd: scenarioMoment(155), status: "PLANNED", typeId: "supplier", employeeId: "maya-kara", creatorEmployeeId: "maya-kara", companyId: "bplas", facilityId: "bplas-merkez" },
+  { id: "v-maya-later", firstName: "Berk", lastName: "Savaş", company: "Pusula Endüstri Çözümleri", plannedStart: scenarioMoment(190), plannedEnd: scenarioMoment(280), status: "PLANNED", typeId: "meeting", employeeId: "maya-kara", creatorEmployeeId: "maya-kara", companyId: "bplas", facilityId: "bplas-merkez" },
+  { id: "v-maya-overlap", firstName: "Cansu", lastName: "Erim", company: "Arma Teknik Hizmetler", plannedStart: scenarioMoment(105), plannedEnd: scenarioMoment(195), status: "PLANNED", typeId: "customer", employeeId: "maya-kara", creatorEmployeeId: "maya-kara", companyId: "bplas", facilityId: "bplas-merkez" },
+  { id: "v-maya-aylin-koca-urun-gelistirme-is-ortakligi", firstName: "Dilan", lastName: "Özkan", company: "Meridyen Ürün Geliştirme ve Endüstriyel Tasarım Hizmetleri A.Ş.", dayOffset: 1, startHour: 9, startMinute: 30, durationMinutes: 75, status: "PLANNED", typeId: "audit", employeeId: "maya-kara", creatorEmployeeId: "maya-kara", companyId: "bplas", facilityId: "bplas-merkez" },
+  { id: "v-maya-different-facility", firstName: "Efe", lastName: "Aydemir", company: "Yön Teknik Otomasyon", dayOffset: 2, startHour: 11, durationMinutes: 90, status: "PLANNED", typeId: "technical-service", employeeId: "emre-yilmaz", creatorEmployeeId: "maya-kara", companyId: "bplas", facilityId: "bplas-arge" },
+  { id: "v-maya-cancelled", firstName: "Filiz", lastName: "Tan", company: "Duru Ambalaj Sistemleri", dayOffset: 1, startHour: 14, durationMinutes: 60, status: "CANCELLED", typeId: "training", employeeId: "maya-kara", creatorEmployeeId: "maya-kara", companyId: "bplas", facilityId: "bplas-merkez", note: "Katılımcı programı değiştiği için iptal edildi." },
+  { id: "v-maya-overdue", firstName: "Gökçe", lastName: "Yalçın", company: "Kareks Süreç Danışmanlık", plannedStart: scenarioMoment(-170), plannedEnd: scenarioMoment(-25), actualCheckIn: scenarioMoment(-165), visitorCardId: "card-16", visitorCardNumber: "016", status: "CHECKED_IN", typeId: "meeting", employeeId: "maya-kara", creatorEmployeeId: "maya-kara", companyId: "bplas", facilityId: "bplas-merkez" },
+  { id: "v-maya-invitation-failed", firstName: "Hakan", lastName: "Sönmez", company: "Eksen Proje Mühendislik", dayOffset: 1, startHour: 13, durationMinutes: 60, status: "PLANNED", typeId: "supplier", employeeId: "maya-kara", creatorEmployeeId: "maya-kara", companyId: "bplas", facilityId: "bplas-merkez", invitationStatus: "FAILED" },
+  { id: "v-maya-checked-out", firstName: "İpek", lastName: "Bayar", company: "Mavi Hat Lojistik", plannedStart: scenarioMoment(-220), plannedEnd: scenarioMoment(-130), actualCheckIn: scenarioMoment(-215), actualCheckOut: scenarioMoment(-140), visitorCardReturned: true, status: "CHECKED_OUT", typeId: "customer", employeeId: "maya-kara", creatorEmployeeId: "maya-kara", companyId: "bplas", facilityId: "bplas-merkez", actualMeetingEnd: scenarioMoment(-140), meetingEndSource: "VISITOR_CHECK_OUT" },
+  { id: "v-maya-no-show", firstName: "Jale", lastName: "Ekin", company: "Kuzey Test Laboratuvarı", dayOffset: 0, startHour: 8, durationMinutes: 60, status: "NO_SHOW", typeId: "interview", employeeId: "maya-kara", creatorEmployeeId: "maya-kara", companyId: "bplas", facilityId: "bplas-merkez" },
   { id: "v-security-expected-1", firstName: "Buse", lastName: "Tekin", company: "Marmara Hassas Parça Sanayi", dayOffset: 0, startHour: 8, durationMinutes: 60, status: "PLANNED", typeId: "supplier", employeeId: "maya-kara", companyId: "bplas", facilityId: "bplas-merkez" },
   { id: "v-security-expected-2", firstName: "Cihat", lastName: "Eroğlu", company: "Doruk Endüstri Sistemleri", dayOffset: 0, startHour: 9, startMinute: 15, durationMinutes: 60, status: "PLANNED", typeId: "meeting", employeeId: "emre-yilmaz", companyId: "bplas", facilityId: "bplas-merkez" },
   { id: "v-security-expected-3", firstName: "Elif", lastName: "Köksal", company: "Yakamoz Teknik Tedarik", dayOffset: 0, startHour: 10, startMinute: 30, durationMinutes: 90, status: "PLANNED", typeId: "customer", employeeId: "eda-karaca", companyId: "bplas", facilityId: "bplas-merkez" },

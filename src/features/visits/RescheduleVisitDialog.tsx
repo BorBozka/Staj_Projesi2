@@ -68,7 +68,7 @@ export function RescheduleVisitDialog({ visit, open, onOpenChange, onSaved }: Pr
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Ziyareti Ertele</DialogTitle>
+          <DialogTitle>Ziyareti ertele</DialogTitle>
           <DialogDescription>
             {visit ? `${visit.visitor.firstName} ${visit.visitor.lastName} için yeni tarih ve saati seçin.` : "Yeni ziyaret tarihini ve saatini seçin."}
           </DialogDescription>

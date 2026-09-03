@@ -12,7 +12,7 @@ import type {
 } from "@/domain/visits"
 import { hasVisitorEmail } from "@/domain/visits"
 import { computeExtendedPlannedEnd, getManualMeetingLifecycleBlockReason, isMeetingExplicitlyClosed } from "@/lib/meeting-lifecycle"
-import { createMockVisitReferenceData, initialMockMeetings, initialMockVisitRecords } from "@/services/mock-visit-data"
+import { createMockVisitReferenceData, demoFixtureCurrentEmployee, initialMockMeetings, initialMockVisitRecords } from "@/services/mock-visit-data"
 import { MockOrganizationStore } from "@/services/mock-organization-store"
 import { MockVisitTypeStore } from "@/services/mock-visit-type-store"
 import type { CheckoutVisitInput, VisitService } from "@/services/visit-service"
@@ -28,6 +28,9 @@ export class MockVisitService implements VisitService {
     private readonly shouldFailInvitation: (visit: Visit) => boolean = () => false,
     private readonly organizationStore = new MockOrganizationStore(),
     private readonly visitTypeStore = new MockVisitTypeStore(),
+    // Demo runtime injects a session-derived resolver; unit/component fixtures fall back to the
+    // deterministic identity so `new MockVisitService()` keeps working unchanged.
+    private readonly resolveCurrentEmployee: () => VisitReferenceData["currentEmployee"] = () => demoFixtureCurrentEmployee,
   ) {}
 
   async listMeetings(): Promise<Meeting[]> {
@@ -488,8 +491,12 @@ export class MockVisitService implements VisitService {
     if (!visitType || !company || !facility) throw new Error("Geçersiz ziyaret referans bilgisi.")
     if (!visitType.active && visitType.id !== existing?.visitTypeId) throw new Error("Pasif ziyaret türü seçilemez.")
 
-    const hostName = input.hostEmployeeName.trim()
-    const hostEmployee = reference.employees.find((employee) => employee.name === hostName)
+    // Prefer the selected id (what the form now submits); fall back to an exact
+    // name match for callers/fixtures that still pass only a name.
+    const hostEmployee =
+      (input.hostEmployeeId ? reference.employees.find((employee) => employee.id === input.hostEmployeeId) : undefined)
+      ?? reference.employees.find((employee) => employee.name === input.hostEmployeeName.trim())
+    const hostName = hostEmployee?.name ?? input.hostEmployeeName.trim()
     const now = new Date().toISOString()
     return {
       id,
@@ -545,6 +552,6 @@ export class MockVisitService implements VisitService {
   }
 
   private getReferenceDataSnapshot() {
-    return createMockVisitReferenceData(this.organizationStore.getSnapshot(), this.visitTypeStore.getAll())
+    return createMockVisitReferenceData(this.organizationStore.getSnapshot(), this.visitTypeStore.getAll(), this.resolveCurrentEmployee())
   }
 }

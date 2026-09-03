@@ -1,4 +1,5 @@
 import { hasVisitorEmail, type Visit } from "@/domain/visits"
+import { formatTr } from "@/lib/date"
 
 // A visitor without an email address can never have a pending invitation — there is nothing to
 // send. Every "is this invitation actionable" filter below routes through this one helper so
@@ -31,4 +32,10 @@ export function getInvitationActionLabel(visit: Visit, isSending = false) {
   if (visit.invitationStatus === "FAILED") return "Yeniden gönder"
   if (visit.invitationStatus === "SENT") return "Davet gönderildi"
   return "Daveti gönder"
+}
+
+// The details dialog shows the send time next to the invitation badge, in the same long-month
+// format the rest of that dialog uses for dates.
+export function formatInvitationSentAt(sentAt: string) {
+  return formatTr(new Date(sentAt), "d MMMM yyyy · HH:mm")
 }

@@ -1,6 +1,6 @@
 import { getResourceDisplayName, type FacilityResource, type ResourceInput } from "@/domain/resources"
 import { initialMockResources } from "@/services/mock-resource-data"
-import { createMockVisitReferenceData } from "@/services/mock-visit-data"
+import { createMockVisitReferenceData, demoFixtureCurrentEmployee } from "@/services/mock-visit-data"
 import { MockOrganizationStore } from "@/services/mock-organization-store"
 import type { ResourceCatalogService } from "@/services/resource-catalog-service"
 
@@ -59,7 +59,8 @@ export class MockResourceCatalogService implements ResourceCatalogService {
     createdAt: string,
     updatedAt: string,
   ): FacilityResource {
-    const referenceData = createMockVisitReferenceData(this.organizationStore.getSnapshot())
+    // Only companies/facilities are read here; the identity argument is irrelevant to this call.
+    const referenceData = createMockVisitReferenceData(this.organizationStore.getSnapshot(), undefined, demoFixtureCurrentEmployee)
     const company = referenceData.companies.find((item) => item.id === input.companyId)
     const facility = referenceData.facilities.find(
       (item) => item.id === input.facilityId && item.companyId === input.companyId,

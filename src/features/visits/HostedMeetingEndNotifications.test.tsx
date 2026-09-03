@@ -1,4 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server"
+import { readFileSync } from "node:fs"
 import { describe, expect, it, vi } from "vitest"
 
 import type { Meeting, Visit } from "@/domain/visits"
@@ -35,11 +36,12 @@ describe("HostedMeetingEndNotifications", () => {
   it("renders a narrower panel with an accessible header toggle", () => {
     vi.mocked(useVisits).mockReturnValue({ meetings: [meeting], visits: [visit], referenceData: { currentEmployee: { employeeId: "host-1" } }, reload: vi.fn() } as never)
 
-    const markup = renderToStaticMarkup(<HostedMeetingEndNotifications onInvitationAction={vi.fn()} />)
+    const markup = renderToStaticMarkup(<HostedMeetingEndNotifications onInvitationAction={vi.fn()} isEmployeeView />)
 
-    expect(markup).toContain("w-[min(350px,calc(100vw-2rem))]")
+    expect(markup).toContain("right-3 w-[min(256px,calc(100vw-2rem))]")
+    expect(markup).toContain('max-height:calc(100dvh - 94px)')
     expect(markup).toContain("İşlem gerekenler")
-    expect(markup).toContain("Toplantılar")
+    expect(markup).toContain("Gecikmiş toplantılar")
     expect(markup).toContain('aria-expanded="true"')
     expect(markup).toContain('aria-controls="action-required-content"')
   })
@@ -79,10 +81,11 @@ describe("HostedMeetingEndNotifications", () => {
   })
 
   it("renders compact meeting details and only renders actions for the expanded row", () => {
-    const props = { meeting, meetingVisits: [visit], actorEmployeeId: "host-1", now: new Date("2026-08-13T09:30:00.000Z"), onExpandedChange: vi.fn(), onChanged: vi.fn().mockResolvedValue(undefined) }
+    const props = { meeting, meetingVisits: [visit], actorEmployeeId: "host-1", currentFacilityId: "facility-2", now: new Date("2026-08-13T09:30:00.000Z"), scrollContainerRef: { current: null }, onExpandedChange: vi.fn(), onChanged: vi.fn().mockResolvedValue(undefined) }
     const collapsed = renderToStaticMarkup(<HostedMeetingNotificationRow {...props} isExpanded={false} />)
     const expanded = renderToStaticMarkup(<HostedMeetingNotificationRow {...props} isExpanded />)
 
+    expect(collapsed).toContain("Ali Demir")
     expect(collapsed).toContain("Müşteri toplantısı")
     expect(collapsed).toContain("30 dk geçti")
     expect(collapsed).not.toContain("Ayşe Yılmaz")
@@ -92,8 +95,41 @@ describe("HostedMeetingEndNotifications", () => {
     expect(expanded).toContain("Toplantıyı Bitir")
   })
 
+  it("locks the row information architecture and custom input decisions in source", () => {
+    const notificationSource = readFileSync(new URL("./HostedMeetingEndNotifications.tsx", import.meta.url), "utf8")
+    const actionsSource = readFileSync(new URL("./MeetingLifecycleActions.tsx", import.meta.url), "utf8")
+
+    expect(notificationSource).toContain('hover:bg-muted/50')
+    expect(notificationSource).toContain('rotate-90')
+    expect(notificationSource).toContain('event.stopPropagation()')
+    expect(notificationSource).toContain('overflow-x-hidden overflow-y-auto')
+    expect(notificationSource).toContain('bg-slate-100 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500')
+    expect(notificationSource).toContain('AlertTriangle className="size-4 shrink-0 text-amber-700"')
+    expect(notificationSource).toContain('CalendarDays className="size-3 shrink-0"')
+    expect(notificationSource).not.toContain('MailWarning')
+    expect(notificationSource).not.toContain('CalendarClock')
+    expect(notificationSource).toContain('shouldShowDifferentFacility')
+    expect(notificationSource).toContain('min-w-0 truncate')
+    expect(notificationSource).toContain('title={meeting.facilityName}')
+    expect(notificationSource).toContain('title={visit.facilityName}')
+    expect(notificationSource).toContain('Başlangıç')
+    expect(notificationSource).toContain('Çıkış')
+    expect(notificationSource).not.toContain('Planlanan başlangıç')
+    expect(notificationSource).not.toContain('Planlanan çıkış')
+    expect(notificationSource).toContain('rounded-full bg-slate-100')
+    expect(notificationSource).toContain('style={{ maxHeight: "calc(100dvh - 94px)" }}')
+    expect(notificationSource).not.toContain('424px')
+    expect(notificationSource).toContain('className="mt-1 flex min-w-0 items-center gap-3 overflow-hidden whitespace-nowrap text-[11px] text-slate-600"')
+    expect(notificationSource).toContain('className="mt-2 h-7 px-2 text-[11px]"')
+    expect(notificationSource).toContain('container.scrollTop +=')
+    expect(actionsSource).toContain('min={5}')
+    expect(actionsSource).toContain('step={5}')
+    expect(actionsSource).toContain('disabled={disabled || !isValidCustomExtensionMinutes(value)}')
+    expect(actionsSource).toContain('absolute inset-y-0 right-2')
+  })
+
   it("reports long overdue spans in hours instead of raw minutes", () => {
-    const props = { meeting, meetingVisits: [visit], actorEmployeeId: "host-1", onExpandedChange: vi.fn(), onChanged: vi.fn().mockResolvedValue(undefined), isExpanded: false }
+    const props = { meeting, meetingVisits: [visit], actorEmployeeId: "host-1", currentFacilityId: "facility-2", scrollContainerRef: { current: null }, onExpandedChange: vi.fn(), onChanged: vi.fn().mockResolvedValue(undefined), isExpanded: false }
     // Meeting ends 09:00Z; 277 minutes later is 13:37Z.
     expect(renderToStaticMarkup(<HostedMeetingNotificationRow {...props} now={new Date("2026-08-13T13:37:00.000Z")} />)).toContain("4 sa 37 dk geçti")
     expect(renderToStaticMarkup(<HostedMeetingNotificationRow {...props} now={new Date("2026-08-13T11:00:00.000Z")} />)).toContain("2 sa geçti")

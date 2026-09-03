@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 
 import type { Meeting, MeetingInput, MeetingWithVisits, RescheduleVisitInput, Visit, VisitReferenceData } from "@/domain/visits"
+import { useAuth } from "@/features/auth/auth-context"
 import type { VisitService } from "@/services"
 
 interface VisitContextValue {
@@ -22,6 +23,8 @@ interface VisitContextValue {
 const VisitContext = createContext<VisitContextValue | null>(null)
 
 export function VisitProvider({ service, children }: { service: VisitService; children: React.ReactNode }) {
+  const { currentUser } = useAuth()
+  const currentUserId = currentUser?.id ?? null
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [visits, setVisits] = useState<Visit[]>([])
   const [referenceData, setReferenceData] = useState<VisitReferenceData | null>(null)
@@ -29,6 +32,16 @@ export function VisitProvider({ service, children }: { service: VisitService; ch
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
+    // Identity is resolved per signed-in user (server-side in api mode, session-derived in demo).
+    // Skip while signed out and re-run when the user changes so stale data never leaks across logins.
+    if (!currentUserId) {
+      setMeetings([])
+      setVisits([])
+      setReferenceData(null)
+      setError(null)
+      setIsLoading(false)
+      return
+    }
     setIsLoading(true)
     setError(null)
     try {
@@ -45,7 +58,7 @@ export function VisitProvider({ service, children }: { service: VisitService; ch
     } finally {
       setIsLoading(false)
     }
-  }, [service])
+  }, [service, currentUserId])
 
   useEffect(() => {
     void load()
