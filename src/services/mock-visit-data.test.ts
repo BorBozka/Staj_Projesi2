@@ -8,6 +8,7 @@ import type { SessionUser } from "@/services/session-service"
 import { initialMockOrganizationSnapshot } from "@/services/mock-organization-store"
 import { mockScenarioNow } from "@/services/mock-scenario"
 import { initialMockVisitTypes } from "@/services/mock-visit-type-store"
+import { getIstanbulWallClockMinutes } from "@/lib/date"
 import { createMockVisitReferenceData, initialMockMeetings, initialMockVisitRecords, toDemoVisitCurrentEmployee } from "@/services/mock-visit-data"
 
 const source = readFileSync(resolve(process.cwd(), "src/services/mock-visit-data.ts"), "utf8")
@@ -97,5 +98,14 @@ describe("Maya Kara demo visit seeds", () => {
     expect(minutesUntil("v-maya-later")).toBeGreaterThan(120)
     expect(mayaVisits.some(({ visit, meeting }) => visit.id === "v-maya-different-facility" && meeting.facilityId !== "bplas-merkez")).toBe(true)
     expect(mayaVisits.some(({ visit }) => visit.id === "v-maya-cancelled" && visit.status === "CANCELLED")).toBe(true)
+  })
+
+  it("includes Maya Kara's planned 19:00–20:00 visit for the after-hours timeline range", () => {
+    const afterHours = getMayaCreatedVisits().find(({ visit }) => visit.id === "v-maya-after-hours")
+
+    expect(afterHours?.visit.status).toBe("PLANNED")
+    expect(afterHours?.meeting.hostEmployeeId).toBe("maya-kara")
+    expect(getIstanbulWallClockMinutes(afterHours?.meeting.plannedStart ?? "")).toBe(19 * 60)
+    expect(getIstanbulWallClockMinutes(afterHours?.meeting.plannedEnd ?? "")).toBe(20 * 60)
   })
 })

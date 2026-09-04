@@ -50,9 +50,19 @@ export function getIstanbulHour(value: Date | string): number | null {
   return getIstanbulWallClockTime(value)?.hour ?? null
 }
 
+export function getIstanbulWallClockMinutes(value: Date | string): number | null {
+  const time = getIstanbulWallClockTime(value)
+  return time ? time.hour * 60 + time.minute : null
+}
+
 export function getIsoWallClockMinutes(value: Date | string): number | null {
   const time = getIsoWallClockTime(value)
   return time ? time.hour * 60 + time.minute : null
+}
+
+export function formatIstanbulWallClockTime(value: Date | string): string {
+  const time = getIstanbulWallClockTime(value)
+  return time ? `${String(time.hour).padStart(2, "0")}:${String(time.minute).padStart(2, "0")}` : ""
 }
 
 export function formatIsoWallClockTime(value: Date | string): string {

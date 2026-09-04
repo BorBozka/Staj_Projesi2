@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest"
 
-import { formatMinutesDuration, getIstanbulWallClockTime } from "@/lib/date"
+import { formatIstanbulWallClockTime, formatMinutesDuration, getIstanbulWallClockMinutes, getIstanbulWallClockTime } from "@/lib/date"
 
 describe("getIstanbulWallClockTime", () => {
   it("normalizes UTC and offset ISO timestamps to the same Europe/Istanbul wall clock", () => {
     expect(getIstanbulWallClockTime("2026-08-24T08:30:00.000Z")).toEqual({ hour: 11, minute: 30 })
     expect(getIstanbulWallClockTime("2026-08-24T11:30:00+03:00")).toEqual({ hour: 11, minute: 30 })
+  })
+
+  it("formats planned-visit instants as the same times shown by the month and detail views", () => {
+    expect(formatIstanbulWallClockTime("2026-08-24T04:50:00.000Z")).toBe("07:50")
+    expect(formatIstanbulWallClockTime("2026-08-24T07:20:00.000Z")).toBe("10:20")
+    expect(formatIstanbulWallClockTime("2026-08-24T11:30:00.000Z")).toBe("14:30")
+    expect(formatIstanbulWallClockTime("2026-08-24T13:00:00.000Z")).toBe("16:00")
+    expect(getIstanbulWallClockMinutes("2026-08-24T04:50:00.000Z")).toBe(7 * 60 + 50)
   })
 })
 

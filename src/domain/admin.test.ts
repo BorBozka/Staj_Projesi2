@@ -4,6 +4,7 @@ import {
   isAdminEmailTaken,
   isAdminUsernameTaken,
   isAuthorizationScopeValid,
+  isTimeBoundVisitType,
   isVisitTypeNameTaken,
   canMarkVisitorCardLost,
   canRestoreVisitorCard,
@@ -71,6 +72,27 @@ describe("Visit type uniqueness", () => {
 
   it("does not treat an edited record as its own duplicate", () => {
     expect(isVisitTypeNameTaken(visitTypes, "type-1", "Toplantı")).toBe(false)
+  })
+})
+
+describe("isTimeBoundVisitType", () => {
+  it("identifies time-bound visit types correctly", () => {
+    expect(isTimeBoundVisitType("Toplantı")).toBe(true)
+    expect(isTimeBoundVisitType("İş Görüşmesi")).toBe(true)
+    expect(isTimeBoundVisitType("Eğitim")).toBe(true)
+    expect(isTimeBoundVisitType("Müşteri Ziyareti")).toBe(true)
+    expect(isTimeBoundVisitType("  toplantı  ")).toBe(true)
+    expect(isTimeBoundVisitType("İŞ GÖRÜŞMESİ")).toBe(true)
+  })
+
+  it("identifies non-time-bound types and defaults unknowns to false", () => {
+    expect(isTimeBoundVisitType("Tedarikçi")).toBe(false)
+    expect(isTimeBoundVisitType("Teknik Servis / Bakım")).toBe(false)
+    expect(isTimeBoundVisitType("Denetim")).toBe(false)
+    expect(isTimeBoundVisitType("Bilinmeyen")).toBe(false)
+    expect(isTimeBoundVisitType("")).toBe(false)
+    expect(isTimeBoundVisitType(undefined)).toBe(false)
+    expect(isTimeBoundVisitType(null)).toBe(false)
   })
 })
 

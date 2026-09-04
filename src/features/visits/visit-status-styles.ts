@@ -15,3 +15,21 @@ export const visitStatusAccents: Record<VisitStatus, string> = {
   CANCELLED: "border-l-rose-500",
   NO_SHOW: "border-l-amber-500",
 }
+
+/** Timeline blocks outline a cancelled visit with a dashed border. */
+export const visitStatusBorderStyle: Record<VisitStatus, string> = {
+  PLANNED: "",
+  CHECKED_IN: "",
+  CHECKED_OUT: "",
+  CANCELLED: "border-dashed",
+  NO_SHOW: "",
+}
+
+/** Timeline blocks strike through the label text of a cancelled visit. */
+export const visitStatusTextDecoration: Record<VisitStatus, string> = {
+  PLANNED: "",
+  CHECKED_IN: "",
+  CHECKED_OUT: "",
+  CANCELLED: "line-through",
+  NO_SHOW: "",
+}

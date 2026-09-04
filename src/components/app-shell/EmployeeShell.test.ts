@@ -24,7 +24,20 @@ describe("EmployeeShell", () => {
     expect(shellSource).not.toContain("Sidebar")
     expect(shellSource).not.toContain("MobileNavigation")
     expect(shellSource).not.toContain("navigation=")
-    expect(shellSource).not.toContain("Ziyaretlerim")
+    expect(shellSource).toContain('title="Ziyaretlerim"')
+    expect(shellSource).not.toContain("Ziyaret Yönetimi")
+  })
+
+  it("centers the shared HeaderClock in a header sized to match the Security header", () => {
+    // Reuses the same component the Security operations header renders.
+    expect(shellSource).toContain('import { HeaderClock } from "@/components/app-shell/HeaderClock"')
+    expect(shellSource).toContain("headerCenter={<div className=\"hidden md:block\"><HeaderClock /></div>}")
+    // No bespoke clock implementation.
+    expect(shellSource).not.toContain("setInterval")
+    expect(shellSource).not.toContain("toLocaleTimeString")
+    // 64px header (like Security) so the 38px clock fits; page-height maths track it at 90px
+    // in MyVisitsPage / HostedMeetingEndNotifications (covered by their own suites).
+    expect(shellSource).toContain("headerHeight={64}")
   })
 })
 

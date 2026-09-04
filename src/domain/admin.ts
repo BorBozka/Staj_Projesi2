@@ -105,6 +105,31 @@ export function isVisitTypeNameTaken(visitTypes: VisitTypeDefinition[], excludeI
   return visitTypes.some((visitType) => visitType.id !== excludeId && normalizeVisitTypeName(visitType.name) === normalized)
 }
 
+/**
+ * Canonical Turkish visit type names whose scheduled end time is binding and
+ * for which lifecycle extension/completion actions are meaningful.
+ * Non-time-bound types (e.g. Tedarikçi, Teknik Servis / Bakım, Denetim) conclude when the work is finished.
+ *
+ * Backed by this static canonical list today; in the future this will read the
+ * `timeBound` field from the VisitType data model.
+ * Any unlisted or unknown type defaults to false (non-time-bound) for safety.
+ */
+export const TIME_BOUND_VISIT_TYPE_NAMES = [
+  "Toplantı",
+  "İş Görüşmesi",
+  "Eğitim",
+  "Müşteri Ziyareti",
+] as const
+
+const TIME_BOUND_VISIT_TYPE_NAMES_SET = new Set(
+  TIME_BOUND_VISIT_TYPE_NAMES.map(normalizeVisitTypeName),
+)
+
+export function isTimeBoundVisitType(visitTypeName?: string | null): boolean {
+  if (!visitTypeName) return false
+  return TIME_BOUND_VISIT_TYPE_NAMES_SET.has(normalizeVisitTypeName(visitTypeName))
+}
+
 export const visitorCardStatuses = ["AVAILABLE", "IN_USE", "NOT_RETURNED", "LOST", "DISABLED"] as const
 export type VisitorCardStatus = (typeof visitorCardStatuses)[number]
 

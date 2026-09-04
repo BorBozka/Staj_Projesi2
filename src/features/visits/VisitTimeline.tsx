@@ -12,16 +12,19 @@ import {
   startOfWeek,
 } from "date-fns"
 import { CalendarPlus, ChevronLeft, ChevronRight, Info } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState, type MutableRefObject } from "react"
+import { createPortal } from "react-dom"
 
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import type { Visit } from "@/domain/visits"
-import { VisitStatusBadge } from "@/features/visits/VisitStatusBadge"
-import { getTimelineRange, type TimelineRange } from "@/features/visits/timeline-range"
-import { defaultWeekDensity, resolveWeekDensity, weekRowHeight } from "@/features/visits/week-density"
-import { visitStatusAccents, visitStatusSurfaces } from "@/features/visits/visit-status-styles"
-import { formatIsoWallClockTime, formatTr, getIsoWallClockMinutes } from "@/lib/date"
+import { visitStatusLabels, type Visit } from "@/domain/visits"
+import { getDayVisitContentLineCount, getDayVisitMinimumHeight, getDayVisitPlacement, getTimelineOffset, getTimelineRange, getTimelineVisitEndMinutes, getTimelineVisitStartMinutes, type TimelineRange } from "@/features/visits/timeline-range"
+import { getMonthVisibleVisitCount } from "@/features/visits/month-visit-capacity"
+import { getTimelineTooltipPosition, type TimelineTooltipPosition } from "@/features/visits/timeline-tooltip"
+import { getNonCancelledUpcomingVisits } from "@/features/visits/upcoming-visits"
+import { defaultWeekDensity, layoutWeekLanes, resolveWeekDensity, weekRowHeight } from "@/features/visits/week-density"
+import { visitStatusAccents, visitStatusBorderStyle, visitStatusSurfaces, visitStatusTextDecoration } from "@/features/visits/visit-status-styles"
+import { formatIstanbulWallClockTime, formatTr, getIsoWallClockMinutes } from "@/lib/date"
 import { cn } from "@/lib/utils"
 
 export type TimelineView = "day" | "week" | "month"
@@ -30,7 +33,6 @@ interface Props {
   visits: Visit[]
   view: TimelineView
   selectedDate: Date
-  currentFacilityId?: string
   onViewChange(view: TimelineView): void
   onSelectedDateChange(date: Date): void
   onVisitOpen(visit: Visit): void
@@ -45,7 +47,7 @@ const viewLabels: Record<TimelineView, string> = {
   month: "Ay",
 }
 
-export function VisitTimeline({ visits, view, selectedDate, currentFacilityId, onViewChange, onSelectedDateChange, onVisitOpen, onNewVisit, fitMonthToHeight = false }: Props) {
+export function VisitTimeline({ visits, view, selectedDate, onViewChange, onSelectedDateChange, onVisitOpen, onNewVisit, fitMonthToHeight = false }: Props) {
   const [now, setNow] = useState(() => new Date())
 
   useEffect(() => {
@@ -64,6 +66,7 @@ export function VisitTimeline({ visits, view, selectedDate, currentFacilityId, o
     }
     return isSameMonth(date, selectedDate)
   })
+  const countedVisits = getNonCancelledUpcomingVisits(visibleVisits)
 
   const move = (direction: -1 | 1) => {
     const amount = direction
@@ -87,7 +90,7 @@ export function VisitTimeline({ visits, view, selectedDate, currentFacilityId, o
           <span className="text-xs text-muted-foreground">·</span>
           <span className="text-xs text-muted-foreground">{title}</span>
           <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-            {visibleVisits.length} ziyaret
+            {countedVisits.length} ziyaret
           </span>
         </div>
 
@@ -124,8 +127,19 @@ export function VisitTimeline({ visits, view, selectedDate, currentFacilityId, o
               <p className="px-1.5 py-1 text-[11px] font-semibold tracking-wider text-slate-500 uppercase">Durum Göstergeleri</p>
               <div className="flex flex-col gap-1.5 p-1">
                 {(["PLANNED", "CHECKED_IN", "CHECKED_OUT", "CANCELLED", "NO_SHOW"] as const).map((status) => (
-                  <div key={status} className="flex items-center">
-                    <VisitStatusBadge status={status} />
+                  <div key={status} className="flex items-center gap-2">
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "block w-12 shrink-0 rounded border border-l-[3px] px-1 py-px text-[9px] font-semibold leading-[13px] shadow-sm",
+                        visitStatusSurfaces[status],
+                        visitStatusAccents[status],
+                        visitStatusBorderStyle[status],
+                      )}
+                    >
+                      <span className={cn("block truncate", visitStatusTextDecoration[status])}>Ziyaret</span>
+                    </span>
+                    <span className="text-xs text-slate-600">{visitStatusLabels[status]}</span>
                   </div>
                 ))}
               </div>
@@ -144,7 +158,6 @@ export function VisitTimeline({ visits, view, selectedDate, currentFacilityId, o
           view={view}
           now={now}
           timeRange={getTimelineRange(visibleVisits)}
-          currentFacilityId={currentFacilityId}
           onVisitOpen={onVisitOpen}
         />
       )}
@@ -152,7 +165,7 @@ export function VisitTimeline({ visits, view, selectedDate, currentFacilityId, o
   )
 }
 
-function LaneTimeline({ visits, selectedDate, view, now, timeRange, currentFacilityId, fitToHeight, onVisitOpen }: { visits: Visit[]; selectedDate: Date; view: "day" | "week"; now: Date; timeRange: TimelineRange; currentFacilityId?: string; fitToHeight: boolean; onVisitOpen(visit: Visit): void }) {
+function LaneTimeline({ visits, selectedDate, view, now, timeRange, fitToHeight, onVisitOpen }: { visits: Visit[]; selectedDate: Date; view: "day" | "week"; now: Date; timeRange: TimelineRange; fitToHeight: boolean; onVisitOpen(visit: Visit): void }) {
   const hours = Array.from({ length: (timeRange.endMinutes - timeRange.startMinutes) / 60 + 1 }, (_, index) => timeRange.startMinutes / 60 + index)
   const weekBodyRef = useRef<HTMLDivElement | null>(null)
   const [weekBodyHeight, setWeekBodyHeight] = useState(0)
@@ -170,8 +183,11 @@ function LaneTimeline({ visits, selectedDate, view, now, timeRange, currentFacil
 
     return (
       <div
-        className="grid min-h-[472px] min-w-0 flex-1 grid-cols-[52px_minmax(0,1fr)] border-b xl:min-h-0"
+        className="grid min-h-[472px] min-w-0 flex-1 grid-cols-[34px_52px_minmax(0,1fr)] border-b xl:min-h-0"
       >
+        <div className="relative bg-slate-50/70" aria-hidden="true">
+          {isSameDay(selectedDate, now) && <DayCurrentTimeMarker now={now} timeRange={timeRange} />}
+        </div>
         <div className="relative border-r bg-slate-50/70" aria-hidden="true">
           {hours.map((hour, index) => (
             <span
@@ -184,14 +200,18 @@ function LaneTimeline({ visits, selectedDate, view, now, timeRange, currentFacil
           ))}
         </div>
         <div className="relative overflow-hidden bg-white" aria-label="Günlük ziyaret gündemi">
-          {hours.map((hour, index) => (
-            <div
-              key={hour}
-              className="pointer-events-none absolute inset-x-0 border-t"
-              style={{ top: `${(index / (hours.length - 1)) * 100}%` }}
-              aria-hidden="true"
-            />
-          ))}
+          {hours.map((hour, index) =>
+            // The first/last hour edges are already drawn by the toolbar's and grid's
+            // own borders — rendering them here again produces a doubled 2px rule.
+            index === 0 || index === hours.length - 1 ? null : (
+              <div
+                key={hour}
+                className="pointer-events-none absolute inset-x-0 border-t"
+                style={{ top: `${(index / (hours.length - 1)) * 100}%` }}
+                aria-hidden="true"
+              />
+            ),
+          )}
           {isSameDay(selectedDate, now) && <DayCurrentTimeIndicator now={now} timeRange={timeRange} />}
           {agendaVisits.map(({ visit, column, columnCount }) => (
             <DayVisitCard key={visit.id} visit={visit} column={column} columnCount={columnCount} timeRange={timeRange} onOpen={onVisitOpen} />
@@ -208,21 +228,30 @@ function LaneTimeline({ visits, selectedDate, view, now, timeRange, currentFacil
   })
   const dayBuckets = days.map((day) => ({ day, dayVisits: visits.filter((visit) => isSameDay(new Date(visit.plannedStart), day)) }))
   const weekContainsToday = days.some((day) => isSameDay(day, now))
+  const weekDays = dayBuckets.map((bucket) => {
+    const laneLayout = layoutWeekLanes(bucket.dayVisits.map((visit) => ({
+      id: visit.id,
+      startMinutes: visitStartMinutes(visit),
+      endMinutes: visitEndMinutes(visit),
+      visit,
+    })))
+    return {
+      ...bucket,
+      laneLayout,
+    }
+  })
   const density = fitToHeight
-    ? resolveWeekDensity(dayBuckets.map((bucket) => bucket.dayVisits.length), weekBodyHeight)
+    ? resolveWeekDensity(weekDays.map((day) => day.laneLayout.laneCount), weekBodyHeight)
     : defaultWeekDensity
   const dense = density.labelFloor < 44
-  const weekDays = dayBuckets.map((bucket) => ({
-    ...bucket,
-    minHeight: weekRowHeight(density, bucket.dayVisits.length),
-  }))
+  const laidOutWeekDays = weekDays.map((day) => ({ ...day, minHeight: weekRowHeight(density, day.laneLayout.laneCount) }))
 
   return (
     <div className="flex min-h-[472px] min-w-0 flex-1 flex-col xl:min-h-0">
       <TimeHeader hours={hours} label="Gün" nowOffset={weekContainsToday ? currentTimeOffset(now, timeRange) : null} />
-      <div ref={weekBodyRef} className="scrollbar-thin flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <div ref={weekBodyRef} className={cn("scrollbar-thin flex min-h-0 flex-1 flex-col", fitToHeight ? "overflow-hidden" : "overflow-y-auto")}>
         <div className="flex min-h-full flex-1 flex-col divide-y">
-          {weekDays.map(({ day, dayVisits, minHeight }) => (
+          {laidOutWeekDays.map(({ day, laneLayout, minHeight }) => (
             <div key={day.toISOString()} className="grid flex-1 grid-cols-[112px_minmax(0,1fr)]" style={{ minHeight }}>
               <div className={cn("flex flex-col justify-center border-r px-2.5", isSameDay(day, new Date()) && "bg-blue-50/60", dense ? "py-1" : fitToHeight ? "py-1.5" : "py-2.5")}>
                 <p className={cn("truncate font-semibold", dense ? "text-[11px] leading-[13px]" : fitToHeight ? "text-xs leading-4" : "text-[13px]")}>{formatTr(day, "EEEE")}</p>
@@ -233,14 +262,13 @@ function LaneTimeline({ visits, selectedDate, view, now, timeRange, currentFacil
                 style={{ minHeight }}
               >
                 {isSameDay(day, now) && <WeekCurrentTimeIndicator now={now} timeRange={timeRange} />}
-                {dayVisits.map((visit, index) => (
+                {laneLayout.placements.map(({ item, lane }) => (
                   <VisitBlock
-                    key={visit.id}
-                    visit={visit}
+                    key={item.id}
+                    visit={item.visit}
                     timeRange={timeRange}
-                    top={2 + index * density.pitch}
+                    top={2 + lane * density.pitch}
                     height={density.pitch - 3}
-                    currentFacilityId={currentFacilityId}
                     onOpen={onVisitOpen}
                   />
                 ))}
@@ -257,7 +285,7 @@ function TimeHeader({ hours, label, nowOffset }: { hours: number[]; label: strin
   return (
     <div className="grid grid-cols-[112px_minmax(0,1fr)] border-b bg-slate-50/80">
       <div className="border-r px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="relative">
+      <div className="relative h-10">
         <TimeAxis hours={hours} />
         {nowOffset !== null && <WeekCurrentTimeMarker left={nowOffset} />}
       </div>
@@ -267,7 +295,7 @@ function TimeHeader({ hours, label, nowOffset }: { hours: number[]; label: strin
 
 function TimeAxis({ hours }: { hours: number[] }) {
   return (
-    <div className="relative h-7">
+    <div className="absolute inset-x-0 bottom-0 h-7">
       {hours.map((hour, index) => (
         <span
           key={hour}
@@ -325,11 +353,11 @@ function layoutDayVisits(visits: Visit[]): DayVisitLayout[] {
 }
 
 function visitStartMinutes(visit: Visit) {
-  return getIsoWallClockMinutes(visit.plannedStart) ?? 0
+  return getTimelineVisitStartMinutes(visit)
 }
 
 function visitEndMinutes(visit: Visit) {
-  return getIsoWallClockMinutes(visit.plannedEnd) ?? 0
+  return getTimelineVisitEndMinutes(visit)
 }
 
 function visitCollisionEndMinutes(visit: Visit) {
@@ -344,91 +372,116 @@ function dayHourLabelPosition(index: number, hourCount: number) {
 }
 
 function DayVisitCard({ visit, column, columnCount, timeRange, onOpen }: { visit: Visit; column: number; columnCount: number; timeRange: TimelineRange; onOpen(visit: Visit): void }) {
-  const startLabel = formatIsoWallClockTime(visit.plannedStart)
-  const endLabel = formatIsoWallClockTime(visit.plannedEnd)
-  const windowMinutes = timeRange.endMinutes - timeRange.startMinutes
+  const startLabel = formatIstanbulWallClockTime(visit.plannedStart)
+  const endLabel = formatIstanbulWallClockTime(visit.plannedEnd)
   const startMinutes = Math.max(timeRange.startMinutes, visitStartMinutes(visit))
   const endMinutes = Math.min(timeRange.endMinutes, visitEndMinutes(visit))
-  const top = ((startMinutes - timeRange.startMinutes) / windowMinutes) * 100
-  const height = ((endMinutes - startMinutes) / windowMinutes) * 100
+  const { top, height } = getDayVisitPlacement(startMinutes, endMinutes, timeRange)
   const width = 100 / columnCount
   const left = column * width
   const duration = visitEndMinutes(visit) - visitStartMinutes(visit)
-  const minimumHeight = duration <= 30 ? 32 : duration < 60 ? 42 : duration === 60 ? 54 : undefined
+  const minimumHeight = getDayVisitMinimumHeight(duration)
+  const contentRef = useRef<HTMLSpanElement | null>(null)
+  const [lineCount, setLineCount] = useState(1)
+
+  useLayoutEffect(() => {
+    const content = contentRef.current
+    if (!content) return
+
+    const updateLineCount = () => {
+      const nextLineCount = getDayVisitContentLineCount(content.clientHeight)
+      setLineCount((current) => current === nextLineCount ? current : nextLineCount)
+    }
+
+    updateLineCount()
+    const observer = new ResizeObserver(updateLineCount)
+    observer.observe(content)
+    return () => observer.disconnect()
+  }, [height, minimumHeight])
 
   return (
-    <button
-      type="button"
-      onClick={() => onOpen(visit)}
-      className={cn(
-        "group absolute z-[1] overflow-visible rounded border border-l-[3px] px-1.5 py-1 text-left shadow-sm transition-shadow hover:z-20 hover:shadow-md focus-visible:z-20",
-        visitStatusSurfaces[visit.status],
-        visitStatusAccents[visit.status],
-        visit.status === "CANCELLED" && "border-dashed",
-      )}
+    <div
+      className="group absolute z-[1] hover:z-20 focus-within:z-20"
       style={{
         top: `${top}%`,
-        height: `calc(${height}% - 2px)`,
+        height: `${height}%`,
         left: `calc(${left}% + 3px)`,
         width: `calc(${width}% - 6px)`,
         minHeight: minimumHeight,
       }}
-      title={`${visit.visitor.firstName} ${visit.visitor.lastName} · ${startLabel}–${endLabel} · ${visit.visitTypeName}`}
     >
-      <span className="block h-full overflow-hidden">
-        {duration <= 30 ? (
-          <span className={cn("block truncate text-[10px] font-semibold leading-4", visit.status === "CANCELLED" && "line-through")}>
-            {visit.visitor.firstName} {visit.visitor.lastName} · {startLabel}–{endLabel}
-          </span>
-        ) : duration < 60 ? (
-          <>
-            <span className={cn("block truncate text-[10px] font-semibold leading-[14px]", visit.status === "CANCELLED" && "line-through")}>{visit.visitor.firstName} {visit.visitor.lastName}</span>
-            <span className="block truncate text-[10px] leading-[14px] opacity-80">{startLabel}–{endLabel} · {visit.visitTypeName}</span>
-          </>
-        ) : (
-          <>
-            <span className={cn("block truncate text-[11px] font-semibold leading-4", visit.status === "CANCELLED" && "line-through")}>{visit.visitor.firstName} {visit.visitor.lastName}</span>
-            <span className="block truncate text-[10px] leading-[13px] tabular-nums opacity-80">{startLabel}–{endLabel}</span>
-            <span className="block truncate text-[10px] leading-[13px] opacity-80">{visit.visitTypeName}</span>
-          </>
+      <button
+        type="button"
+        onClick={() => onOpen(visit)}
+        className={cn(
+          "absolute inset-0 w-full overflow-hidden rounded border border-l-[3px] px-1.5 py-1 text-left shadow-sm transition-shadow hover:shadow-md focus-visible:z-20",
+          visitStatusSurfaces[visit.status],
+          visitStatusAccents[visit.status],
+          visitStatusBorderStyle[visit.status],
         )}
-      </span>
-      <VisitHoverTooltip visit={visit} />
-    </button>
+      >
+        <span ref={contentRef} className="block h-full overflow-hidden">
+          <span className={cn("block truncate text-[11px] font-semibold leading-4", visitStatusTextDecoration[visit.status])}>{visit.visitor.firstName} {visit.visitor.lastName}</span>
+          {lineCount >= 2 && <span className="block truncate text-[10px] leading-[13px] tabular-nums opacity-80">{startLabel}–{endLabel}</span>}
+          {lineCount >= 3 && <span className="block truncate text-[10px] leading-[13px] opacity-80">{visit.visitTypeName}</span>}
+          {lineCount >= 4 && <span className="block truncate text-[10px] leading-[13px] opacity-80">{visit.visitor.company}</span>}
+        </span>
+      </button>
+    </div>
   )
 }
 
-function VisitBlock({ visit, timeRange, top = 10, height = 24, currentFacilityId, onOpen }: { visit: Visit; timeRange: TimelineRange; top?: number; height?: number; currentFacilityId?: string; onOpen(visit: Visit): void }) {
-  const startLabel = formatIsoWallClockTime(visit.plannedStart)
-  const endLabel = formatIsoWallClockTime(visit.plannedEnd)
+const visitBlockInteractionClass = "transition-shadow hover:z-20 hover:shadow-md focus-visible:z-20"
+
+function VisitBlock({ visit, timeRange, top = 10, height = 24, onOpen }: { visit: Visit; timeRange: TimelineRange; top?: number; height?: number; onOpen(visit: Visit): void }) {
   const startMinutes = visitStartMinutes(visit)
   const endMinutes = visitEndMinutes(visit)
-  const windowMinutes = timeRange.endMinutes - timeRange.startMinutes
-  const left = Math.max(0, ((startMinutes - timeRange.startMinutes) / windowMinutes) * 100)
-  const unclampedWidth = ((endMinutes - startMinutes) / windowMinutes) * 100
+  const left = Math.max(0, getTimelineOffset(startMinutes, timeRange))
+  const unclampedWidth = getTimelineOffset(endMinutes, timeRange) - getTimelineOffset(startMinutes, timeRange)
   const width = Math.min(100 - left, Math.max(6, unclampedWidth))
+  const contentRef = useRef<HTMLSpanElement | null>(null)
+  const fullLabelRef = useRef<HTMLSpanElement | null>(null)
+  const [hasExtraSpace, setHasExtraSpace] = useState(false)
+
+  useLayoutEffect(() => {
+    const content = contentRef.current
+    const fullLabel = fullLabelRef.current
+    if (!content || !fullLabel) return
+
+    const updateExtraSpace = () => {
+      const nextHasExtraSpace = fullLabel.getBoundingClientRect().width <= content.clientWidth
+      setHasExtraSpace((current) => current === nextHasExtraSpace ? current : nextHasExtraSpace)
+    }
+
+    updateExtraSpace()
+    const observer = new ResizeObserver(updateExtraSpace)
+    observer.observe(content)
+    return () => observer.disconnect()
+  }, [visit.visitor.firstName, visit.visitor.lastName])
 
   return (
     <button
       type="button"
       onClick={() => onOpen(visit)}
+      title={`${visit.visitor.firstName} ${visit.visitor.lastName}`}
       className={cn(
-        "group absolute rounded border border-l-[3px] px-1.5 py-px text-left shadow-sm transition-shadow hover:z-20 hover:shadow-md focus-visible:z-20",
+        "group absolute flex items-center rounded border border-l-[3px] px-1.5 py-px text-left shadow-sm",
+        visitBlockInteractionClass,
         visitStatusSurfaces[visit.status],
         visitStatusAccents[visit.status],
-        visit.status === "CANCELLED" && "border-dashed",
+        visitStatusBorderStyle[visit.status],
       )}
       style={{ left: `${left}%`, width: `${width}%`, top, height }}
-      title={`${visit.visitor.firstName} ${visit.visitor.lastName} · ${startLabel}–${endLabel} · ${visit.visitTypeName}`}
     >
-      <span className="block h-full overflow-hidden">
-        <span className={cn("block truncate text-[10px] font-semibold leading-[11px]", visit.status === "CANCELLED" && "line-through")}>
+      <span ref={contentRef} className="relative block w-full min-w-0 overflow-hidden">
+        <span className="pointer-events-none invisible absolute whitespace-nowrap text-[10px] leading-[11px] font-semibold" ref={fullLabelRef} aria-hidden="true">
           {visit.visitor.firstName} {visit.visitor.lastName}
-          {currentFacilityId && visit.facilityId !== currentFacilityId && <span className="text-primary"> · {visit.facilityName}</span>}
-          {height < 24 && <span className="font-normal tabular-nums opacity-80"> · {startLabel}–{endLabel}</span>}
         </span>
-        {height >= 24 && <span className="block truncate text-[10px] leading-[11px] opacity-80">{startLabel}–{endLabel}</span>}
+        <span className={cn("block truncate text-[10px] font-semibold leading-[11px]", hasExtraSpace && "text-center", visitStatusTextDecoration[visit.status])}>
+          {visit.visitor.firstName} {visit.visitor.lastName}
+        </span>
       </span>
+      <VisitHoverTooltip visit={visit} />
     </button>
   )
 }
@@ -438,21 +491,21 @@ function WeekCurrentTimeIndicator({ now, timeRange }: { now: Date; timeRange: Ti
   if (left === null) return null
 
   return (
-    <div className="pointer-events-none absolute inset-y-0 z-30 w-px bg-rose-500/80" style={{ left: `${left}%` }} aria-hidden="true" />
+    <div className="pointer-events-none absolute inset-y-0 z-0 w-px bg-rose-500/80" style={{ left: `${left}%` }} aria-hidden="true" />
   )
 }
 
 /**
- * The "Şimdi" pill lives in the week's time ruler rather than inside a day lane,
- * so it never collides with a lane border or a visit block. It is nudged inward at
- * the extremes so the pill stays inside the ruler instead of bleeding past it.
+ * The "Şimdi" pill occupies the header's separate upper band, so every time label
+ * remains visible in the ruler below. It is nudged inward at the extremes.
  */
 function WeekCurrentTimeMarker({ left }: { left: number }) {
   const alignment = left < 4 ? "translate-x-0" : left > 96 ? "-translate-x-full" : "-translate-x-1/2"
   return (
     <span
+      data-week-current-time-marker
       className={cn(
-        "pointer-events-none absolute top-1/2 z-10 -translate-y-1/2 whitespace-nowrap rounded bg-rose-600 px-1 py-0.5 text-[9px] font-semibold leading-none text-white shadow-sm",
+        "pointer-events-none absolute top-1 z-10 whitespace-nowrap rounded bg-rose-600 px-1 py-0.5 text-[9px] font-semibold leading-none text-white shadow-sm",
         alignment,
       )}
       style={{ left: `${left}%` }}
@@ -476,12 +529,21 @@ function DayCurrentTimeIndicator({ now, timeRange }: { now: Date; timeRange: Tim
   if (currentMinutes < timeRange.startMinutes || currentMinutes > timeRange.endMinutes) return null
 
   const top = ((currentMinutes - timeRange.startMinutes) / windowMinutes) * 100
+
+  return <div className="pointer-events-none absolute inset-x-0 z-0 h-px bg-rose-500/90" style={{ top: `${top}%` }} aria-hidden="true" />
+}
+
+function DayCurrentTimeMarker({ now, timeRange }: { now: Date; timeRange: TimelineRange }) {
+  const currentMinutes = getIsoWallClockMinutes(now) ?? 0
+  const windowMinutes = timeRange.endMinutes - timeRange.startMinutes
+  if (currentMinutes < timeRange.startMinutes || currentMinutes > timeRange.endMinutes) return null
+
+  const top = ((currentMinutes - timeRange.startMinutes) / windowMinutes) * 100
+
   return (
-    <div className="pointer-events-none absolute inset-x-0 z-30 h-px bg-rose-500/90" style={{ top: `${top}%` }} aria-hidden="true">
-      <span className="absolute left-1 top-0 -translate-y-1/2 whitespace-nowrap rounded bg-rose-600 px-1 py-0.5 text-[9px] font-semibold leading-none text-white shadow-sm">
-        Şimdi
-      </span>
-    </div>
+    <span className="pointer-events-none absolute left-0 z-30 -translate-y-1/2 whitespace-nowrap rounded bg-rose-600 px-1 py-0.5 text-[9px] font-semibold leading-none text-white shadow-sm" style={{ top: `${top}%` }} aria-hidden="true">
+      Şimdi
+    </span>
   )
 }
 
@@ -491,10 +553,19 @@ function VisitHoverTooltip({ visit }: { visit: Visit }) {
       role="tooltip"
       className="pointer-events-none invisible absolute right-0 top-full z-50 mt-1 w-56 rounded-md bg-slate-950 px-2.5 py-2 text-left text-[11px] leading-4 text-white opacity-0 shadow-lg transition-opacity group-hover:visible group-hover:opacity-100 group-focus-visible:visible group-focus-visible:opacity-100"
     >
+      <VisitTooltipContent visit={visit} />
+    </span>
+  )
+}
+
+function VisitTooltipContent({ visit }: { visit: Visit }) {
+  return (
+    <>
       <span className="block font-semibold">{visit.visitor.firstName} {visit.visitor.lastName}</span>
       <span className="block text-slate-300">{visit.visitTypeName}</span>
-      <span className="block tabular-nums text-slate-300">{formatIsoWallClockTime(visit.plannedStart)}–{formatIsoWallClockTime(visit.plannedEnd)}</span>
-    </span>
+      <span className="block text-slate-300">{visit.visitor.company}</span>
+      <span className="block tabular-nums text-slate-300">{formatIstanbulWallClockTime(visit.plannedStart)}–{formatIstanbulWallClockTime(visit.plannedEnd)}</span>
+    </>
   )
 }
 
@@ -518,32 +589,140 @@ function MonthTimeline({ visits, selectedDate, onVisitOpen, fitToHeight }: { vis
           {days.map((day) => {
             const dayVisits = visits.filter((visit) => isSameDay(new Date(visit.plannedStart), day))
             return (
-              <div
-                key={day.toISOString()}
-                className={cn(
-                  "min-h-0 overflow-hidden border-b border-r p-1.5 last:border-r-0",
-                  !isSameMonth(day, selectedDate) && "bg-slate-50/70 text-muted-foreground",
-                )}
-              >
-                <div className={cn("mb-1 flex size-[22px] items-center justify-center rounded-full text-[11px] font-medium", isSameDay(day, new Date()) && "bg-primary text-primary-foreground")}>
-                  {formatTr(day, "d")}
-                </div>
-                <div className="space-y-1">
-                  {dayVisits.slice(0, 2).map((visit) => (
-                    <button type="button" onClick={() => onVisitOpen(visit)} key={visit.id} className={cn("group relative block w-full rounded border border-l-[3px] px-1.5 py-0.5 text-left text-[10px]", visitStatusSurfaces[visit.status], visitStatusAccents[visit.status])} title={`${visit.visitor.firstName} ${visit.visitor.lastName}`}>
-                      <p className={cn("truncate font-semibold", visit.status === "CANCELLED" && "line-through")}>{formatTr(new Date(visit.plannedStart), "HH:mm")} · {visit.visitor.firstName} {visit.visitor.lastName}</p>
-                    </button>
-                  ))}
-                  {dayVisits.length > 2 && (
-                    <MonthOverflowMenu day={day} visits={dayVisits.slice(2)} onVisitOpen={onVisitOpen} />
-                  )}
-                </div>
-              </div>
+              <MonthDayCell key={day.toISOString()} day={day} visits={dayVisits} selectedDate={selectedDate} onVisitOpen={onVisitOpen} />
             )
           })}
         </div>
       </div>
     </div>
+  )
+}
+
+const monthVisitBlockClass = "group relative block w-full rounded border border-l-[3px] px-1.5 py-0.5 text-left text-[10px]"
+
+function MonthDayCell({ day, visits, selectedDate, onVisitOpen }: { day: Date; visits: Visit[]; selectedDate: Date; onVisitOpen(visit: Visit): void }) {
+  const cellRef = useRef<HTMLDivElement | null>(null)
+  const dayNumberRef = useRef<HTMLDivElement | null>(null)
+  const visitMeasureRef = useRef<HTMLDivElement | null>(null)
+  const overflowMeasureRef = useRef<HTMLButtonElement | null>(null)
+  const [visibleVisitCount, setVisibleVisitCount] = useState(visits.length)
+  const visibleVisits = visits.slice(0, visibleVisitCount)
+  const hiddenVisits = visits.slice(visibleVisitCount)
+
+  useLayoutEffect(() => {
+    const cell = cellRef.current
+    const dayNumber = dayNumberRef.current
+    const visitMeasure = visitMeasureRef.current
+    const overflowMeasure = overflowMeasureRef.current
+    if (!cell || !dayNumber || !visitMeasure || !overflowMeasure) return
+
+    const updateCapacity = () => {
+      const cellStyle = window.getComputedStyle(cell)
+      const dayNumberStyle = window.getComputedStyle(dayNumber)
+      const availableHeight = cell.clientHeight
+        - Number.parseFloat(cellStyle.paddingTop)
+        - Number.parseFloat(cellStyle.paddingBottom)
+        - dayNumber.getBoundingClientRect().height
+        - Number.parseFloat(dayNumberStyle.marginBottom)
+      const visitRect = visitMeasure.getBoundingClientRect()
+      const overflowRect = overflowMeasure.getBoundingClientRect()
+      const itemGap = Math.max(0, overflowRect.top - visitRect.bottom)
+      const nextVisibleVisitCount = getMonthVisibleVisitCount({
+        availableHeight,
+        visitHeight: visitRect.height,
+        itemGap,
+        overflowHeight: overflowRect.height,
+        visitCount: visits.length,
+      })
+      setVisibleVisitCount((current) => current === nextVisibleVisitCount ? current : nextVisibleVisitCount)
+    }
+
+    updateCapacity()
+    const observer = new ResizeObserver(updateCapacity)
+    observer.observe(cell)
+    return () => observer.disconnect()
+  }, [visits.length])
+
+  return (
+    <div
+      ref={cellRef}
+      className={cn(
+        "relative min-h-0 overflow-hidden border-b border-r p-1.5 last:border-r-0",
+        !isSameMonth(day, selectedDate) && "bg-slate-50/70 text-muted-foreground",
+      )}
+    >
+      <div ref={dayNumberRef} className={cn("mb-1 flex size-[22px] items-center justify-center rounded-full text-[11px] font-medium", isSameDay(day, new Date()) && "bg-primary text-primary-foreground")}>
+        {formatTr(day, "d")}
+      </div>
+      <div className="space-y-1">
+        {visibleVisits.map((visit) => (
+          <MonthVisitBlock key={visit.id} visit={visit} onOpen={onVisitOpen} />
+        ))}
+        {hiddenVisits.length > 0 && <MonthOverflowMenu day={day} visits={hiddenVisits} onVisitOpen={onVisitOpen} />}
+      </div>
+      {visits.length > 0 && (
+        <div aria-hidden="true" className="pointer-events-none invisible absolute inset-x-1.5 top-0 space-y-1">
+          <div ref={visitMeasureRef} className={monthVisitBlockClass}><p className="truncate font-semibold">00:00 · Ziyaret</p></div>
+          <button ref={overflowMeasureRef} type="button" className="relative rounded px-1 py-0.5 text-[10px] font-semibold text-primary">+99 ziyaret</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MonthVisitBlock({ visit, onOpen }: { visit: Visit; onOpen(visit: Visit): void }) {
+  const cardRef = useRef<HTMLButtonElement | null>(null)
+  const [tooltipOpen, setTooltipOpen] = useState(false)
+
+  useEffect(() => {
+    if (!tooltipOpen) return
+    const closeTooltip = () => setTooltipOpen(false)
+    document.addEventListener("scroll", closeTooltip, true)
+    return () => document.removeEventListener("scroll", closeTooltip, true)
+  }, [tooltipOpen])
+
+  return (
+    <>
+      <button ref={cardRef} type="button" onClick={() => onOpen(visit)} onPointerEnter={() => setTooltipOpen(true)} onPointerLeave={() => setTooltipOpen(false)} onFocus={() => setTooltipOpen(true)} onBlur={() => setTooltipOpen(false)} className={cn(monthVisitBlockClass, visitBlockInteractionClass, visitStatusSurfaces[visit.status], visitStatusAccents[visit.status])}>
+        <p className={cn("truncate font-semibold", visitStatusTextDecoration[visit.status])}>{formatTr(new Date(visit.plannedStart), "HH:mm")} · {visit.visitor.firstName} {visit.visitor.lastName}</p>
+      </button>
+      <MonthVisitHoverTooltip visit={visit} anchorRef={cardRef} open={tooltipOpen} />
+    </>
+  )
+}
+
+function MonthVisitHoverTooltip({ visit, anchorRef, open }: { visit: Visit; anchorRef: MutableRefObject<HTMLElement | null>; open: boolean }) {
+  const tooltipRef = useRef<HTMLSpanElement | null>(null)
+  const [position, setPosition] = useState<TimelineTooltipPosition | null>(null)
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setPosition(null)
+      return
+    }
+
+    const anchor = anchorRef.current
+    const tooltip = tooltipRef.current
+    if (!anchor || !tooltip) return
+
+    const updatePlacement = () => setPosition(getTimelineTooltipPosition(anchor.getBoundingClientRect(), tooltip.getBoundingClientRect(), { width: window.innerWidth, height: window.innerHeight }))
+    updatePlacement()
+    window.addEventListener("resize", updatePlacement)
+    return () => window.removeEventListener("resize", updatePlacement)
+  }, [anchorRef, open])
+
+  if (!open || typeof document === "undefined") return null
+
+  return createPortal(
+    <span
+      role="tooltip"
+      ref={tooltipRef}
+      className={cn("pointer-events-none fixed z-[45] w-56 overflow-y-auto rounded-md bg-slate-950 px-2.5 py-2 text-left text-[11px] leading-4 text-white shadow-lg", position ? "visible opacity-100" : "invisible opacity-0")}
+      style={position ? { top: position.top, left: position.left, maxWidth: position.maxWidth, maxHeight: position.maxHeight } : undefined}
+    >
+      <VisitTooltipContent visit={visit} />
+    </span>,
+    document.body,
   )
 }
 
@@ -553,7 +732,7 @@ function MonthOverflowMenu({ day, visits, onVisitOpen }: { day: Date; visits: Vi
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="rounded px-1 py-0.5 text-[10px] font-semibold text-primary hover:bg-blue-50 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className={cn("relative rounded px-1 py-0.5 text-[10px] font-semibold text-primary hover:bg-blue-50 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", visitBlockInteractionClass)}
           aria-label={`${formatTr(day, "d MMMM")} günü için ${visits.length} ek ziyareti göster`}
         >
           +{visits.length} ziyaret
@@ -569,12 +748,12 @@ function MonthOverflowMenu({ day, visits, onVisitOpen }: { day: Date; visits: Vi
             <DropdownMenuItem
               key={visit.id}
               onSelect={() => onVisitOpen(visit)}
-              className="flex items-center gap-2 px-2 py-1.5 text-xs"
+              className={cn("relative flex items-center gap-2 px-2 py-1.5 text-xs", visitBlockInteractionClass)}
             >
               <span className="w-9 shrink-0 tabular-nums text-muted-foreground">
                 {formatTr(new Date(visit.plannedStart), "HH:mm")}
               </span>
-              <span className={cn("truncate font-medium", visit.status === "CANCELLED" && "line-through")}>
+              <span className={cn("truncate font-medium", visitStatusTextDecoration[visit.status])}>
                 {visit.visitor.firstName} {visit.visitor.lastName}
               </span>
             </DropdownMenuItem>

@@ -3,8 +3,13 @@ import { resolve } from "node:path"
 import { describe, expect, it } from "vitest"
 
 const shellSource = readFileSync(resolve(process.cwd(), "src/components/app-shell/SecurityShell.tsx"), "utf8")
+const headerClockSource = readFileSync(resolve(process.cwd(), "src/components/app-shell/HeaderClock.tsx"), "utf8")
 
 describe("SecurityShell header", () => {
+  it("keeps its shared-shell title independent from the Employee workspace", () => {
+    expect(shellSource).toContain('title="Güvenlik"')
+    expect(shellSource).not.toContain("Ziyaretlerim")
+  })
 
   it("renders through the shared sidebar-less shell with no collapse or drawer state", () => {
     expect(shellSource).toContain("FocusedShell")
@@ -21,16 +26,19 @@ describe("SecurityShell header", () => {
   it("keeps a second-updating clock centered in the compact Security header", () => {
     expect(shellSource).toContain("headerHeight={64}")
     expect(shellSource).toContain("headerNavigation={<SecurityNavigation />}")
-    expect(shellSource).toContain("headerCenter={<SecurityClock />}")
+    expect(shellSource).toContain("headerCenter={<HeaderClock />}")
     expect(shellSource).not.toContain("topBand")
-    expect(shellSource).toContain("window.setInterval(() => setNow(new Date()), 1_000)")
-    expect(shellSource).toContain("window.clearInterval(intervalId)")
-    expect(shellSource).toContain('hour: "2-digit", minute: "2-digit", second: "2-digit"')
-    expect(shellSource).toContain('weekday: "long"')
-    expect(shellSource).toContain("tabular-nums")
-    expect(shellSource).toContain("text-[38px]")
-    expect(shellSource).toContain("text-[11px]")
-    expect(shellSource).toContain("headerCenter={<SecurityClock />}")
+    // The clock is the shared HeaderClock component, rendered exactly once here.
+    expect(shellSource.match(/<HeaderClock \/>/g)).toHaveLength(1)
+    expect(shellSource).not.toContain("function SecurityClock")
+    expect(shellSource).not.toContain("setInterval")
+    expect(headerClockSource).toContain("window.setInterval(() => setNow(new Date()), 1_000)")
+    expect(headerClockSource).toContain("window.clearInterval(intervalId)")
+    expect(headerClockSource).toContain('hour: "2-digit", minute: "2-digit", second: "2-digit"')
+    expect(headerClockSource).toContain('weekday: "long"')
+    expect(headerClockSource).toContain("tabular-nums")
+    expect(headerClockSource).toContain("text-[38px]")
+    expect(headerClockSource).toContain("text-[11px]")
   })
 
   it("keeps the compact Security navigation beside the title", () => {

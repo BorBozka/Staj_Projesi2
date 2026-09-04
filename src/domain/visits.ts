@@ -226,3 +226,6 @@ export const visitStatusLabels: Record<VisitStatus, string> = {
   CANCELLED: "İptal Edildi",
   NO_SHOW: "Gelmedi",
 }
+
+export { isTimeBoundVisitType } from "@/domain/admin"
+

@@ -71,12 +71,11 @@ export function MyVisitsPage() {
         </div>
       )}
 
-      <div className={"mb-[14px] grid gap-3 xl:mb-0 xl:min-h-0 " + (isEmployeeView ? "xl:grid-cols-[minmax(0,1fr)_256px] " : "xl:grid-cols-[minmax(0,1fr)_320px] ") + (isManagerView ? "xl:h-[calc(111.112dvh-27.5556px)]" : isEmployeeView ? "xl:h-[calc(100dvh-78px)]" : "xl:h-[calc(100dvh-76px)]")}>
+      <div className={"mb-[14px] grid gap-3 xl:mb-0 xl:min-h-0 " + (isEmployeeView ? "xl:grid-cols-[minmax(0,1fr)_244px] " : "xl:grid-cols-[minmax(0,1fr)_320px] ") + (isManagerView ? "xl:h-[calc(111.112dvh-27.5556px)]" : isEmployeeView ? "xl:h-[calc(100dvh-90px)]" : "xl:h-[calc(100dvh-76px)]")}>
         <VisitTimeline
           visits={ownVisits}
           view={view}
           selectedDate={selectedDate}
-          currentFacilityId={referenceData?.currentEmployee.facilityId}
           onViewChange={setView}
           onSelectedDateChange={setSelectedDate}
           onVisitOpen={setViewingVisit}

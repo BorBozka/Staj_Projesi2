@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom"
-import { useEffect, useState } from "react"
 
 import { FocusedShell } from "@/components/app-shell/FocusedShell"
+import { HeaderClock } from "@/components/app-shell/HeaderClock"
 import { toAccountProfile } from "@/features/account/account-profile"
 import { useAuth } from "@/features/auth/auth-context"
 import { cn } from "@/lib/utils"
@@ -20,26 +20,10 @@ export function SecurityShell() {
       account={toAccountProfile(currentUser)}
       headerHeight={64}
       headerNavigation={<SecurityNavigation />}
-      headerCenter={<SecurityClock />}
+      headerCenter={<HeaderClock />}
     >
       <Outlet />
     </FocusedShell>
-  )
-}
-
-function SecurityClock() {
-  const [now, setNow] = useState(() => new Date())
-
-  useEffect(() => {
-    const intervalId = window.setInterval(() => setNow(new Date()), 1_000)
-    return () => window.clearInterval(intervalId)
-  }, [])
-
-  return (
-    <div className="shrink-0 text-center leading-none">
-      <time className="block tabular-nums text-[38px] font-semibold tracking-tight text-slate-900" dateTime={now.toISOString()}>{formatClockTime(now)}</time>
-      <p className="mt-0.5 text-[11px] text-slate-500">{formatClockDate(now)}</p>
-    </div>
   )
 }
 
@@ -63,12 +47,4 @@ function SecurityNavigation() {
       ))}
     </nav>
   )
-}
-
-function formatClockTime(value: Date) {
-  return value.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })
-}
-
-function formatClockDate(value: Date) {
-  return value.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric", weekday: "long" })
 }

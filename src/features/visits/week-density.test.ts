@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { resolveWeekDensity, weekDensitySteps, weekRowHeight } from "@/features/visits/week-density"
+import { layoutWeekLanes, resolveWeekDensity, weekDensitySteps, weekRowHeight } from "@/features/visits/week-density"
 
 const quietWeek = [0, 0, 0, 0, 0, 0, 0]
 const busyWeek = [0, 0, 6, 0, 0, 0, 0]
@@ -46,5 +46,41 @@ describe("resolveWeekDensity", () => {
       expect(blockHeight).toBeGreaterThan(0)
       expect(weekRowHeight(density, 3)).toBeGreaterThanOrEqual(2 + 2 * density.pitch + blockHeight)
     })
+  })
+})
+
+describe("layoutWeekLanes", () => {
+  const visit = (id: string, startMinutes: number, endMinutes: number) => ({ id, startMinutes, endMinutes })
+  const lanes = (items: ReturnType<typeof visit>[]) => layoutWeekLanes(items).placements.map(({ item, lane }) => [item.id, lane])
+
+  it("puts a single visit in lane zero", () => {
+    expect(lanes([visit("a", 9 * 60, 10 * 60)])).toEqual([["a", 0]])
+  })
+
+  it("reuses lane zero for three non-overlapping visits", () => {
+    const layout = layoutWeekLanes([visit("a", 9 * 60, 10 * 60), visit("b", 11 * 60, 12 * 60), visit("c", 13 * 60, 14 * 60)])
+    expect(layout.placements.map(({ lane }) => lane)).toEqual([0, 0, 0])
+    expect(layout.laneCount).toBe(1)
+  })
+
+  it("allows visits that touch end-to-start to share a lane", () => {
+    expect(lanes([visit("a", 10 * 60, 11 * 60), visit("b", 11 * 60, 12 * 60)])).toEqual([["a", 0], ["b", 0]])
+  })
+
+  it("separates fully overlapping visits", () => {
+    expect(lanes([visit("a", 10 * 60, 12 * 60), visit("b", 10 * 60, 12 * 60)])).toEqual([["a", 0], ["b", 1]])
+  })
+
+  it("reuses the earliest available lane in a partial-overlap chain", () => {
+    expect(lanes([visit("a", 9 * 60, 11 * 60), visit("b", 10 * 60, 12 * 60), visit("c", 11 * 60 + 30, 13 * 60)])).toEqual([["a", 0], ["b", 1], ["c", 0]])
+  })
+
+  it("produces the same placements regardless of input order", () => {
+    const items = [visit("a", 9 * 60, 11 * 60), visit("b", 10 * 60, 12 * 60), visit("c", 11 * 60 + 30, 13 * 60)]
+    expect(lanes([...items].reverse())).toEqual(lanes(items))
+  })
+
+  it("uses the id to deterministically order identical time ranges", () => {
+    expect(lanes([visit("b", 10 * 60, 11 * 60), visit("a", 10 * 60, 11 * 60)])).toEqual([["a", 0], ["b", 1]])
   })
 })

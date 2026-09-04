@@ -6,6 +6,7 @@ import { Dialog, DialogFooter, DialogHeader, DialogTitle, InternalDialogContent 
 import type { InvitationStatus, Visit } from "@/domain/visits"
 import { VisitStatusBadge } from "@/features/visits/VisitStatusBadge"
 import { formatInvitationSentAt } from "@/features/visits/invitation-status"
+import { formatVisitActualTimes } from "@/features/visits/visit-details-format"
 import { getVisibleAdditionalRequirementNote, type VisitViewerRole } from "@/features/visits/visit-visibility"
 import { formatTr } from "@/lib/date"
 import { cn } from "@/lib/utils"
@@ -39,6 +40,7 @@ interface Props {
 export function VisitDetailsDialog({ visit, open, onOpenChange, onEdit, onReschedule, onCancel, readOnly = false, viewerRole = "SECURITY", showHostEmployee = true }: Props) {
   if (!visit) return null
   const additionalRequirementNote = getVisibleAdditionalRequirementNote(visit, viewerRole)
+  const actualTimes = formatVisitActualTimes(visit)
   const plannedDateLine = formatTr(new Date(visit.plannedStart), "d MMMM yyyy")
   const plannedTimeLine = `Başlangıç ${formatTr(new Date(visit.plannedStart), "HH:mm")} · Çıkış ${formatTr(new Date(visit.plannedEnd), "HH:mm")}`
 
@@ -64,7 +66,7 @@ export function VisitDetailsDialog({ visit, open, onOpenChange, onEdit, onResche
               <Field label="Ziyaretçi Şirketi" value={visit.visitor.company} />
               <Field label="Ziyaret Türü" value={visit.visitTypeName} />
               {visit.visitor.phone && <Field label="Telefon" value={visit.visitor.phone} />}
-              <Field label="Davet" labelClassName="whitespace-nowrap" value={<InvitationStatus visit={{ ...visit, invitationSentAt: visit.invitationStatus === "SENT" ? visit.invitationSentAt : undefined, invitationError: visit.invitationStatus === "FAILED" ? visit.invitationError : undefined }} />} />
+              <Field label="Davet" labelClassName="whitespace-nowrap" truncateValue={false} value={<InvitationStatus visit={{ ...visit, invitationSentAt: visit.invitationStatus === "SENT" ? visit.invitationSentAt : undefined, invitationError: visit.invitationStatus === "FAILED" ? visit.invitationError : undefined }} />} />
             </DetailSection>
             <DetailSection title="Ziyaret" className="mt-5 border-t border-slate-100 pt-5 min-[560px]:mt-0 min-[560px]:border-t-0 min-[560px]:pl-5 min-[560px]:pt-0">
               {showHostEmployee && <Field label="İlgili personel" value={visit.hostEmployeeName} />}
@@ -80,8 +82,8 @@ export function VisitDetailsDialog({ visit, open, onOpenChange, onEdit, onResche
                   </div>
                 }
               />
-              {visit.actualCheckIn && <Field label="Gerçek giriş" value={formatTr(new Date(visit.actualCheckIn), "d MMM yyyy · HH:mm")} />}
-              {visit.actualCheckOut && <Field label="Gerçek çıkış" value={formatTr(new Date(visit.actualCheckOut), "d MMM yyyy · HH:mm")} />}
+              {visit.actualCheckIn && <Field label="Gerçek giriş" value={actualTimes.checkIn} />}
+              {visit.actualCheckOut && <Field label="Gerçek çıkış" value={actualTimes.checkOut} />}
             </DetailSection>
           </div>
           {(visit.note || additionalRequirementNote) && <div className="my-4 border-t border-slate-200" />}

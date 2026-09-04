@@ -39,6 +39,7 @@ describe("UpcomingVisits layout", () => {
 
   it("keeps the title and search control in one bordered top block", () => {
     expect(componentSource).toContain('className="shrink-0 space-y-2 border-b px-3 py-2.5"')
+    expect(componentSource).toContain('className="group block w-full border-b border-slate-200 px-3 py-2.5')
     expect(componentSource).not.toContain('className="shrink-0 flex items-center justify-between border-b px-3 py-2.5"')
   })
 })

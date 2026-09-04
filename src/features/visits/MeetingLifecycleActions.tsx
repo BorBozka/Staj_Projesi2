@@ -3,11 +3,13 @@ import { useRef, useState, type RefObject } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { isTimeBoundVisitType } from "@/domain/visits"
 import { getCustomExtensionError, getExtensionPreviewEnd, isValidCustomExtensionMinutes, maximumCustomExtensionMinutes } from "@/features/visits/meeting-extension-utils"
 import { formatTr } from "@/lib/date"
 import { cn } from "@/lib/utils"
 
 interface MeetingLifecycleActionsProps {
+  visitTypeName?: string
   meetingLabel: string
   onExtend(minutes: number): Promise<void>
   onClose(): Promise<void>
@@ -15,12 +17,16 @@ interface MeetingLifecycleActionsProps {
   className?: string
 }
 
-export function MeetingLifecycleActions({ meetingLabel, onExtend, onClose, now, className }: MeetingLifecycleActionsProps) {
+export function MeetingLifecycleActions({ visitTypeName, meetingLabel, onExtend, onClose, now, className }: MeetingLifecycleActionsProps) {
   const [showCustom, setShowCustom] = useState(false)
   const [customMinutes, setCustomMinutes] = useState("")
   const [pendingAction, setPendingAction] = useState<"extend" | "close" | null>(null)
   const [error, setError] = useState<string | null>(null)
   const customInputRef = useRef<HTMLInputElement>(null)
+
+  if (visitTypeName && !isTimeBoundVisitType(visitTypeName)) {
+    return null
+  }
 
   async function extend(minutes: number) {
     setError(null)
@@ -81,6 +87,7 @@ export function MeetingLifecycleActions({ meetingLabel, onExtend, onClose, now, 
       </div>
       {showCustom && (
         <MeetingLifecycleCustomExtension
+          visitTypeName={visitTypeName}
           meetingLabel={meetingLabel}
           value={customMinutes}
           inputRef={customInputRef}
@@ -109,6 +116,7 @@ export function MeetingLifecycleActions({ meetingLabel, onExtend, onClose, now, 
 }
 
 interface MeetingLifecycleCustomExtensionProps {
+  visitTypeName?: string
   meetingLabel: string
   value: string
   inputRef?: RefObject<HTMLInputElement | null>
@@ -120,8 +128,12 @@ interface MeetingLifecycleCustomExtensionProps {
 }
 
 export function MeetingLifecycleCustomExtension({
-  meetingLabel, value, inputRef, now, disabled = false, onChange, onExtend, onClose,
+  visitTypeName, meetingLabel, value, inputRef, now, disabled = false, onChange, onExtend, onClose,
 }: MeetingLifecycleCustomExtensionProps) {
+  if (visitTypeName && !isTimeBoundVisitType(visitTypeName)) {
+    return null
+  }
+
   const validationError = getCustomExtensionError(value)
   const preview = isValidCustomExtensionMinutes(value) ? getExtensionPreviewEnd(now, Number(value)) : null
 

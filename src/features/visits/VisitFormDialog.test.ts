@@ -76,12 +76,12 @@ describe("VisitFormDialog optional notes", () => {
 })
 
 describe("VisitTimeline current-time indicator", () => {
-  it("stacks above visit blocks, including hovered ones", () => {
-    // Visit blocks sit at z-[1] and rise to z-20 on hover/focus.
-    expect(timelineSource).toContain("absolute inset-y-0 z-30 w-px bg-rose-500/80")
-    expect(timelineSource).toContain("absolute inset-x-0 z-30 h-px bg-rose-500/90")
-    expect(timelineSource).not.toContain("z-10 w-px bg-rose-500")
-    expect(timelineSource).not.toContain("z-10 h-px bg-rose-500")
+  it("keeps current-time lines behind visit blocks while the day badge remains visible", () => {
+    expect(timelineSource).toContain("absolute inset-y-0 z-0 w-px bg-rose-500/80")
+    expect(timelineSource).toContain("absolute inset-x-0 z-0 h-px bg-rose-500/90")
+    expect(timelineSource).toContain("pointer-events-none absolute right-1 z-30")
+    expect(timelineSource).not.toContain("absolute inset-y-0 z-30 w-px bg-rose-500/80")
+    expect(timelineSource).not.toContain("absolute inset-x-0 z-30 h-px bg-rose-500/90")
   })
 
   it("puts the week marker in the time ruler and pulls it inside the lane at the extremes", () => {

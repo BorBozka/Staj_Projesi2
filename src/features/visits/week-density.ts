@@ -5,6 +5,22 @@ export interface WeekDensity {
   labelFloor: number
 }
 
+export interface WeekLaneItem {
+  id: string
+  startMinutes: number
+  endMinutes: number
+}
+
+export interface WeekLanePlacement<T extends WeekLaneItem> {
+  item: T
+  lane: number
+}
+
+export interface WeekLaneLayout<T extends WeekLaneItem> {
+  placements: WeekLanePlacement<T>[]
+  laneCount: number
+}
+
 /** Roomy density used when the week grid is free to scroll. */
 export const defaultWeekDensity: WeekDensity = { pitch: 27, labelFloor: 56 }
 
@@ -21,8 +37,24 @@ export const weekDensitySteps: WeekDensity[] = [
 ]
 
 /** Height a single week row needs at the given density. */
-export function weekRowHeight(density: WeekDensity, visitCount: number) {
-  return Math.max(density.labelFloor, visitCount * density.pitch + 4)
+export function weekRowHeight(density: WeekDensity, laneCount: number) {
+  return Math.max(density.labelFloor, laneCount * density.pitch + 4)
+}
+
+/** Places non-overlapping visits into the first available weekly timeline lane. */
+export function layoutWeekLanes<T extends WeekLaneItem>(items: T[]): WeekLaneLayout<T> {
+  const sortedItems = [...items].sort(
+    (a, b) => a.startMinutes - b.startMinutes || a.endMinutes - b.endMinutes || a.id.localeCompare(b.id),
+  )
+  const laneEnds: number[] = []
+  const placements = sortedItems.map((item) => {
+    let lane = laneEnds.findIndex((endMinutes) => endMinutes <= item.startMinutes)
+    if (lane === -1) lane = laneEnds.length
+    laneEnds[lane] = item.endMinutes
+    return { item, lane }
+  })
+
+  return { placements, laneCount: laneEnds.length }
 }
 
 /**
